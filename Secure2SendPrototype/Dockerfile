@@ -32,6 +32,8 @@ RUN npm ci --only=production && npm cache clean --force
 # Copy built application from builder stage
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/shared ./shared
+COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
+COPY --from=builder /app/vite.config.ts ./vite.config.ts
 
 # Create uploads directory with proper permissions
 RUN mkdir -p uploads && chown -R node:node uploads
