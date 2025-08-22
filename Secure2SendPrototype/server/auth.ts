@@ -183,16 +183,35 @@ export async function setupAuth(app: Express) {
     });
   });
 
-  app.get("/api/auth/user", (req: any, res) => {
+  app.get("/api/auth/user", async (req: any, res) => {
     if (!req.isAuthenticated() || !req.user) {
       return res.status(401).json({ message: "Unauthorized" });
     }
+    
     // Don't send password in response
     const { password: _, ...userWithoutPassword } = req.user;
+    
+    // If impersonating, include the impersonated user data
+    if (req.session.isImpersonating && req.session.impersonatedUserId) {
+      try {
+        const { storage } = await import("./storage");
+        const impersonatedUser = await storage.getUser(req.session.impersonatedUserId);
+        if (impersonatedUser) {
+          const { password: __, ...impersonatedUserWithoutPassword } = impersonatedUser;
+          return res.json({
+            ...userWithoutPassword,
+            isImpersonating: true,
+            impersonatedUser: impersonatedUserWithoutPassword
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching impersonated user:", error);
+      }
+    }
+    
     res.json({
       ...userWithoutPassword,
-      isImpersonating: req.session.isImpersonating || false,
-      originalAdminId: req.session.originalAdminId || null
+      isImpersonating: false
     });
   });
 }

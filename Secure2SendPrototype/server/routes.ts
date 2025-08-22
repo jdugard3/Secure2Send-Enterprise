@@ -141,26 +141,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/documents', requireAuth, async (req: any, res: Response) => {
     try {
-      const userId = req.user.id;
-      console.log('Fetching documents for user:', userId);
+      const user = req.user;
+      let targetUserId = user.id;
       
-      const user = await storage.getUser(userId);
+      // If admin is impersonating, use the impersonated user's data
+      if (user.role === 'ADMIN' && req.session.isImpersonating && req.session.impersonatedUserId) {
+        targetUserId = req.session.impersonatedUserId;
+        console.log('Admin impersonating, fetching documents for user:', targetUserId);
+      } else {
+        console.log('Fetching documents for user:', targetUserId);
+      }
       
-      if (!user) {
-        console.log('User not found:', userId);
+      const targetUser = await storage.getUser(targetUserId);
+      
+      if (!targetUser) {
+        console.log('Target user not found:', targetUserId);
         return res.status(404).json({ message: "User not found" });
       }
 
-      console.log('User found:', { id: user.id, role: user.role });
+      console.log('Target user found:', { id: targetUser.id, role: targetUser.role });
 
-      if (user.role === 'ADMIN') {
+      // If the original user is admin and NOT impersonating, show all documents for review
+      if (user.role === 'ADMIN' && !req.session.isImpersonating) {
         const documents = await storage.getAllDocumentsForReview();
-        console.log('Admin fetched documents:', documents.length);
+        console.log('Admin fetched all documents:', documents.length);
         res.json(documents);
       } else {
-        const client = await storage.getClientByUserId(userId);
+        // Show specific client's documents (either real client or impersonated client)
+        const client = await storage.getClientByUserId(targetUserId);
         if (!client) {
-          console.log('Client profile not found for user:', userId);
+          console.log('Client profile not found for user:', targetUserId);
           return res.status(404).json({ message: "Client profile not found" });
         }
         console.log('Client found:', client.id);
@@ -449,18 +459,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Audit log impersonation start
       await AuditService.logImpersonationStart(admin, req, userId, targetUser.email);
 
-      // Store original admin ID in session for returning later
-      req.session.originalAdminId = adminId;
+      // Store impersonation data in session (keep admin logged in)
       req.session.isImpersonating = true;
+      req.session.impersonatedUserId = userId;
 
-      // Update session user to impersonated user
-      req.login(targetUser, (err: any) => {
-        if (err) {
-          console.error("Error during impersonation login:", err);
-          return res.status(500).json({ message: "Failed to impersonate user" });
-        }
-        res.json(targetUser);
-      });
+      // Return the admin user with impersonation context
+      const adminWithImpersonation = {
+        ...admin,
+        isImpersonating: true,
+        impersonatedUser: targetUser
+      };
+
+      res.json(adminWithImpersonation);
     } catch (error) {
       console.error("Error impersonating user:", error);
       res.status(500).json({ message: "Failed to impersonate user" });
@@ -469,35 +479,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/admin/stop-impersonate', requireAuth, async (req: any, res: Response) => {
     try {
-      if (!req.session.isImpersonating || !req.session.originalAdminId) {
+      if (!req.session.isImpersonating || !req.session.impersonatedUserId) {
         return res.status(400).json({ message: "Not currently impersonating" });
       }
 
-      const originalAdminId = req.session.originalAdminId;
-      const admin = await storage.getUser(originalAdminId);
-
+      const admin = req.user; // Admin is still the logged-in user
       if (!admin || admin.role !== 'ADMIN') {
-        return res.status(404).json({ message: "Original admin not found" });
+        return res.status(403).json({ message: "Admin access required" });
       }
 
-      // Get current impersonated user info for audit log
-      const currentUser = req.user;
+      const impersonatedUserId = req.session.impersonatedUserId;
+      const impersonatedUser = await storage.getUser(impersonatedUserId);
 
-      // Audit log impersonation end
-      await AuditService.logImpersonationEnd(admin, req, currentUser.id, currentUser.email);
+      if (impersonatedUser) {
+        // Audit log impersonation end
+        await AuditService.logImpersonationEnd(admin, req, impersonatedUser.id, impersonatedUser.email);
+      }
 
       // Clear impersonation session data
-      req.session.originalAdminId = undefined;
+      req.session.impersonatedUserId = undefined;
       req.session.isImpersonating = false;
 
-      // Return to admin user
-      req.login(admin, (err: any) => {
-        if (err) {
-          console.error("Error returning to admin:", err);
-          return res.status(500).json({ message: "Failed to return to admin" });
-        }
-        res.json(admin);
-      });
+      // Return the admin user without impersonation context
+      res.json(admin);
     } catch (error) {
       console.error("Error stopping impersonation:", error);
       res.status(500).json({ message: "Failed to stop impersonation" });

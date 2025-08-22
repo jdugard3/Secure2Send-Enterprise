@@ -31,15 +31,15 @@ export default function Home() {
         return;
       }
       
-      // Redirect admins to the admin dashboard
-      if (user?.role === 'ADMIN') {
+      // Redirect admins to the admin dashboard (unless they're impersonating)
+      if (user?.role === 'ADMIN' && !user?.isImpersonating) {
         navigate("/admin");
         return;
       }
     }
   }, [isAuthenticated, isLoading, user, toast, navigate]);
 
-  if (isLoading || !isAuthenticated || user?.role === 'ADMIN') {
+  if (isLoading || !isAuthenticated || (user?.role === 'ADMIN' && !user?.isImpersonating)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">

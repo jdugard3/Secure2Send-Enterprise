@@ -5,7 +5,7 @@ interface AuthUser extends User {
   clientId?: string;
   clientStatus?: string;
   isImpersonating?: boolean;
-  originalAdminId?: string | null;
+  impersonatedUser?: User;
 }
 
 export function useAuth() {

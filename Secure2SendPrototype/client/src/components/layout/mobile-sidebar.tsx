@@ -82,12 +82,15 @@ export function MobileSidebar() {
       const response = await apiRequest("POST", "/api/admin/impersonate", { userId });
       return response.json();
     },
-    onSuccess: (impersonatedUser) => {
-      queryClient.setQueryData(["/api/auth/user"], impersonatedUser);
+    onSuccess: (adminWithImpersonation) => {
+      queryClient.setQueryData(["/api/auth/user"], adminWithImpersonation);
       toast({
         title: "User Switched",
-        description: `Now viewing as ${impersonatedUser.firstName} ${impersonatedUser.lastName}`,
+        description: `Now viewing as ${adminWithImpersonation.impersonatedUser?.firstName} ${adminWithImpersonation.impersonatedUser?.lastName}`,
       });
+      // Navigate to client home page after successful impersonation
+      navigate("/");
+      setOpen(false); // Close mobile sidebar
     },
     onError: (error: Error) => {
       toast({
@@ -109,6 +112,9 @@ export function MobileSidebar() {
         title: "Returned to Admin",
         description: "Now viewing as admin account",
       });
+      // Navigate back to admin dashboard after returning from impersonation
+      navigate("/admin");
+      setOpen(false); // Close mobile sidebar
     },
     onError: (error: Error) => {
       toast({

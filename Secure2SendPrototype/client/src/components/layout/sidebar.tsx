@@ -91,12 +91,14 @@ export default function Sidebar({ isCollapsed = false, onToggle }: SidebarProps)
       const response = await apiRequest("POST", "/api/admin/impersonate", { userId });
       return response.json();
     },
-    onSuccess: (impersonatedUser) => {
-      queryClient.setQueryData(["/api/auth/user"], impersonatedUser);
+    onSuccess: (adminWithImpersonation) => {
+      queryClient.setQueryData(["/api/auth/user"], adminWithImpersonation);
       toast({
         title: "User Switched",
-        description: `Now viewing as ${impersonatedUser.firstName} ${impersonatedUser.lastName}`,
+        description: `Now viewing as ${adminWithImpersonation.impersonatedUser?.firstName} ${adminWithImpersonation.impersonatedUser?.lastName}`,
       });
+      // Navigate to client home page after successful impersonation
+      navigate("/");
     },
     onError: (error: Error) => {
       toast({
@@ -118,6 +120,8 @@ export default function Sidebar({ isCollapsed = false, onToggle }: SidebarProps)
         title: "Returned to Admin",
         description: "Now viewing as admin account",
       });
+      // Navigate back to admin dashboard after returning from impersonation
+      navigate("/admin");
     },
     onError: (error: Error) => {
       toast({
@@ -247,17 +251,23 @@ export default function Sidebar({ isCollapsed = false, onToggle }: SidebarProps)
       {/* User Profile */}
       <div className="p-4 border-t border-gray-200">
         {/* Admin User Switcher - show for admins or when impersonating */}
-        {(user?.role === 'ADMIN' || user?.isImpersonating) && !isCollapsed && (
+        {(user?.role === 'ADMIN' || user?.isImpersonating) && (
           <div className="mb-3">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="w-full justify-between text-xs">
-                  <div className="flex items-center">
-                    <UserCheck className="h-3 w-3 mr-2" />
-                    Switch User
-                  </div>
-                  <ChevronDown className="h-3 w-3" />
-                </Button>
+                {isCollapsed ? (
+                  <Button variant="outline" size="sm" className="w-full p-2">
+                    <UserCheck className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button variant="outline" className="w-full justify-between text-xs">
+                    <div className="flex items-center">
+                      <UserCheck className="h-3 w-3 mr-2" />
+                      Switch User
+                    </div>
+                    <ChevronDown className="h-3 w-3" />
+                  </Button>
+                )}
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56" align="start">
                 {user?.isImpersonating ? (
