@@ -4,17 +4,38 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Build outputs
-dist/
-build/
-*.tar.gz
-
-# Environment files
+# Environment variables
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output
+
+# Logs
+logs
+*.log
+
+# Runtime data
+tmp/
+temp/
 
 # IDE/Editor files
 .vscode/
@@ -32,25 +53,30 @@ build/
 ehthumbs.db
 Thumbs.db
 
-# Logs
-logs
-*.log
+# Security sensitive files
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+secrets/
+private/
 
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
+# Database files
+*.db
+*.sqlite
+*.sqlite3
 
-# Coverage directory used by tools like istanbul
-coverage/
-*.lcov
+# Uploaded files (keep structure but not actual files)
+uploads/*
+!uploads/.gitkeep
 
-# nyc test coverage
-.nyc_output
+# Cache directories
+.cache/
+.parcel-cache/
 
-# Dependency directories
-jspm_packages/
+# TypeScript cache
+*.tsbuildinfo
 
 # Optional npm cache directory
 .npm
@@ -73,19 +99,6 @@ jspm_packages/
 # Yarn Integrity file
 .yarn-integrity
 
-# parcel-bundler cache (https://parceljs.org/)
-.cache
-.parcel-cache
-
-# next.js build output
-.next
-
-# nuxt.js build output
-.nuxt
-
-# vuepress build output
-.vuepress/dist
-
 # Serverless directories
 .serverless/
 
@@ -98,6 +111,28 @@ jspm_packages/
 # TernJS port file
 .tern-port
 
-# Project specific
-server/public
-vite.config.ts.*
+# Stores VSCode versions used for testing VSCode extensions
+.vscode-test
+
+# Temporary folders
+tmp/
+temp/
+
+# Local development files
+.local
+.env.example.local
+
+# Security testing results
+security-scan-results/
+penetration-test-reports/
+
+# Backup files
+*.backup
+*.bak
+
+# Lock files (uncomment if using npm)
+# package-lock.json
+
+# Replit specific
+.replit
+replit.nix
