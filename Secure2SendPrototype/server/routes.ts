@@ -508,6 +508,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Security dashboard endpoint for admin
+  app.get('/api/admin/security/dashboard', requireAdmin, async (req: any, res: Response) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+
+      if (!user || user.role !== 'ADMIN') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const timeRange = req.query.timeRange as 'day' | 'week' | 'month' || 'day';
+      const { SecurityMonitoringService } = await import('./services/securityMonitoring');
+      const securityData = await SecurityMonitoringService.getSecurityDashboard(timeRange);
+
+      res.json(securityData);
+    } catch (error) {
+      console.error("Error fetching security dashboard:", error);
+      res.status(500).json({ message: "Failed to fetch security dashboard" });
+    }
+  });
+
+  // Audit logs endpoint for admin
+  app.get('/api/admin/audit-logs', requireAdmin, async (req: any, res: Response) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+
+      if (!user || user.role !== 'ADMIN') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const limit = parseInt(req.query.limit as string) || 50;
+      const targetUserId = req.query.userId as string;
+
+      let auditLogs;
+      if (targetUserId) {
+        auditLogs = await AuditService.getUserAuditTrail(targetUserId, limit);
+      } else {
+        auditLogs = await AuditService.getRecentAuditLogs(limit);
+      }
+
+      res.json(auditLogs);
+    } catch (error) {
+      console.error("Error fetching audit logs:", error);
+      res.status(500).json({ message: "Failed to fetch audit logs" });
+    }
+  });
+
   // Stats endpoint for admin dashboard
   app.get('/api/admin/stats', requireAdmin, async (req: any, res: Response) => {
     try {

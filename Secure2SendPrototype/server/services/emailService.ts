@@ -11,6 +11,7 @@ import { DocumentRejectedEmail } from '../emails/DocumentRejectedEmail';
 import { AllDocumentsApprovedEmail } from '../emails/AllDocumentsApprovedEmail';
 import { NewUserNotificationEmail } from '../emails/NewUserNotificationEmail';
 import { NewDocumentNotificationEmail } from '../emails/NewDocumentNotificationEmail';
+import { SecurityAlertEmail } from '../emails/SecurityAlertEmail';
 import type { User, Document, Client } from '@shared/schema';
 
 // Initialize email providers based on configuration
@@ -302,6 +303,43 @@ export class EmailService {
     }
 
     throw new Error(`Unknown email provider: ${env.EMAIL_PROVIDER}`);
+  }
+
+  /**
+   * Send security alert email to admin
+   */
+  static async sendSecurityAlert(admin: User, alertDetails: {
+    type: string;
+    severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+    timestamp: string;
+    ipAddress: string;
+    userEmail: string;
+    userName: string;
+    details: string;
+  }): Promise<void> {
+    try {
+      const emailHtml = await render(SecurityAlertEmail({
+        adminName: admin.firstName || 'Admin',
+        alertType: alertDetails.type,
+        severity: alertDetails.severity,
+        timestamp: alertDetails.timestamp,
+        ipAddress: alertDetails.ipAddress,
+        userEmail: alertDetails.userEmail,
+        userName: alertDetails.userName,
+        details: alertDetails.details,
+        appUrl: env.APP_URL!,
+      }));
+
+      await this.sendEmail({
+        to: admin.email,
+        subject: `🚨 Security Alert: ${alertDetails.type} - ${alertDetails.severity} Priority`,
+        html: emailHtml,
+      });
+
+      console.log(`✅ Security alert email sent to ${admin.email} for ${alertDetails.type}`);
+    } catch (error) {
+      console.error('❌ Failed to send security alert email:', error);
+    }
   }
 
   /**
