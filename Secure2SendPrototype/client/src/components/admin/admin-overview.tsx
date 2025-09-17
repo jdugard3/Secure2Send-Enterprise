@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import AddClientForm from "./add-client-form";
+import MerchantApplicationsList from "./merchant-applications-list";
 
 interface CompanyOverview {
   id: string;
@@ -246,6 +247,11 @@ export default function AdminOverview() {
             </CardContent>
           </Card>
         )}
+      </div>
+
+      {/* Merchant Applications Section */}
+      <div className="mt-8">
+        <MerchantApplicationsList />
       </div>
 
       <AddClientForm 

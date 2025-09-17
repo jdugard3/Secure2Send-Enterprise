@@ -712,6 +712,265 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Merchant Application routes
+  app.post('/api/merchant-applications', requireAuth, async (req: any, res: Response) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.role !== 'CLIENT') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const client = await storage.getClientByUserId(userId);
+      if (!client) {
+        return res.status(404).json({ message: "Client profile not found" });
+      }
+
+        // CRITICAL: Remove all problematic null/undefined date fields before processing
+        const sanitizedBody = { ...req.body };
+        const problematicDateFields = [
+          'merchantDate', 'corduroDate', 'merchantSignatureDate', 'partnerSignatureDate',
+          'createdAt', 'updatedAt', 'submittedAt', 'reviewedAt', 'lastSavedAt', 'reviewedBy', 'rejectionReason'
+        ];
+        
+        // Remove null/undefined date fields and other problematic fields
+        problematicDateFields.forEach(field => {
+          if (sanitizedBody[field] === null || sanitizedBody[field] === undefined) {
+            delete sanitizedBody[field];
+          }
+        });
+
+        const applicationData = {
+          ...sanitizedBody,
+          clientId: client.id,
+          status: 'DRAFT' as const,
+        };
+
+      const application = await storage.createMerchantApplication(applicationData);
+
+      // Audit log the creation
+      await AuditService.logAction(user, 'MERCHANT_APPLICATION_CREATE', req, {
+        resourceType: 'merchant_application',
+        resourceId: application.id,
+        metadata: { applicationId: application.id, status: 'DRAFT' }
+      });
+
+      res.json(application);
+    } catch (error) {
+      console.error("Error creating merchant application:", error);
+      res.status(500).json({ message: "Failed to create merchant application" });
+    }
+  });
+
+  app.get('/api/merchant-applications', requireAuth, async (req: any, res: Response) => {
+    try {
+      const user = req.user;
+      let targetUserId = user.id;
+      
+      // If admin is impersonating, use the impersonated user's data
+      if (user.role === 'ADMIN' && req.session.isImpersonating && req.session.impersonatedUserId) {
+        targetUserId = req.session.impersonatedUserId;
+      }
+      
+      const targetUser = await storage.getUser(targetUserId);
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // If the original user is admin and NOT impersonating, show all applications for review
+      if (user.role === 'ADMIN' && !req.session.isImpersonating) {
+        const applications = await storage.getAllMerchantApplicationsForReview();
+        res.json(applications);
+      } else {
+        // Show specific client's applications
+        const client = await storage.getClientByUserId(targetUserId);
+        if (!client) {
+          return res.status(404).json({ message: "Client profile not found" });
+        }
+        
+        const applications = await storage.getMerchantApplicationsByClientId(client.id);
+        res.json(applications);
+      }
+    } catch (error) {
+      console.error("Error fetching merchant applications:", error);
+      res.status(500).json({ message: "Failed to fetch merchant applications" });
+    }
+  });
+
+  app.get('/api/merchant-applications/:id', requireAuth, async (req: any, res: Response) => {
+    try {
+      const { id } = req.params;
+      const user = req.user;
+      
+      const application = await storage.getMerchantApplicationById(id);
+      if (!application) {
+        return res.status(404).json({ message: "Merchant application not found" });
+      }
+
+      // Check access permissions
+      if (user.role === 'CLIENT') {
+        const client = await storage.getClientByUserId(user.id);
+        if (!client || application.clientId !== client.id) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      res.json(application);
+    } catch (error) {
+      console.error("Error fetching merchant application:", error);
+      res.status(500).json({ message: "Failed to fetch merchant application" });
+    }
+  });
+
+  app.put('/api/merchant-applications/:id', requireAuth, async (req: any, res: Response) => {
+    try {
+      const { id } = req.params;
+      const user = req.user;
+      
+      console.log("PUT /api/merchant-applications/:id - Request body:", JSON.stringify(req.body, null, 2));
+      
+      // CRITICAL: Remove all problematic null/undefined date fields before processing
+      const sanitizedBody = { ...req.body };
+      const problematicDateFields = [
+        'merchantDate', 'corduroDate', 'merchantSignatureDate', 'partnerSignatureDate',
+        'createdAt', 'updatedAt', 'submittedAt', 'reviewedAt', 'lastSavedAt', 'reviewedBy', 'rejectionReason'
+      ];
+      
+      // Remove null/undefined date fields and other problematic fields
+      problematicDateFields.forEach(field => {
+        if (sanitizedBody[field] === null || sanitizedBody[field] === undefined) {
+          delete sanitizedBody[field];
+          console.log(`Removed problematic field: ${field}`);
+        }
+      });
+      
+      console.log("PUT /api/merchant-applications/:id - Sanitized body:", JSON.stringify(sanitizedBody, null, 2));
+      
+      const existingApplication = await storage.getMerchantApplicationById(id);
+      if (!existingApplication) {
+        return res.status(404).json({ message: "Merchant application not found" });
+      }
+
+      // Check access permissions
+      if (user.role === 'CLIENT') {
+        const client = await storage.getClientByUserId(user.id);
+        if (!client || existingApplication.clientId !== client.id) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+        
+        // Clients can only update draft applications
+        if (existingApplication.status !== 'DRAFT') {
+          return res.status(400).json({ message: "Cannot modify submitted application" });
+        }
+      }
+
+      const application = await storage.updateMerchantApplication(id, sanitizedBody);
+
+      // Audit log the update
+      await AuditService.logAction(user, 'MERCHANT_APPLICATION_UPDATE', req, {
+        resourceType: 'merchant_application',
+        resourceId: id,
+        metadata: { applicationId: id, changes: Object.keys(sanitizedBody) }
+      });
+
+      res.json(application);
+    } catch (error) {
+      console.error("Error updating merchant application:", error);
+      console.error("Error details:", error instanceof Error ? error.message : String(error));
+      console.error("Error stack:", error instanceof Error ? error.stack : 'No stack trace');
+      res.status(500).json({ message: "Failed to update merchant application" });
+    }
+  });
+
+  app.put('/api/merchant-applications/:id/status', requireAuth, async (req: any, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { status, rejectionReason } = req.body;
+      const user = req.user;
+
+      const existingApplication = await storage.getMerchantApplicationById(id);
+      if (!existingApplication) {
+        return res.status(404).json({ message: "Merchant application not found" });
+      }
+
+      const validStatuses = ['DRAFT', 'SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'REJECTED'];
+      if (!validStatuses.includes(status)) {
+        return res.status(400).json({ message: "Invalid status" });
+      }
+
+      // Only clients can submit their own draft applications
+      if (status === 'SUBMITTED' && user.role === 'CLIENT') {
+        const client = await storage.getClientByUserId(user.id);
+        if (!client || existingApplication.clientId !== client.id) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+        if (existingApplication.status !== 'DRAFT') {
+          return res.status(400).json({ message: "Can only submit draft applications" });
+        }
+      }
+
+      // Only admins can review applications
+      if (['UNDER_REVIEW', 'APPROVED', 'REJECTED'].includes(status) && user.role !== 'ADMIN') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      if (status === 'REJECTED' && !rejectionReason) {
+        return res.status(400).json({ message: "Rejection reason is required" });
+      }
+
+      const application = await storage.updateMerchantApplicationStatus(id, status, rejectionReason);
+
+      // Audit log the status change
+      await AuditService.logAction(user, 'MERCHANT_APPLICATION_REVIEW', req, {
+        resourceType: 'merchant_application',
+        resourceId: id,
+        metadata: {
+          applicationId: id,
+          oldStatus: existingApplication.status,
+          newStatus: status,
+          rejectionReason
+        }
+      });
+
+      res.json(application);
+    } catch (error) {
+      console.error("Error updating merchant application status:", error);
+      res.status(500).json({ message: "Failed to update merchant application status" });
+    }
+  });
+
+  app.delete('/api/merchant-applications/:id', requireAuth, async (req: any, res: Response) => {
+    try {
+      const { id } = req.params;
+      const user = req.user;
+
+      const application = await storage.getMerchantApplicationById(id);
+      if (!application) {
+        return res.status(404).json({ message: "Merchant application not found" });
+      }
+
+      // Check access permissions
+      if (user.role === 'CLIENT') {
+        const client = await storage.getClientByUserId(user.id);
+        if (!client || application.clientId !== client.id) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+        
+        // Clients can only delete draft applications
+        if (application.status !== 'DRAFT') {
+          return res.status(400).json({ message: "Cannot delete submitted application" });
+        }
+      }
+
+      await storage.deleteMerchantApplication(id);
+      res.json({ message: "Merchant application deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting merchant application:", error);
+      res.status(500).json({ message: "Failed to delete merchant application" });
+    }
+  });
+
   // Email preview routes for development
   if (env.NODE_ENV === 'development') {
     app.get('/api/emails/preview', (req, res) => {

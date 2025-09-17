@@ -47,6 +47,9 @@ export const documentTypeEnum = pgEnum('document_type', [
   'INSURANCE_COVERAGE'
 ]);
 export const documentStatusEnum = pgEnum('document_status', ['PENDING', 'APPROVED', 'REJECTED']);
+export const merchantApplicationStatusEnum = pgEnum('merchant_application_status', ['DRAFT', 'SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'REJECTED']);
+export const ownershipTypeEnum = pgEnum('ownership_type', ['NON_PROFIT', 'SOLE_PROPRIETORSHIP', 'GOVERNMENT', 'PERSONAL', 'PARTNERSHIP_LLP', 'FINANCIAL_INSTITUTION', 'CORPORATION_PUBLICLY_TRADED', 'CORPORATION_PRIVATELY_HELD', 'LLC', 'S_CORP']);
+export const processingCategoryEnum = pgEnum('processing_category', ['MOBILE', 'CARD_NOT_PRESENT_E_COMMERCE', 'CARD_PRESENT_RETAIL', 'MAIL_ORDER_TELEPHONE_MOTO', 'OTHER']);
 export const auditLogEnum = pgEnum('audit_action', [
   'USER_LOGIN',
   'USER_LOGOUT', 
@@ -60,7 +63,11 @@ export const auditLogEnum = pgEnum('audit_action', [
   'ADMIN_IMPERSONATE_END',
   'SENSITIVE_DATA_ACCESS',
   'SENSITIVE_DATA_UPDATE',
-  'FILE_DOWNLOAD'
+  'FILE_DOWNLOAD',
+  'MERCHANT_APPLICATION_CREATE',
+  'MERCHANT_APPLICATION_UPDATE',
+  'MERCHANT_APPLICATION_SUBMIT',
+  'MERCHANT_APPLICATION_REVIEW'
 ]);
 
 // Users table
@@ -104,6 +111,77 @@ export const documents = pgTable("documents", {
   r2Key: text("r2_key"),
   r2Url: text("r2_url"),
   encryptionKeyId: varchar("encryption_key_id"),
+});
+
+// Merchant applications table
+export const merchantApplications = pgTable("merchant_applications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  clientId: varchar("client_id").notNull().references(() => clients.id),
+  status: merchantApplicationStatusEnum("status").default('DRAFT'),
+  
+  // Business Information
+  legalBusinessName: varchar("legal_business_name"),
+  dbaBusinessName: varchar("dba_business_name"),
+  billingAddress: text("billing_address"),
+  locationAddress: text("location_address"),
+  city: varchar("city"),
+  state: varchar("state"),
+  zip: varchar("zip"),
+  businessPhone: varchar("business_phone"),
+  businessFaxNumber: varchar("business_fax_number"),
+  customerServicePhone: varchar("customer_service_phone"),
+  federalTaxIdNumber: varchar("federal_tax_id_number"),
+  contactName: varchar("contact_name"),
+  contactPhoneNumber: varchar("contact_phone_number"),
+  contactEmail: varchar("contact_email"),
+  websiteAddress: varchar("website_address"),
+  
+  // Business Description
+  processingCategories: jsonb("processing_categories"), // Array of selected categories
+  ownershipType: ownershipTypeEnum("ownership_type"),
+  
+  // Owner/Principal Officers (stored as JSON array)
+  principalOfficers: jsonb("principal_officers"),
+  
+  // Settlement/Banking
+  bankName: varchar("bank_name"),
+  abaRoutingNumber: varchar("aba_routing_number"),
+  accountName: varchar("account_name"),
+  ddaNumber: varchar("dda_number"),
+  
+  // Fee Schedule Information
+  feeScheduleData: jsonb("fee_schedule_data"),
+  
+  // Supporting Information
+  supportingInformation: jsonb("supporting_information"),
+  
+  // Equipment Information
+  equipmentData: jsonb("equipment_data"),
+  
+  // Beneficial Ownership (stored as JSON array)
+  beneficialOwners: jsonb("beneficial_owners"),
+  
+  // Corporate Resolution and Certification
+  corporateResolution: text("corporate_resolution"),
+  merchantSignature: varchar("merchant_signature"),
+  merchantName: varchar("merchant_name"),
+  merchantTitle: varchar("merchant_title"),
+  merchantDate: timestamp("merchant_date"),
+  corduroSignature: varchar("corduro_signature"),
+  corduroName: varchar("corduro_name"),
+  corduroTitle: varchar("corduro_title"),
+  corduroDate: timestamp("corduro_date"),
+  
+  // Metadata
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  submittedAt: timestamp("submitted_at"),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewedBy: varchar("reviewed_by").references(() => users.id),
+  rejectionReason: text("rejection_reason"),
+  
+  // Auto-save tracking
+  lastSavedAt: timestamp("last_saved_at").defaultNow(),
 });
 
 // Sensitive data table for encrypted PII
@@ -150,12 +228,24 @@ export const clientsRelations = relations(clients, ({ one, many }) => ({
   }),
   documents: many(documents),
   sensitiveData: many(sensitiveData),
+  merchantApplications: many(merchantApplications),
 }));
 
 export const documentsRelations = relations(documents, ({ one }) => ({
   client: one(clients, {
     fields: [documents.clientId],
     references: [clients.id],
+  }),
+}));
+
+export const merchantApplicationsRelations = relations(merchantApplications, ({ one }) => ({
+  client: one(clients, {
+    fields: [merchantApplications.clientId],
+    references: [clients.id],
+  }),
+  reviewedByUser: one(users, {
+    fields: [merchantApplications.reviewedBy],
+    references: [users.id],
   }),
 }));
 
@@ -197,6 +287,15 @@ export const insertDocumentSchema = createInsertSchema(documents).omit({
   reviewedAt: true,
 });
 
+export const insertMerchantApplicationSchema = createInsertSchema(merchantApplications).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  submittedAt: true,
+  reviewedAt: true,
+  lastSavedAt: true,
+}).partial(); // Make all fields optional for draft applications
+
 // Types
 export type InsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -212,6 +311,8 @@ export type InsertClient = z.infer<typeof insertClientSchema>;
 export type Client = typeof clients.$inferSelect;
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
 export type Document = typeof documents.$inferSelect;
+export type InsertMerchantApplication = z.infer<typeof insertMerchantApplicationSchema>;
+export type MerchantApplication = typeof merchantApplications.$inferSelect;
 
 // Additional types
 export type InsertSensitiveData = typeof sensitiveData.$inferInsert;
@@ -222,3 +323,4 @@ export type AuditLog = typeof auditLogs.$inferSelect;
 // Combined types
 export type ClientWithUser = Client & { user: User };
 export type DocumentWithClient = Document & { client: ClientWithUser };
+export type MerchantApplicationWithClient = MerchantApplication & { client: ClientWithUser };

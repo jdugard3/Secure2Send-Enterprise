@@ -7,11 +7,12 @@ import Header from "@/components/layout/header";
 import DocumentUpload from "@/components/documents/document-upload";
 import DocumentList from "@/components/documents/document-list";
 import DocumentDebug from "@/components/debug/DocumentDebug";
+import MerchantApplicationWizard from "@/components/merchant-application/MerchantApplicationWizard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Upload, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { FileText, Upload, Clock, CheckCircle, XCircle, AlertCircle, CreditCard } from "lucide-react";
 
 interface Document {
   id: string;
@@ -28,10 +29,29 @@ export default function DocumentsPage() {
   const { user } = useAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   
+  // Get URL parameters to check for existing application ID
+  const urlParams = new URLSearchParams(window.location.search);
+  const applicationId = urlParams.get('id');
+  
   const { data: documents = [] } = useQuery<Document[]>({
     queryKey: ["/api/documents", user?.id],
     queryFn: async () => {
       const response = await fetch("/api/documents", {
+        credentials: "include",
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return response.json();
+    },
+    enabled: !!user?.id,
+  });
+
+  // Fetch merchant applications for this user
+  const { data: merchantApplications = [] } = useQuery({
+    queryKey: ["/api/merchant-applications", user?.id],
+    queryFn: async () => {
+      const response = await fetch("/api/merchant-applications", {
         credentials: "include",
       });
       if (!response.ok) {
@@ -161,6 +181,10 @@ export default function DocumentsPage() {
                 <Upload className="h-4 w-4" />
                 Upload Documents
               </TabsTrigger>
+              <TabsTrigger value="merchant-application" className="flex items-center gap-2">
+                <CreditCard className="h-4 w-4" />
+                Merchant Application
+              </TabsTrigger>
               <TabsTrigger value="all" className="flex items-center gap-2">
                 <FileText className="h-4 w-4" />
                 All Documents
@@ -181,6 +205,62 @@ export default function DocumentsPage() {
 
             <TabsContent value="upload" className="flex-1 p-0 -mx-6 -mb-6 h-full">
               <DocumentUpload />
+            </TabsContent>
+
+            <TabsContent value="merchant-application" className="flex-1 p-0 -mx-6 -mb-6 h-full">
+              <div className="p-6">
+                {/* Show existing drafts if any */}
+                {!applicationId && merchantApplications.length > 0 && (
+                  <Card className="mb-6">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <CreditCard className="h-5 w-5 text-blue-500" />
+                        Existing Applications
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {merchantApplications.map((app: any) => (
+                          <div key={app.id} className="flex items-center justify-between p-3 border rounded-lg">
+                            <div>
+                              <div className="font-medium">
+                                {app.legalBusinessName || 'Untitled Application'}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                Status: <Badge variant={app.status === 'DRAFT' ? 'secondary' : 'default'}>
+                                  {app.status}
+                                </Badge>
+                                {app.lastSavedAt && (
+                                  <span className="ml-2">
+                                    Last saved: {new Date(app.lastSavedAt).toLocaleDateString()}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                window.location.href = `/documents?tab=merchant-application&id=${app.id}`;
+                              }}
+                            >
+                              {app.status === 'DRAFT' ? 'Continue' : 'View'}
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                
+                <MerchantApplicationWizard 
+                  applicationId={applicationId || undefined}
+                  onComplete={() => {
+                    // Refresh the merchant applications list
+                    window.location.reload();
+                  }}
+                />
+              </div>
             </TabsContent>
 
             <TabsContent value="all" className="space-y-6">
