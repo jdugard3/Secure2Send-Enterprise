@@ -79,7 +79,7 @@ export class IrisCrmService {
         users_emails: ["admin@secure2send.com"], // Keep at least 1 email
         fields: [
           {
-            id: "1", // First Name field ID
+            id: "6", // First Name field ID
             record: "1",
             value: user.firstName || ''
           },
@@ -94,7 +94,7 @@ export class IrisCrmService {
             value: user.email
           },
           {
-            id: "6", // Company field ID
+            id: "1", // Company field ID
             record: "1",
             value: user.companyName || ''
           }
