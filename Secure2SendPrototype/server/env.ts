@@ -34,6 +34,10 @@ const envSchema = z.object({
   CLOUDFLARE_R2_SECRET_ACCESS_KEY: z.string().optional(),
   CLOUDFLARE_R2_BUCKET_NAME: z.string().optional(),
   CLOUDFLARE_R2_PUBLIC_URL: z.string().url().optional(),
+  
+  // IRIS CRM Integration
+  IRIS_CRM_API_KEY: z.string().optional(),
+  IRIS_CRM_SUBDOMAIN: z.string().optional(),
 });
 
 // Parse and validate environment variables
@@ -85,3 +89,5 @@ console.log(`   - RESEND_API_KEY: ${env.RESEND_API_KEY ? "✓ Set" : "✗ Missin
 console.log(`   - MAILGUN_API_KEY: ${env.MAILGUN_API_KEY ? "✓ Set" : "✗ Missing"}`);
 console.log(`   - MAILGUN_DOMAIN: ${env.MAILGUN_DOMAIN || "✗ Missing"}`);
 console.log(`   - APP_URL: ${env.APP_URL}`);
+console.log(`   - IRIS_CRM_API_KEY: ${env.IRIS_CRM_API_KEY ? "✓ Set" : "✗ Missing"}`);
+console.log(`   - IRIS_CRM_SUBDOMAIN: ${env.IRIS_CRM_SUBDOMAIN || "✗ Missing"}`);

@@ -113,15 +113,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Audit log the upload
       await AuditService.logDocumentUpload(user, req, document.id, documentType, file.originalname);
 
-      // Clean up local file after R2 upload (if successful)
-      if (r2Key && fs.existsSync(file.path)) {
-        try {
-          fs.unlinkSync(file.path);
-        } catch (error) {
-          console.error('Failed to clean up local file:', error);
-        }
-      }
-
       // Send document uploaded confirmation email to user (async, don't block response)
       EmailService.sendDocumentUploadedEmail(user, document).catch(error => {
         console.error('Failed to send document uploaded email:', error);
@@ -131,6 +122,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
       EmailService.sendNewDocumentNotificationEmail(user, document).catch(error => {
         console.error('Failed to send new document notification email:', error);
       });
+
+      // Sync document to IRIS CRM via Zapier webhook (async, don't block response)
+      // Read file content before potential cleanup
+      let fileContentForIris: Buffer | null = null;
+      if (client.irisLeadId && fs.existsSync(file.path)) {
+        try {
+          fileContentForIris = fs.readFileSync(file.path);
+        } catch (error) {
+          console.error('Failed to read file for IRIS sync:', error);
+        }
+      }
+
+      // Clean up local file after R2 upload (if successful)
+      if (r2Key && fs.existsSync(file.path)) {
+        try {
+          fs.unlinkSync(file.path);
+        } catch (error) {
+          console.error('Failed to clean up local file:', error);
+        }
+      }
+
+      // Now sync to IRIS CRM - prefer R2 URL, fallback to buffer
+      if (client.irisLeadId) {
+        import('./services/irisCrmService').then(async ({ IrisCrmService }) => {
+          if (r2Key && cloudflareR2) {
+            try {
+              // Generate signed URL that Zapier can access (24 hour expiry)
+              const signedUrl = await cloudflareR2.getDownloadUrl(r2Key, 86400);
+              console.log('🔗 Using Cloudflare R2 signed URL for IRIS sync (24h expiry)');
+              IrisCrmService.syncDocumentToIrisWithUrl(user, document, client.irisLeadId!, signedUrl).catch(error => {
+                console.error('Failed to sync document to IRIS CRM with signed URL:', error);
+              });
+            } catch (error) {
+              console.error('Failed to generate signed URL, falling back to base64:', error);
+              // Fallback to base64 if signed URL generation fails
+              if (fileContentForIris) {
+                IrisCrmService.syncDocumentToIrisWithBuffer(user, document, client.irisLeadId!, fileContentForIris).catch(error => {
+                  console.error('Failed to sync document to IRIS CRM with buffer:', error);
+                });
+              }
+            }
+          } else if (fileContentForIris) {
+            // Fallback to base64 content when R2 isn't available
+            console.log('💾 Using base64 content for IRIS sync (R2 not available)');
+            IrisCrmService.syncDocumentToIrisWithBuffer(user, document, client.irisLeadId!, fileContentForIris).catch(error => {
+              console.error('Failed to sync document to IRIS CRM with buffer:', error);
+            });
+          } else {
+            console.warn('⚠️ No R2 key or file content available for IRIS sync');
+          }
+        }).catch(error => {
+          console.error('Failed to import IRIS CRM service:', error);
+        });
+      } else {
+        console.warn('⚠️ No IRIS lead ID found for client, skipping document sync');
+      }
 
       res.json(document);
     } catch (error) {
@@ -631,6 +678,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "PENDING",
       });
 
+      // Create IRIS CRM lead (async, don't block response)
+      import('./services/irisCrmService').then(({ IrisCrmService }) => {
+        IrisCrmService.createLead(newUser).then(leadId => {
+          if (leadId) {
+            // Update client with IRIS lead ID
+            storage.updateClientIrisLeadId(client.id, leadId).catch(error => {
+              console.error('Failed to update client with IRIS lead ID:', error);
+            });
+          }
+        }).catch(error => {
+          console.error('Failed to create IRIS CRM lead:', error);
+        });
+      }).catch(error => {
+        console.error('Failed to import IRIS CRM service:', error);
+      });
+
       // Send account created email to user (async, don't block response)
       EmailService.sendAccountCreatedEmail(newUser, password).catch(error => {
         console.error('Failed to send account created email:', error);
@@ -874,6 +937,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         metadata: { applicationId: id, changes: Object.keys(sanitizedBody) }
       });
 
+      // Sync merchant application to IRIS CRM via Zapier webhook (async, don't block response)
+      const client = await storage.getClientById(application.clientId);
+      if (client && client.irisLeadId) {
+        const applicationOwner = await storage.getUser(client.userId);
+        if (applicationOwner) {
+          import('./services/irisCrmService').then(({ IrisCrmService }) => {
+            IrisCrmService.syncMerchantApplicationToIris(applicationOwner, application, client.irisLeadId!).catch(error => {
+              console.error('Failed to sync merchant application to IRIS CRM:', error);
+            });
+          }).catch(error => {
+            console.error('Failed to import IRIS CRM service:', error);
+          });
+        }
+      } else {
+        console.warn('⚠️ No IRIS lead ID found for client, skipping merchant application sync');
+      }
+
       res.json(application);
     } catch (error) {
       console.error("Error updating merchant application:", error);
@@ -932,6 +1012,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           rejectionReason
         }
       });
+
+      // Sync merchant application to IRIS CRM via Zapier webhook (async, don't block response)
+      // Trigger on any status change (SUBMITTED, UNDER_REVIEW, APPROVED, REJECTED)
+      if (['SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'REJECTED'].includes(status)) {
+        const client = await storage.getClientById(application.clientId);
+        if (client && client.irisLeadId) {
+          const applicationOwner = await storage.getUser(client.userId);
+          if (applicationOwner) {
+            import('./services/irisCrmService').then(({ IrisCrmService }) => {
+              IrisCrmService.syncMerchantApplicationToIris(applicationOwner, application, client.irisLeadId!).catch(error => {
+                console.error('Failed to sync merchant application to IRIS CRM:', error);
+              });
+            }).catch(error => {
+              console.error('Failed to import IRIS CRM service:', error);
+            });
+          }
+        } else {
+          console.warn('⚠️ No IRIS lead ID found for client, skipping merchant application sync');
+        }
+      }
 
       res.json(application);
     } catch (error) {

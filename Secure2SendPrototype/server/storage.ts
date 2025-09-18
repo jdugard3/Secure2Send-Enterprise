@@ -31,6 +31,7 @@ export interface IStorage {
   createClient(client: InsertClient): Promise<Client>;
   getAllClients(): Promise<ClientWithUser[]>;
   updateClientStatus(clientId: string, status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'INCOMPLETE'): Promise<Client>;
+  updateClientIrisLeadId(clientId: string, irisLeadId: string): Promise<Client>;
   
   // Document operations
   createDocument(document: InsertDocument): Promise<Document>;
@@ -104,6 +105,15 @@ export class DatabaseStorage implements IStorage {
     const [client] = await db
       .update(clients)
       .set({ status, updatedAt: new Date() })
+      .where(eq(clients.id, clientId))
+      .returning();
+    return client;
+  }
+
+  async updateClientIrisLeadId(clientId: string, irisLeadId: string): Promise<Client> {
+    const [client] = await db
+      .update(clients)
+      .set({ irisLeadId, updatedAt: new Date() })
       .where(eq(clients.id, clientId))
       .returning();
     return client;
