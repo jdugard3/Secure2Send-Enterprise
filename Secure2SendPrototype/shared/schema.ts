@@ -167,6 +167,7 @@ export const merchantApplications = pgTable("merchant_applications", {
   merchantName: varchar("merchant_name"),
   merchantTitle: varchar("merchant_title"),
   merchantDate: timestamp("merchant_date"),
+  agreementAccepted: boolean("agreement_accepted").default(false),
   corduroSignature: varchar("corduro_signature"),
   corduroName: varchar("corduro_name"),
   corduroTitle: varchar("corduro_title"),

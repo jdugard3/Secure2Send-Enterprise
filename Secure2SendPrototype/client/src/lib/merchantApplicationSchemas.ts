@@ -145,9 +145,9 @@ export const businessInformationSchema = z.object({
 
 // Fee Schedule Schema (Step 2)
 export const feeScheduleStepSchema = z.object({
-  feeScheduleData: feeScheduleSchema.optional(),
-  supportingInformation: supportingInformationSchema.optional(),
-  equipmentData: z.array(equipmentSchema).optional(),
+  feeScheduleData: z.array(feeScheduleSchema).optional().default([]),
+  supportingInformation: z.array(supportingInformationSchema).optional().default([]),
+  equipmentData: z.array(equipmentSchema).optional().default([]),
 });
 
 // Certification Schema (Step 3)  
@@ -220,15 +220,17 @@ export const defaultBeneficialOwner: Partial<BeneficialOwner> = {
   ssn: "",
   dob: "",
   ownershipPercentage: 25,
+  title: "",
   residentialAddress: "",
   city: "",
   state: undefined,
   zip: "",
   phoneNumber: "",
+  email: "",
   idType: 'DRIVERS_LICENSE',
   idNumber: "",
-  idIssuingState: undefined,
-  idExpirationDate: "",
+  idState: undefined,
+  idExpDate: "",
 };
 
 export const defaultEquipment: Equipment = {

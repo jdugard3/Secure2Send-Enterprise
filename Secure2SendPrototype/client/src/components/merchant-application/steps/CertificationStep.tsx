@@ -4,7 +4,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Shield, FileText, CheckCircle } from "lucide-react";
+import { Shield, FileText, CheckCircle, Info } from "lucide-react";
 import { MerchantApplicationForm } from "@/lib/merchantApplicationSchemas";
 
 interface CertificationStepProps {
@@ -77,11 +77,11 @@ export function CertificationStep({ form }: CertificationStepProps) {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Merchant Signature Section */}
+            {/* Merchant Signature Section - Client Only */}
+            <div className="max-w-md">
+              <h4 className="font-medium text-lg mb-4">Merchant Signature</h4>
+              
               <div className="space-y-4">
-                <h4 className="font-medium text-lg">Merchant</h4>
-                
                 <FormField
                   control={form.control}
                   name="merchantName"
@@ -131,59 +131,43 @@ export function CertificationStep({ form }: CertificationStepProps) {
                   </div>
                 </div>
               </div>
-
-              {/* Corduro Signature Section */}
-              <div className="space-y-4">
-                <h4 className="font-medium text-lg">Corduro</h4>
-                
-                <div className="space-y-4 text-sm text-gray-600">
-                  <div>
-                    <p className="font-medium">Name:</p>
-                    <p>_________________________</p>
-                  </div>
-                  
-                  <div>
-                    <p className="font-medium">Title:</p>
-                    <p>_________________________</p>
-                  </div>
-                  
-                  <div>
-                    <p className="font-medium">Date:</p>
-                    <p>_________________________</p>
-                  </div>
-                </div>
-
-                <div className="border-t pt-4 mt-6">
-                  <p className="text-sm text-gray-600 mb-2">Signature:</p>
-                  <div className="h-12 border-b-2 border-gray-300 flex items-end">
-                    <span className="text-xs text-gray-500 mb-1">To be signed by Corduro upon approval</span>
-                  </div>
+            </div>
+            
+            {/* Note about admin approval */}
+            <div className="bg-amber-50 p-4 rounded-lg border border-amber-200 mt-6">
+              <div className="flex items-start gap-3">
+                <Info className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                <div className="text-sm text-amber-800">
+                  <p className="font-medium mb-1">Pending Administrative Review</p>
+                  <p>After submission, this application will be reviewed and signed by a Corduro administrator before final approval.</p>
                 </div>
               </div>
             </div>
 
-            {/* Agreement Acceptance */}
-            <div className="border-t pt-6">
+            {/* Agreement Acceptance - Made more prominent */}
+            <div className="border-t pt-6 mt-8 bg-blue-50 p-4 rounded-lg">
+              <h4 className="font-semibold text-lg mb-4 text-blue-900">Final Agreement</h4>
               <FormField
                 control={form.control}
                 name="agreementAccepted"
-                render={({ field }) => (
+                render={({ field, fieldState }) => (
                   <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                     <FormControl>
                       <Checkbox
-                        checked={field.value}
+                        checked={field.value || false}
                         onCheckedChange={field.onChange}
+                        className={fieldState.error ? "border-destructive" : ""}
                       />
                     </FormControl>
                     <div className="space-y-1 leading-none">
-                      <FormLabel className="text-sm font-medium">
+                      <FormLabel className={`text-sm font-medium ${fieldState.error ? "text-destructive" : ""}`}>
                         I agree and accept the terms and conditions specified and referenced in this Merchant Application. *
                       </FormLabel>
                       <p className="text-xs text-gray-600">
                         By checking this box, you acknowledge that you have read and understood all terms and conditions.
                       </p>
+                      <FormMessage />
                     </div>
-                    <FormMessage />
                   </FormItem>
                 )}
               />

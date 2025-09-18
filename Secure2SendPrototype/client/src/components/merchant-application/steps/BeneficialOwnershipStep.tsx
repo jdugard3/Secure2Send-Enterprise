@@ -378,38 +378,6 @@ export function BeneficialOwnershipStep({ form }: BeneficialOwnershipStepProps) 
           </CardContent>
         </Card>
 
-        {/* Certification */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Management Responsibility / Individual with Significant Control - Section 2</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200 mb-4">
-              <p className="text-sm text-yellow-800">
-                <strong>Administrator Name:</strong> [To be filled by administrator]
-              </p>
-              <p className="text-sm text-yellow-800 mt-2">
-                I hereby certify, to the best of my knowledge, that the information provided on this form is complete and correct for all accounts. It is further agreed that Bank will be immediately notified by the legal entity of any change in such information on this form.
-              </p>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <p className="text-sm font-medium mb-2">Signature:</p>
-                <div className="h-12 border-b-2 border-gray-300 flex items-end">
-                  <span className="text-xs text-gray-500 mb-1">Digital signature will be applied upon submission</span>
-                </div>
-              </div>
-              
-              <div>
-                <p className="text-sm font-medium mb-2">Date:</p>
-                <div className="h-12 border-b-2 border-gray-300 flex items-end">
-                  <span className="text-xs text-gray-500 mb-1">Date will be automatically filled</span>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </div>
     </Form>
   );
