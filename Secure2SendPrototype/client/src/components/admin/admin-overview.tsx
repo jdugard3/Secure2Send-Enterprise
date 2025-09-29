@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,11 +12,25 @@ import {
   CheckCircle, 
   XCircle,
   AlertCircle,
-  Plus
+  Plus,
+  Trash2
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import AddClientForm from "./add-client-form";
 import MerchantApplicationsList from "./merchant-applications-list";
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 interface CompanyOverview {
   id: string;
@@ -46,6 +60,8 @@ interface CompanyOverview {
 
 export default function AdminOverview() {
   const [showAddClientForm, setShowAddClientForm] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   
   const { data: companies = [], isLoading } = useQuery<CompanyOverview[]>({
     queryKey: ["/api/admin/overview"],
@@ -57,6 +73,28 @@ export default function AdminOverview() {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       return response.json();
+    },
+  });
+
+  // Delete user mutation
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const response = await apiRequest("DELETE", `/api/admin/users/${userId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "User Deleted",
+        description: "The user has been successfully deleted.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/overview"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Delete Failed",
+        description: error.message,
+        variant: "destructive",
+      });
     },
   });
 
@@ -152,7 +190,42 @@ export default function AdminOverview() {
                   </div>
                 </div>
                 <div className="flex flex-col items-end space-y-2">
-                  {getStatusBadge(company.status)}
+                  <div className="flex items-center gap-2">
+                    {getStatusBadge(company.status)}
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete User</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to delete this user? This action cannot be undone and will permanently remove:
+                          </AlertDialogDescription>
+                          <div className="mt-2 space-y-1">
+                            <div className="font-medium">• User: {company.user.firstName} {company.user.lastName} ({company.user.email})</div>
+                            <div className="font-medium">• Company: {company.companyName || 'No Company Name'}</div>
+                            <div className="font-medium">• All associated documents and data</div>
+                          </div>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => deleteUserMutation.mutate(company.user.id)}
+                            className="bg-red-600 hover:bg-red-700"
+                          >
+                            Delete User
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
                   <span className="text-xs text-gray-500">
                     {company.createdAt 
                       ? `Joined ${formatDistanceToNow(new Date(company.createdAt), { addSuffix: true })}`

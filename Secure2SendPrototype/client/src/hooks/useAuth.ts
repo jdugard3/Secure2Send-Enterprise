@@ -26,9 +26,9 @@ export function useAuth() {
       
       return await res.json();
     },
-    retry: false,
+    retry: 1, // Retry once on failure to handle temporary network issues
     refetchOnWindowFocus: false,
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 30 * 60 * 1000, // 30 minutes - much longer to prevent frequent auth checks
   });
 
   return {

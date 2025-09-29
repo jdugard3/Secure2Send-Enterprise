@@ -32,7 +32,8 @@ import {
   UserCheck,
   Menu,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  CreditCard
 } from "lucide-react";
 import type { User } from "@shared/schema";
 
@@ -74,8 +75,8 @@ export default function Sidebar({ isCollapsed = false, onToggle }: SidebarProps)
         title: "Logged Out",
         description: "You have been successfully logged out.",
       });
-      // Navigate to the landing page
-      navigate("/");
+      // Navigate to the login page
+      navigate("/login");
     },
     onError: (error: Error) => {
       toast({
@@ -140,6 +141,7 @@ export default function Sidebar({ isCollapsed = false, onToggle }: SidebarProps)
   const navItems = [
     { href: "/", icon: BarChart3, label: "Overview", roles: ["CLIENT"] },
     { href: "/documents", icon: FileUp, label: "Documents", roles: ["CLIENT"] },
+    { href: "/merchant-applications", icon: CreditCard, label: "Merchant Applications", roles: ["CLIENT"] },
     { href: "/activity", icon: History, label: "Activity", roles: ["CLIENT"] },
   ];
 

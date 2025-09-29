@@ -19,6 +19,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { 
@@ -28,7 +39,8 @@ import {
   XCircle, 
   Clock, 
   Building,
-  Calendar
+  Calendar,
+  Trash2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -109,6 +121,28 @@ export default function MerchantApplicationsList() {
     },
   });
 
+  // Delete draft application mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (applicationId: string) => {
+      const response = await apiRequest("DELETE", `/api/merchant-applications/${applicationId}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Application Deleted",
+        description: "The draft application has been successfully deleted.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/merchant-applications'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Delete Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleReview = (action: 'APPROVED' | 'REJECTED') => {
     if (!selectedApplication) return;
 
@@ -128,7 +162,7 @@ export default function MerchantApplicationsList() {
     });
   };
 
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: string | undefined) => {
     switch (status) {
       case 'APPROVED':
         return <CheckCircle className="h-4 w-4 text-green-600" />;
@@ -136,6 +170,8 @@ export default function MerchantApplicationsList() {
         return <XCircle className="h-4 w-4 text-red-600" />;
       case 'UNDER_REVIEW':
         return <Clock className="h-4 w-4 text-yellow-600" />;
+      case 'SUBMITTED':
+        return <Clock className="h-4 w-4 text-blue-600" />;
       default:
         return <Clock className="h-4 w-4 text-gray-600" />;
     }
@@ -216,11 +252,11 @@ export default function MerchantApplicationsList() {
                   <TableCell>
                     <Badge 
                       variant="secondary" 
-                      className={STATUS_COLORS[application.status]}
+                      className={STATUS_COLORS[application.status] || STATUS_COLORS.DRAFT}
                     >
                       <div className="flex items-center gap-1">
                         {getStatusIcon(application.status)}
-                        {application.status.replace('_', ' ')}
+                        {application.status?.replace('_', ' ') || 'DRAFT'}
                       </div>
                     </Badge>
                   </TableCell>
@@ -234,17 +270,18 @@ export default function MerchantApplicationsList() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setSelectedApplication(application)}
-                        >
-                          <Eye className="h-4 w-4 mr-2" />
-                          Review
-                        </Button>
-                      </DialogTrigger>
+                    <div className="flex items-center gap-2">
+                      <Dialog key={`dialog-${application.id}`}>
+                        <DialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSelectedApplication(application)}
+                          >
+                            <Eye className="h-4 w-4 mr-2" />
+                            Review
+                          </Button>
+                        </DialogTrigger>
                       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
                         <DialogHeader>
                           <DialogTitle>Merchant Application Review</DialogTitle>
@@ -279,9 +316,9 @@ export default function MerchantApplicationsList() {
                                 <Label className="text-sm font-medium">Current Status</Label>
                                 <Badge 
                                   variant="secondary" 
-                                  className={STATUS_COLORS[selectedApplication.status]}
+                                  className={STATUS_COLORS[selectedApplication.status] || STATUS_COLORS.DRAFT}
                                 >
-                                  {selectedApplication.status.replace('_', ' ')}
+                                  {selectedApplication.status?.replace('_', ' ') || 'DRAFT'}
                                 </Badge>
                               </div>
                             </div>
@@ -354,6 +391,44 @@ export default function MerchantApplicationsList() {
                         )}
                       </DialogContent>
                     </Dialog>
+                    
+                    {/* Delete button for draft applications */}
+                    {application.status === 'DRAFT' && (
+                      <AlertDialog key={`delete-dialog-${application.id}`}>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Draft Application</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete this draft application? This action cannot be undone.
+                            </AlertDialogDescription>
+                            {application.legalBusinessName && (
+                              <div className="mt-2 font-medium">
+                                Application: {application.legalBusinessName}
+                              </div>
+                            )}
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => deleteMutation.mutate(application.id)}
+                              className="bg-red-600 hover:bg-red-700"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

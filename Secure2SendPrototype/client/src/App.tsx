@@ -11,6 +11,7 @@ import Signup from "@/pages/signup";
 import Home from "@/pages/home";
 import Admin from "@/pages/admin";
 import Documents from "@/pages/documents";
+import MerchantApplications from "@/pages/merchant-applications";
 import Activity from "@/pages/activity";
 import NotFound from "@/pages/not-found";
 
@@ -40,6 +41,7 @@ function Router() {
         <>
           <Route path="/" component={Home} />
           <Route path="/documents" component={Documents} />
+          <Route path="/merchant-applications" component={MerchantApplications} />
           <Route path="/activity" component={Activity} />
           {user?.role === 'ADMIN' && (
             <>

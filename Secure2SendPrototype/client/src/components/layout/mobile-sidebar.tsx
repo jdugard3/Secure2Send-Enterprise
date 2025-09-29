@@ -28,7 +28,8 @@ import {
   LogOut,
   ChevronDown,
   UserCheck,
-  Menu
+  Menu,
+  CreditCard
 } from "lucide-react";
 import type { User } from "@shared/schema";
 
@@ -65,8 +66,8 @@ export function MobileSidebar() {
         title: "Logged Out",
         description: "You have been successfully logged out.",
       });
-      // Navigate to the landing page
-      navigate("/");
+      // Navigate to the login page
+      navigate("/login");
     },
     onError: (error: Error) => {
       toast({
@@ -128,6 +129,7 @@ export function MobileSidebar() {
   const clientItems = [
     { label: "Home", href: "/", icon: BarChart3, roles: ["CLIENT"] },
     { label: "Documents", href: "/documents", icon: FileUp, roles: ["CLIENT"] },
+    { label: "Merchant Applications", href: "/merchant-applications", icon: CreditCard, roles: ["CLIENT"] },
     { label: "Activity", href: "/activity", icon: History, roles: ["CLIENT"] },
   ];
 

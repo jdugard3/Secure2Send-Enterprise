@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -15,20 +15,36 @@ export default function Home() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading, user } = useAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const authFailureCount = useRef(0);
+  const lastAuthCheck = useRef(Date.now());
 
   // Redirect admins to admin dashboard, or redirect to login if not authenticated
   useEffect(() => {
     if (!isLoading) {
       if (!isAuthenticated) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
+        const now = Date.now();
+        // Only count as a failure if it's been more than 10 seconds since last check
+        // This prevents counting initial loads or rapid re-renders as failures
+        if (now - lastAuthCheck.current > 10000) {
+          authFailureCount.current += 1;
+        }
+        lastAuthCheck.current = now;
+
+        // Only redirect after multiple consecutive failures to avoid kicking users out on temporary issues
+        if (authFailureCount.current >= 2) {
+          toast({
+            title: "Session Expired",
+            description: "Your session has expired. Please log in again.",
+            variant: "destructive",
+          });
+          setTimeout(() => {
+            window.location.href = "/login";
+          }, 1500); // Longer delay to allow user to see the message
+        }
         return;
+      } else {
+        // Reset failure count on successful auth
+        authFailureCount.current = 0;
       }
       
       // Redirect admins to the admin dashboard (unless they're impersonating)
