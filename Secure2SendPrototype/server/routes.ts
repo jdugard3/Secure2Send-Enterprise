@@ -58,9 +58,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
 
-      const client = await storage.getClientByUserId(userId);
+      let client = await storage.getClientByUserId(userId);
       if (!client) {
-        return res.status(404).json({ message: "Client profile not found" });
+        console.log('Client profile not found for user, creating one:', userId);
+        // Create client record for existing user (migration fix)
+        client = await storage.createClient({
+          userId: userId,
+          status: 'PENDING',
+        });
+        console.log('Created client record:', client.id);
       }
 
       const file = req.file;
@@ -215,10 +221,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json(documents);
       } else {
         // Show specific client's documents (either real client or impersonated client)
-        const client = await storage.getClientByUserId(targetUserId);
+        let client = await storage.getClientByUserId(targetUserId);
         if (!client) {
-          console.log('Client profile not found for user:', targetUserId);
-          return res.status(404).json({ message: "Client profile not found" });
+          console.log('Client profile not found for user, creating one:', targetUserId);
+          // Create client record for existing user (migration fix)
+          client = await storage.createClient({
+            userId: targetUserId,
+            status: 'PENDING',
+          });
+          console.log('Created client record:', client.id);
         }
         console.log('Client found:', client.id);
         
@@ -480,6 +491,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching users:", error);
       res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  app.delete('/api/admin/users/:id', requireAdmin, async (req: any, res: Response) => {
+    try {
+      const { id } = req.params;
+      const adminId = req.user.id;
+      const admin = await storage.getUser(adminId);
+
+      if (!admin || admin.role !== 'ADMIN') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      // Prevent admin from deleting themselves
+      if (id === adminId) {
+        return res.status(400).json({ message: "Cannot delete your own account" });
+      }
+
+      // Check if user exists
+      const userToDelete = await storage.getUser(id);
+      if (!userToDelete) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Prevent deleting other admin users
+      if (userToDelete.role === 'ADMIN') {
+        return res.status(400).json({ message: "Cannot delete admin users" });
+      }
+
+      // Audit log the deletion (commented out until USER_DELETE enum is added)
+      // await AuditService.logAction(admin, 'USER_DELETE', req, {
+      //   resourceType: 'user',
+      //   resourceId: id,
+      //   metadata: { 
+      //     deletedUserEmail: userToDelete.email,
+      //     deletedUserRole: userToDelete.role 
+      //   }
+      // });
+
+      await storage.deleteUser(id);
+      res.json({ message: "User deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ message: "Failed to delete user" });
     }
   });
 
@@ -785,9 +840,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
 
-      const client = await storage.getClientByUserId(userId);
+      let client = await storage.getClientByUserId(userId);
       if (!client) {
-        return res.status(404).json({ message: "Client profile not found" });
+        console.log('Client profile not found for user, creating one:', userId);
+        // Create client record for existing user (migration fix)
+        client = await storage.createClient({
+          userId: userId,
+          status: 'PENDING',
+        });
+        console.log('Created client record:', client.id);
       }
 
         // CRITICAL: Remove all problematic null/undefined date fields before processing
@@ -847,9 +908,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json(applications);
       } else {
         // Show specific client's applications
-        const client = await storage.getClientByUserId(targetUserId);
+        let client = await storage.getClientByUserId(targetUserId);
         if (!client) {
-          return res.status(404).json({ message: "Client profile not found" });
+          console.log('Client profile not found for user, creating one:', targetUserId);
+          // Create client record for existing user (migration fix)
+          client = await storage.createClient({
+            userId: targetUserId,
+            status: 'PENDING',
+          });
+          console.log('Created client record:', client.id);
         }
         
         const applications = await storage.getMerchantApplicationsByClientId(client.id);
@@ -943,8 +1010,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const applicationOwner = await storage.getUser(client.userId);
         if (applicationOwner) {
           import('./services/irisCrmService').then(({ IrisCrmService }) => {
+            // Sync via Zapier webhook (comprehensive payload)
             IrisCrmService.syncMerchantApplicationToIris(applicationOwner, application, client.irisLeadId!).catch(error => {
-              console.error('Failed to sync merchant application to IRIS CRM:', error);
+              console.error('Failed to sync merchant application to IRIS CRM via Zapier:', error);
+            });
+            
+            // Also update lead fields directly (field ID mapping)
+            IrisCrmService.updateLeadWithMerchantApplication(client.irisLeadId!, application).catch(error => {
+              console.error('Failed to update IRIS CRM lead with field mapping:', error);
             });
           }).catch(error => {
             console.error('Failed to import IRIS CRM service:', error);
@@ -1021,8 +1094,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const applicationOwner = await storage.getUser(client.userId);
           if (applicationOwner) {
             import('./services/irisCrmService').then(({ IrisCrmService }) => {
+              // Sync via Zapier webhook (comprehensive payload)
               IrisCrmService.syncMerchantApplicationToIris(applicationOwner, application, client.irisLeadId!).catch(error => {
-                console.error('Failed to sync merchant application to IRIS CRM:', error);
+                console.error('Failed to sync merchant application to IRIS CRM via Zapier:', error);
+              });
+              
+              // Also update lead fields directly (field ID mapping)
+              IrisCrmService.updateLeadWithMerchantApplication(client.irisLeadId!, application).catch(error => {
+                console.error('Failed to update IRIS CRM lead with field mapping:', error);
               });
             }).catch(error => {
               console.error('Failed to import IRIS CRM service:', error);

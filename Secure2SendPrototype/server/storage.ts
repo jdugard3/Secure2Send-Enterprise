@@ -3,6 +3,8 @@ import {
   clients,
   documents,
   merchantApplications,
+  sensitiveData,
+  auditLogs,
   type User,
   type InsertUser,
   type Client,
@@ -23,7 +25,9 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  upsertUser(user: any): Promise<User>;
   getAllUsers(): Promise<User[]>;
+  deleteUser(id: string): Promise<void>;
   
   // Client operations
   getClientByUserId(userId: string): Promise<Client | undefined>;
@@ -68,8 +72,88 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async upsertUser(user: any): Promise<User> {
+    const existingUser = await this.getUser(user.id);
+    if (existingUser) {
+      // Update existing user
+      const [updatedUser] = await db
+        .update(users)
+        .set({
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, user.id))
+        .returning();
+      
+      // Ensure client record exists
+      const existingClient = await this.getClientByUserId(user.id);
+      if (!existingClient) {
+        await this.createClient({
+          userId: user.id,
+          status: 'PENDING',
+        });
+      }
+      
+      return updatedUser;
+    } else {
+      // Create new user
+      const [newUser] = await db
+        .insert(users)
+        .values({
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          password: '', // Replit auth doesn't use passwords
+          role: 'CLIENT',
+          emailVerified: true,
+        })
+        .returning();
+      
+      // Create client record for new user
+      await this.createClient({
+        userId: newUser.id,
+        status: 'PENDING',
+      });
+      
+      return newUser;
+    }
+  }
+
   async getAllUsers(): Promise<User[]> {
     return await db.select().from(users);
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    try {
+      // Get client first
+      const client = await this.getClientByUserId(id);
+      
+      if (client) {
+        // Delete merchant applications for this user's client
+        await db.delete(merchantApplications).where(eq(merchantApplications.clientId, client.id));
+        
+        // Delete documents for this user's client  
+        await db.delete(documents).where(eq(documents.clientId, client.id));
+        
+        // Delete client record (this removes the foreign key reference)
+        await db.delete(clients).where(eq(clients.id, client.id));
+      }
+      
+      // Delete sensitive data for this user
+      await db.delete(sensitiveData).where(eq(sensitiveData.userId, id));
+      
+      // Delete audit logs for this user (skip for now to avoid enum error)
+      // await db.delete(auditLogs).where(eq(auditLogs.userId, id));
+      
+      // Finally delete the user
+      await db.delete(users).where(eq(users.id, id));
+    } catch (error) {
+      console.error("Error in deleteUser:", error);
+      throw error;
+    }
   }
 
   // Client operations
@@ -216,7 +300,7 @@ export class DatabaseStorage implements IStorage {
     return rows
       .filter((row) => row.clients && row.users)
       .map((row) => ({
-        ...row.merchantApplications,
+        ...row.merchant_applications,
         client: {
           ...row.clients!,
           user: row.users!,
@@ -263,7 +347,8 @@ export class DatabaseStorage implements IStorage {
     // Define date fields that should be converted to Date objects or null
     const dateFields = [
       'merchantDate', 'corduroDate', 'merchantSignatureDate', 'partnerSignatureDate',
-      'createdAt', 'updatedAt', 'submittedAt', 'reviewedAt', 'lastSavedAt'
+      'createdAt', 'updatedAt', 'submittedAt', 'reviewedAt', 'lastSavedAt',
+      'mpaSignedDate', 'entityStartDate', 'ownerBirthday', 'ownerIdExpDate', 'ownerIdDateIssued'
     ];
     
     console.log("sanitizeApplicationData - input data keys:", Object.keys(data));
@@ -271,6 +356,12 @@ export class DatabaseStorage implements IStorage {
     
     for (const [key, value] of Object.entries(data)) {
       console.log(`Processing field ${key}:`, value, `(type: ${typeof value})`);
+      
+      // Always preserve clientId and status - these are required
+      if (key === 'clientId' || key === 'status') {
+        sanitized[key] = value;
+        continue;
+      }
       
       // Skip undefined AND null values entirely
       if (value === undefined || value === null) {
