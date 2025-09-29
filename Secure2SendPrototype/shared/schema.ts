@@ -162,6 +162,78 @@ export const merchantApplications = pgTable("merchant_applications", {
   // Beneficial Ownership (stored as JSON array)
   beneficialOwners: jsonb("beneficial_owners"),
   
+  // IRIS CRM Integration Fields
+  // MPA and Sales Information
+  mpaSignedDate: timestamp("mpa_signed_date"),
+  salesRepName: varchar("sales_rep_name"),
+  
+  // Enhanced DBA Information
+  productOrServiceSold: text("product_or_service_sold"),
+  dbaWebsite: varchar("dba_website"),
+  multipleLocations: boolean("multiple_locations").default(false),
+  
+  // Enhanced Corporate Information
+  legalContactName: varchar("legal_contact_name"),
+  legalPhone: varchar("legal_phone"),
+  legalEmail: varchar("legal_email"),
+  incorporationState: varchar("incorporation_state"),
+  entityStartDate: timestamp("entity_start_date"),
+  
+  // Transaction and Volume
+  averageTicket: varchar("average_ticket"), // Using varchar to handle decimal precision
+  highTicket: varchar("high_ticket"),
+  monthlySalesVolume: varchar("monthly_sales_volume"),
+  monthlyTransactions: integer("monthly_transactions"),
+  annualVolume: varchar("annual_volume"),
+  annualTransactions: integer("annual_transactions"),
+  
+  // Enhanced Banking Information
+  accountOwnerFirstName: varchar("account_owner_first_name"),
+  accountOwnerLastName: varchar("account_owner_last_name"),
+  nameOnBankAccount: varchar("name_on_bank_account"),
+  bankOfficerName: varchar("bank_officer_name"),
+  bankOfficerPhone: varchar("bank_officer_phone"),
+  bankOfficerEmail: varchar("bank_officer_email"),
+  
+  // Enhanced Owner Information
+  ownerFullName: varchar("owner_full_name"),
+  ownerFirstName: varchar("owner_first_name"),
+  ownerLastName: varchar("owner_last_name"),
+  ownerOfficer: varchar("owner_officer"),
+  ownerTitle: varchar("owner_title"),
+  ownerOwnershipPercentage: varchar("owner_ownership_percentage"),
+  ownerMobilePhone: varchar("owner_mobile_phone"),
+  ownerEmail: varchar("owner_email"),
+  ownerSsn: varchar("owner_ssn"),
+  ownerBirthday: timestamp("owner_birthday"),
+  ownerStateIssuedIdNumber: varchar("owner_state_issued_id_number"),
+  ownerIdExpDate: timestamp("owner_id_exp_date"),
+  ownerIssuingState: varchar("owner_issuing_state"),
+  ownerIdDateIssued: timestamp("owner_id_date_issued"),
+  ownerLegalAddress: text("owner_legal_address"),
+  ownerCity: varchar("owner_city"),
+  ownerState: varchar("owner_state"),
+  ownerZip: varchar("owner_zip"),
+  ownerCountry: varchar("owner_country").default('US'),
+  
+  // Financial Representative (JSONB for complex structure)
+  financialRepresentative: jsonb("financial_representative"),
+  
+  // Business Operations
+  businessType: varchar("business_type").default('Retail'),
+  refundGuarantee: boolean("refund_guarantee").default(false),
+  refundDays: integer("refund_days"),
+  posSystem: varchar("pos_system"),
+  
+  // Authorized Contacts (JSONB for array of contacts)
+  authorizedContacts: jsonb("authorized_contacts"),
+  
+  // Auto-filled fields for IRIS integration
+  processedCardsPast: boolean("processed_cards_past").default(false),
+  previouslyProcessed: boolean("previously_processed").default(false),
+  automaticBilling: boolean("automatic_billing").default(false),
+  cardholderData3rdParty: boolean("cardholder_data_3rd_party").default(false),
+  
   // Corporate Resolution and Certification
   corporateResolution: text("corporate_resolution"),
   merchantSignature: varchar("merchant_signature"),
