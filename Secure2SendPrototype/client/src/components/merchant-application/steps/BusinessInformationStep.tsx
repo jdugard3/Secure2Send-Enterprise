@@ -6,12 +6,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Trash2, Building2, Users, CreditCard, Landmark } from "lucide-react";
+import { Plus, Trash2, Building2, Users, CreditCard, Landmark, FileText, Calculator, Briefcase } from "lucide-react";
 import { 
   MerchantApplicationForm,
   US_STATES,
   PROCESSING_CATEGORIES,
   OWNERSHIP_TYPES,
+  BUSINESS_TYPES,
   defaultPrincipalOfficer
 } from "@/lib/merchantApplicationSchemas";
 
@@ -40,6 +41,15 @@ const OWNERSHIP_TYPE_LABELS = {
   S_CORP: "S-Corp"
 } as const;
 
+const BUSINESS_TYPE_LABELS = {
+  'Retail': "Retail",
+  'E-Commerce': "E-Commerce",
+  'Restaurant': "Restaurant",
+  'Professional Services': "Professional Services",
+  'Healthcare': "Healthcare",
+  'Other': "Other"
+} as const;
+
 export function BusinessInformationStep({ form }: BusinessInformationStepProps) {
   const { fields: principalOfficers, append, remove } = useFieldArray({
     control: form.control,
@@ -56,30 +66,58 @@ export function BusinessInformationStep({ form }: BusinessInformationStepProps) 
     }
   };
 
+  // Auto-calculation logic for derived fields
+  const calculateDerivedFields = () => {
+    const averageTicketValue = form.getValues("averageTicket");
+    const monthlySalesVolumeValue = form.getValues("monthlySalesVolume");
+    
+    const averageTicket = parseFloat(averageTicketValue) || 0;
+    const monthlySalesVolume = parseFloat(monthlySalesVolumeValue) || 0;
+    
+    if (averageTicket > 0 && monthlySalesVolume > 0) {
+      // Calculate monthly transactions: Monthly Sales Volume / Average Ticket
+      const monthlyTransactions = Math.round(monthlySalesVolume / averageTicket);
+      form.setValue("monthlyTransactions", monthlyTransactions);
+      
+      // Calculate annual volume: Monthly Sales Volume * 12
+      const annualVolume = (monthlySalesVolume * 12).toString();
+      form.setValue("annualVolume", annualVolume);
+      
+      // Calculate annual transactions: Monthly Transactions * 12
+      const annualTransactions = monthlyTransactions * 12;
+      form.setValue("annualTransactions", annualTransactions);
+    } else {
+      // Reset calculated fields if inputs are invalid
+      form.setValue("monthlyTransactions", 0);
+      form.setValue("annualVolume", "");
+      form.setValue("annualTransactions", 0);
+    }
+  };
+
   return (
     <Form {...form}>
       <div className="space-y-8">
-        {/* Business Information */}
+        {/* MPA and Sales Information */}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-primary" />
-              <CardTitle>Business Information</CardTitle>
+              <FileText className="h-5 w-5 text-primary" />
+              <CardTitle>MPA and Sales Information</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="legalBusinessName"
+                name="mpaSignedDate"
                 render={({ field, fieldState }) => (
                   <FormItem>
                     <FormLabel className={fieldState.error ? "text-destructive" : ""}>
-                      Legal Name of Business or Corporate Owner *
+                      MPA Signed Date *
                     </FormLabel>
                     <FormControl>
                       <Input 
-                        placeholder="Enter legal business name" 
+                        type="date"
                         className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
                         {...field} 
                       />
@@ -91,12 +129,65 @@ export function BusinessInformationStep({ form }: BusinessInformationStepProps) 
 
               <FormField
                 control={form.control}
-                name="dbaBusinessName"
+                name="salesRepName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>DBA (Doing Business As) Name</FormLabel>
+                    <FormLabel>Sales Rep Name</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter DBA name" {...field} />
+                      <Input placeholder="Enter sales representative name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* DBA Information */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-primary" />
+              <CardTitle>DBA Information</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="dbaBusinessName"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      DBA Name *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Enter DBA name" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="dbaWebsite"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      DBA Website *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Enter website URL" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -105,26 +196,6 @@ export function BusinessInformationStep({ form }: BusinessInformationStepProps) 
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="billingAddress"
-                render={({ field, fieldState }) => (
-                  <FormItem>
-                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
-                      Billing Address *
-                    </FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="Enter billing address" 
-                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
               <FormField
                 control={form.control}
                 name="locationAddress"
@@ -144,17 +215,43 @@ export function BusinessInformationStep({ form }: BusinessInformationStepProps) 
                   </FormItem>
                 )}
               />
+
+              <FormField
+                control={form.control}
+                name="productOrServiceSold"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Product or Service Sold *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Describe products or services" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <FormField
                 control={form.control}
                 name="city"
-                render={({ field }) => (
+                render={({ field, fieldState }) => (
                   <FormItem>
-                    <FormLabel>City *</FormLabel>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      City *
+                    </FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter city" {...field} />
+                      <Input 
+                        placeholder="Enter city" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -164,12 +261,14 @@ export function BusinessInformationStep({ form }: BusinessInformationStepProps) 
               <FormField
                 control={form.control}
                 name="state"
-                render={({ field }) => (
+                render={({ field, fieldState }) => (
                   <FormItem>
-                    <FormLabel>State *</FormLabel>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      State *
+                    </FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}>
                           <SelectValue placeholder="Select state" />
                         </SelectTrigger>
                       </FormControl>
@@ -189,13 +288,39 @@ export function BusinessInformationStep({ form }: BusinessInformationStepProps) 
               <FormField
                 control={form.control}
                 name="zip"
-                render={({ field }) => (
+                render={({ field, fieldState }) => (
                   <FormItem>
-                    <FormLabel>ZIP Code *</FormLabel>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      ZIP Code *
+                    </FormLabel>
                     <FormControl>
-                      <Input placeholder="12345" {...field} />
+                      <Input 
+                        placeholder="Enter ZIP code" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
                     </FormControl>
                     <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="multipleLocations"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>
+                        Multiple Locations?
+                      </FormLabel>
+                    </div>
                   </FormItem>
                 )}
               />
@@ -212,111 +337,7 @@ export function BusinessInformationStep({ form }: BusinessInformationStepProps) 
                     </FormLabel>
                     <FormControl>
                       <Input 
-                        placeholder="(555) 123-4567" 
-                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="businessFaxNumber"
-                render={({ field, fieldState }) => (
-                  <FormItem>
-                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
-                      Business Fax Number
-                    </FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="(555) 123-4567" 
-                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="customerServicePhone"
-                render={({ field, fieldState }) => (
-                  <FormItem>
-                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
-                      Customer Service Phone *
-                    </FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="(555) 123-4567" 
-                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="federalTaxIdNumber"
-                render={({ field, fieldState }) => (
-                  <FormItem>
-                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
-                      Federal Tax ID Number *
-                    </FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="12-3456789" 
-                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <FormField
-                control={form.control}
-                name="contactName"
-                render={({ field, fieldState }) => (
-                  <FormItem>
-                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
-                      Contact Name/Office Manager *
-                    </FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="Enter contact name" 
-                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="contactPhoneNumber"
-                render={({ field, fieldState }) => (
-                  <FormItem>
-                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
-                      Contact Phone Number *
-                    </FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="(555) 123-4567" 
+                        placeholder="Enter business phone" 
                         className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
                         {...field} 
                       />
@@ -336,7 +357,61 @@ export function BusinessInformationStep({ form }: BusinessInformationStepProps) 
                     </FormLabel>
                     <FormControl>
                       <Input 
-                        placeholder="contact@example.com" 
+                        type="email"
+                        placeholder="Enter contact email" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Corporate Information */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Briefcase className="h-5 w-5 text-primary" />
+              <CardTitle>Corporate Information</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="legalBusinessName"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Legal Business Name *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Enter legal business name" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="billingAddress"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Legal Address *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Enter legal address" 
                         className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
                         {...field} 
                       />
@@ -347,99 +422,615 @@ export function BusinessInformationStep({ form }: BusinessInformationStepProps) 
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name="websiteAddress"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Website Address</FormLabel>
-                  <FormControl>
-                    <Input placeholder="https://www.example.com" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="legalContactName"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Legal Contact Name *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Enter legal contact name" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="legalPhone"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Legal Phone *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Enter legal phone" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="legalEmail"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Legal Email *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="email"
+                        placeholder="Enter legal email" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="ownershipType"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Entity Type *
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}>
+                          <SelectValue placeholder="Select entity type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {OWNERSHIP_TYPES.map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {OWNERSHIP_TYPE_LABELS[type]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="federalTaxIdNumber"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Federal Tax ID *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Enter Federal Tax ID" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="incorporationState"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Incorporation State *
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}>
+                          <SelectValue placeholder="Select state" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {US_STATES.map((state) => (
+                          <SelectItem key={state} value={state}>
+                            {state}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="entityStartDate"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Entity Start Date *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="date"
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
           </CardContent>
         </Card>
 
-        {/* Business Description */}
+        {/* Transaction and Volume */}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
-              <CreditCard className="h-5 w-5 text-primary" />
-              <CardTitle>Business Description</CardTitle>
+              <Calculator className="h-5 w-5 text-primary" />
+              <CardTitle>Transaction and Volume</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
-            <FormField
-              control={form.control}
-              name="processingCategories"
-              render={({ fieldState }) => (
-                <FormItem>
-                  <FormLabel className={fieldState.error ? "text-destructive" : ""}>
-                    Processing Category *
-                  </FormLabel>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="averageTicket"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Average Ticket *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Enter average ticket amount" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field}
+                        onChange={(e) => {
+                          field.onChange(e);
+                          setTimeout(calculateDerivedFields, 100);
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="highTicket"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      High Ticket *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Enter high ticket amount" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="monthlySalesVolume"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Monthly Sales Volume *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Enter monthly sales volume" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field}
+                        onChange={(e) => {
+                          field.onChange(e);
+                          setTimeout(calculateDerivedFields, 100);
+                        }}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="monthlyTransactions"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Monthly # of Transactions</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number"
+                        placeholder="Auto-calculated from volume/average ticket" 
+                        {...field}
+                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Enhanced Banking Information */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Landmark className="h-5 w-5 text-primary" />
+              <CardTitle>Banking Information</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="accountOwnerFirstName"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Account Owner First Name *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Enter account owner first name" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="accountOwnerLastName"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Account Owner Last Name *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Enter account owner last name" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="nameOnBankAccount"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Name on Bank Account *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Enter name on bank account" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="bankName"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Bank Name *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Enter bank name" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="abaRoutingNumber"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      ABA Routing Number *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Enter 9-digit routing number" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="ddaNumber"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Account Number *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Enter account number" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="bankOfficerName"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Bank Officer Name *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Enter bank officer name" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="bankOfficerPhone"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Bank Officer Phone *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Enter bank officer phone" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="bankOfficerEmail"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Bank Officer Email *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="email"
+                        placeholder="Enter bank officer email" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Business Operations */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Briefcase className="h-5 w-5 text-primary" />
+              <CardTitle>Business Operations</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="businessType"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Business Type *
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}>
+                          <SelectValue placeholder="Select business type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {BUSINESS_TYPES.map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {BUSINESS_TYPE_LABELS[type]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="posSystem"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      POS System *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Enter POS system" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="refundDays"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Refund Days</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number"
+                        placeholder="Enter refund days" 
+                        {...field}
+                        onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="refundGuarantee"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                    <FormControl>
+                      <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                      <FormLabel>
+                        Refund/Guarantee Policy?
+                      </FormLabel>
+                    </div>
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="processingCategories"
+                render={() => (
+                  <FormItem>
+                    <div className="mb-4">
+                      <FormLabel className="text-base">Processing Categories *</FormLabel>
+                    </div>
                     {PROCESSING_CATEGORIES.map((category) => (
                       <FormField
                         key={category}
                         control={form.control}
                         name="processingCategories"
-                        render={({ field }) => (
-                          <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value?.includes(category)}
-                                onCheckedChange={(checked) => {
-                                  const current = field.value || [];
-                                  if (checked) {
-                                    field.onChange([...current, category]);
-                                  } else {
-                                    field.onChange(current.filter((c) => c !== category));
-                                  }
-                                }}
-                              />
-                            </FormControl>
-                            <FormLabel className="text-sm font-normal cursor-pointer">
-                              {PROCESSING_CATEGORY_LABELS[category]}
-                            </FormLabel>
-                          </FormItem>
-                        )}
+                        render={({ field }) => {
+                          return (
+                            <FormItem
+                              key={category}
+                              className="flex flex-row items-start space-x-3 space-y-0"
+                            >
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value?.includes(category)}
+                                  onCheckedChange={(checked) => {
+                                    return checked
+                                      ? field.onChange([...field.value, category])
+                                      : field.onChange(
+                                          field.value?.filter(
+                                            (value) => value !== category
+                                          )
+                                        )
+                                  }}
+                                />
+                              </FormControl>
+                              <FormLabel className="font-normal">
+                                {PROCESSING_CATEGORY_LABELS[category]}
+                              </FormLabel>
+                            </FormItem>
+                          )
+                        }}
                       />
                     ))}
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="ownershipType"
-              render={({ field, fieldState }) => (
-                <FormItem>
-                  <FormLabel className={fieldState.error ? "text-destructive" : ""}>
-                    Type of Ownership *
-                  </FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger className={fieldState.error ? "border-destructive focus:ring-destructive" : ""}>
-                        <SelectValue placeholder="Select ownership type" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {OWNERSHIP_TYPES.map((type) => (
-                        <SelectItem key={type} value={type}>
-                          {OWNERSHIP_TYPE_LABELS[type]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
           </CardContent>
         </Card>
 
@@ -449,7 +1040,7 @@ export function BusinessInformationStep({ form }: BusinessInformationStepProps) 
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-primary" />
-                <CardTitle>Owner/Principal Officers</CardTitle>
+                <CardTitle>Principal Officers</CardTitle>
               </div>
               <Button
                 type="button"
@@ -466,11 +1057,11 @@ export function BusinessInformationStep({ form }: BusinessInformationStepProps) 
             {principalOfficers.map((field, index) => (
               <div key={field.id} className="space-y-4 p-4 border rounded-lg">
                 <div className="flex items-center justify-between">
-                  <h4 className="font-medium">Principal Officer #{index + 1}</h4>
+                  <h4 className="text-sm font-medium">Principal Officer {index + 1}</h4>
                   {principalOfficers.length > 1 && (
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
                       onClick={() => removePrincipalOfficer(index)}
                     >
@@ -485,7 +1076,7 @@ export function BusinessInformationStep({ form }: BusinessInformationStepProps) 
                     name={`principalOfficers.${index}.name`}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Principal Owner/Officer Name *</FormLabel>
+                        <FormLabel>Name *</FormLabel>
                         <FormControl>
                           <Input placeholder="Enter name" {...field} />
                         </FormControl>
@@ -509,7 +1100,7 @@ export function BusinessInformationStep({ form }: BusinessInformationStepProps) 
                   />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name={`principalOfficers.${index}.ssn`}
@@ -537,22 +1128,36 @@ export function BusinessInformationStep({ form }: BusinessInformationStepProps) 
                       </FormItem>
                     )}
                   />
+                </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
                     name={`principalOfficers.${index}.equityPercentage`}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Equity % *</FormLabel>
+                        <FormLabel>Equity Percentage *</FormLabel>
                         <FormControl>
-                          <Input
-                            type="number"
-                            min="0"
-                            max="100"
-                            placeholder="0"
+                          <Input 
+                            type="number" 
+                            placeholder="Enter percentage" 
                             {...field}
-                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
+                            onChange={(e) => field.onChange(e.target.value ? parseFloat(e.target.value) : 0)}
                           />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name={`principalOfficers.${index}.phoneNumber`}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Phone Number *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter phone number" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -574,7 +1179,7 @@ export function BusinessInformationStep({ form }: BusinessInformationStepProps) 
                   )}
                 />
 
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
                     name={`principalOfficers.${index}.city`}
@@ -619,110 +1224,17 @@ export function BusinessInformationStep({ form }: BusinessInformationStepProps) 
                     name={`principalOfficers.${index}.zip`}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>ZIP *</FormLabel>
+                        <FormLabel>ZIP Code *</FormLabel>
                         <FormControl>
-                          <Input placeholder="12345" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name={`principalOfficers.${index}.phoneNumber`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Phone Number *</FormLabel>
-                        <FormControl>
-                          <Input placeholder="(555) 123-4567" {...field} />
+                          <Input placeholder="Enter ZIP code" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
-
-                {index < principalOfficers.length - 1 && <Separator />}
               </div>
             ))}
-          </CardContent>
-        </Card>
-
-        {/* Settlement/Banking */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center gap-2">
-              <Landmark className="h-5 w-5 text-primary" />
-              <CardTitle>Settlement: Attach Voided Business Check or Confirmation of Account on Bank Letterhead</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="bankName"
-                render={({ field, fieldState }) => (
-                  <FormItem>
-                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
-                      Bank Name *
-                    </FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="Enter bank name" 
-                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="abaRoutingNumber"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>ABA/Routing Number *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="123456789" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="accountName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Account Name *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter account name" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="ddaNumber"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>DDA Number *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter DDA number" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
           </CardContent>
         </Card>
       </div>

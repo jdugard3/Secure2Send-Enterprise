@@ -52,64 +52,64 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
                   <tr>
                     <td className="border border-gray-300 p-3 font-medium">Other Services</td>
                     <td className="border border-gray-300 p-3">
-                      <FormField
-                        control={form.control}
-                        name="feeScheduleData.qualificationDiscountFee"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                className="text-center"
-                                {...field}
-                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
+                <FormField
+                  control={form.control}
+                  name={"feeScheduleData.qualificationDiscountFee" as any}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          className="text-center"
+                          value={field.value || ""}
+                          onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
                     </td>
                     <td className="border border-gray-300 p-3">
-                      <FormField
-                        control={form.control}
-                        name="feeScheduleData.qualificationPerItem"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                className="text-center"
-                                {...field}
-                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
+                <FormField
+                  control={form.control}
+                  name={"feeScheduleData.qualificationPerItem" as any}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          className="text-center"
+                          value={field.value || ""}
+                          onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
                     </td>
                     <td className="border border-gray-300 p-3">
-                      <FormField
-                        control={form.control}
-                        name="feeScheduleData.minimumFee"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                className="text-center"
-                                {...field}
-                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
+                <FormField
+                  control={form.control}
+                  name={"feeScheduleData.minimumFee" as any}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          className="text-center"
+                          value={field.value || ""}
+                          onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
                     </td>
                   </tr>
                   <tr>
@@ -140,7 +140,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
-                  name="supportingInformation.salesInformation.averageTicket"
+                  name={"supportingInformation.salesInformation.averageTicket" as any}
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Average Ticket</FormLabel>
@@ -150,7 +150,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
                           step="0.01"
                           min="0"
                           placeholder="0.00"
-                          {...field}
+                          value={field.value || ""}
                           onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
                         />
                       </FormControl>
@@ -161,7 +161,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
 
                 <FormField
                   control={form.control}
-                  name="supportingInformation.salesInformation.highTicket"
+                  name={"supportingInformation.salesInformation.highTicket" as any}
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>High Ticket</FormLabel>
@@ -171,7 +171,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
                           step="0.01"
                           min="0"
                           placeholder="0.00"
-                          {...field}
+                          value={field.value || ""}
                           onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
                         />
                       </FormControl>
@@ -182,7 +182,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
 
                 <FormField
                   control={form.control}
-                  name="supportingInformation.salesInformation.monthlyVolume"
+                  name={"supportingInformation.salesInformation.monthlyVolume" as any}
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Monthly Volume</FormLabel>
@@ -192,7 +192,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
                           step="0.01"
                           min="0"
                           placeholder="0.00"
-                          {...field}
+                          value={field.value || ""}
                           onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
                         />
                       </FormControl>
@@ -203,7 +203,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
 
                 <FormField
                   control={form.control}
-                  name="supportingInformation.salesInformation.annualVolume"
+                  name={"supportingInformation.salesInformation.annualVolume" as any}
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Annual Volume</FormLabel>
@@ -213,7 +213,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
                           step="0.01"
                           min="0"
                           placeholder="0.00"
-                          {...field}
+                          value={field.value || ""}
                           onChange={(e) => field.onChange(parseFloat(e.target.value) || undefined)}
                         />
                       </FormControl>
@@ -232,7 +232,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <FormField
                   control={form.control}
-                  name="supportingInformation.monthlyFees.monthlyMin"
+                  name={"supportingInformation.monthlyFees.monthlyMin" as any}
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Monthly Min</FormLabel>
@@ -241,8 +241,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
                           type="number"
                           step="0.01"
                           min="0"
-                          defaultValue="10.00"
-                          {...field}
+                          value={field.value || "10.00"}
                           onChange={(e) => field.onChange(parseFloat(e.target.value) || 10.00)}
                         />
                       </FormControl>
@@ -253,7 +252,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
 
                 <FormField
                   control={form.control}
-                  name="supportingInformation.monthlyFees.monthlyServiceFee"
+                  name={"supportingInformation.monthlyFees.monthlyServiceFee" as any}
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Monthly Service Fee</FormLabel>
@@ -262,8 +261,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
                           type="number"
                           step="0.01"
                           min="0"
-                          defaultValue="0.00"
-                          {...field}
+                          value={field.value || "0.00"}
                           onChange={(e) => field.onChange(parseFloat(e.target.value) || 0.00)}
                         />
                       </FormControl>
@@ -274,7 +272,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
 
                 <FormField
                   control={form.control}
-                  name="supportingInformation.monthlyFees.wirelessFee"
+                  name={"supportingInformation.monthlyFees.wirelessFee" as any}
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Wireless Fee</FormLabel>
@@ -283,8 +281,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
                           type="number"
                           step="0.01"
                           min="0"
-                          defaultValue="0.00"
-                          {...field}
+                          value={field.value || "0.00"}
                           onChange={(e) => field.onChange(parseFloat(e.target.value) || 0.00)}
                         />
                       </FormControl>
@@ -295,7 +292,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
 
                 <FormField
                   control={form.control}
-                  name="supportingInformation.monthlyFees.industryNonCompliance"
+                  name={"supportingInformation.monthlyFees.industryNonCompliance" as any}
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Industry Non-Compliance</FormLabel>
@@ -304,8 +301,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
                           type="number"
                           step="0.01"
                           min="0"
-                          defaultValue="0.00"
-                          {...field}
+                          value={field.value || "0.00"}
                           onChange={(e) => field.onChange(parseFloat(e.target.value) || 0.00)}
                         />
                       </FormControl>
@@ -316,7 +312,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
 
                 <FormField
                   control={form.control}
-                  name="supportingInformation.monthlyFees.miscMonthlyFee"
+                  name={"supportingInformation.monthlyFees.miscMonthlyFee" as any}
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Misc Monthly Fee</FormLabel>
@@ -325,8 +321,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
                           type="number"
                           step="0.01"
                           min="0"
-                          defaultValue="0.00"
-                          {...field}
+                          value={field.value || "0.00"}
                           onChange={(e) => field.onChange(parseFloat(e.target.value) || 0.00)}
                         />
                       </FormControl>
@@ -337,7 +332,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
 
                 <FormField
                   control={form.control}
-                  name="supportingInformation.monthlyFees.chargebackFee"
+                  name={"supportingInformation.monthlyFees.chargebackFee" as any}
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Chargeback Fee</FormLabel>
@@ -346,8 +341,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
                           type="number"
                           step="0.01"
                           min="0"
-                          defaultValue="25.00"
-                          {...field}
+                          value={field.value || "25.00"}
                           onChange={(e) => field.onChange(parseFloat(e.target.value) || 25.00)}
                         />
                       </FormControl>
@@ -366,12 +360,12 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
               <div className="space-y-4">
                 <FormField
                   control={form.control}
-                  name="supportingInformation.miscellaneous.salesTerminalPurchaseDesired"
+                  name={"supportingInformation.miscellaneous.salesTerminalPurchaseDesired" as any}
                   render={({ field }) => (
                     <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                       <FormControl>
                         <Checkbox
-                          checked={field.value}
+                          checked={!!field.value}
                           onCheckedChange={field.onChange}
                         />
                       </FormControl>
@@ -385,7 +379,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
-                    name="supportingInformation.miscellaneous.generalFee"
+                    name={"supportingInformation.miscellaneous.generalFee" as any}
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>General Fee</FormLabel>
@@ -394,8 +388,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
                             type="number"
                             step="0.01"
                             min="0"
-                            defaultValue="35.00"
-                            {...field}
+                            value={field.value || "35.00"}
                             onChange={(e) => field.onChange(parseFloat(e.target.value) || 35.00)}
                           />
                         </FormControl>
@@ -406,7 +399,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
 
                   <FormField
                     control={form.control}
-                    name="supportingInformation.miscellaneous.rushFee"
+                    name={"supportingInformation.miscellaneous.rushFee" as any}
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Rush Fee</FormLabel>
@@ -415,8 +408,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
                             type="number"
                             step="0.01"
                             min="0"
-                            defaultValue="35.00"
-                            {...field}
+                            value={field.value || "35.00"}
                             onChange={(e) => field.onChange(parseFloat(e.target.value) || 35.00)}
                           />
                         </FormControl>
@@ -427,7 +419,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
 
                   <FormField
                     control={form.control}
-                    name="supportingInformation.miscellaneous.achRejectFee"
+                    name={"supportingInformation.miscellaneous.achRejectFee" as any}
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>ACH Reject Fee</FormLabel>
@@ -436,8 +428,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
                             type="number"
                             step="0.01"
                             min="0"
-                            defaultValue="35.00"
-                            {...field}
+                            value={field.value || "35.00"}
                             onChange={(e) => field.onChange(parseFloat(e.target.value) || 35.00)}
                           />
                         </FormControl>
@@ -448,7 +439,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
 
                   <FormField
                     control={form.control}
-                    name="supportingInformation.miscellaneous.onlineReportingFee"
+                    name={"supportingInformation.miscellaneous.onlineReportingFee" as any}
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Online Reporting Fee</FormLabel>
@@ -457,8 +448,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
                             type="number"
                             step="0.01"
                             min="0"
-                            defaultValue="35.00"
-                            {...field}
+                            value={field.value || "35.00"}
                             onChange={(e) => field.onChange(parseFloat(e.target.value) || 35.00)}
                           />
                         </FormControl>
@@ -469,7 +459,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
 
                   <FormField
                     control={form.control}
-                    name="supportingInformation.miscellaneous.monthlyServiceFee"
+                    name={"supportingInformation.miscellaneous.monthlyServiceFee" as any}
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Monthly Service Fee</FormLabel>
@@ -478,8 +468,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
                             type="number"
                             step="0.01"
                             min="0"
-                            defaultValue="10.00"
-                            {...field}
+                            value={field.value || "10.00"}
                             onChange={(e) => field.onChange(parseFloat(e.target.value) || 10.00)}
                           />
                         </FormControl>
@@ -490,7 +479,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
 
                   <FormField
                     control={form.control}
-                    name="supportingInformation.miscellaneous.batchFee"
+                    name={"supportingInformation.miscellaneous.batchFee" as any}
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Batch Fee</FormLabel>
@@ -499,8 +488,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
                             type="number"
                             step="0.01"
                             min="0"
-                            defaultValue="0.00"
-                            {...field}
+                            value={field.value || "0.00"}
                             onChange={(e) => field.onChange(parseFloat(e.target.value) || 0.00)}
                           />
                         </FormControl>

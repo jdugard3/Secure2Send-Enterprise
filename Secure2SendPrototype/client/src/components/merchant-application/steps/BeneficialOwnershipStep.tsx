@@ -6,17 +6,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Plus, Trash2, Users, AlertCircle } from "lucide-react";
-import { MerchantApplicationForm, US_STATES, defaultBeneficialOwner } from "@/lib/merchantApplicationSchemas";
+import { MerchantApplicationForm, US_STATES, ID_TYPES, defaultBeneficialOwner } from "@/lib/merchantApplicationSchemas";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface BeneficialOwnershipStepProps {
   form: UseFormReturn<MerchantApplicationForm>;
 }
 
-const ID_TYPES = [
-  { value: 'DRIVERS_LICENSE', label: "Driver's License" },
-  { value: 'PASSPORT', label: 'US Passport' },
-  { value: 'OTHER', label: 'Other (Specify)' }
-] as const;
+const ID_TYPE_LABELS = {
+  'DRIVERS_LICENSE': "Driver's License",
+  'PASSPORT': 'US Passport', 
+  'STATE_ID': 'State ID',
+  'OTHER': 'Other (Specify)'
+} as const;
 
 export function BeneficialOwnershipStep({ form }: BeneficialOwnershipStepProps) {
   const { fields: beneficialOwners, append, remove } = useFieldArray({
@@ -305,8 +307,8 @@ export function BeneficialOwnershipStep({ form }: BeneficialOwnershipStepProps) 
                           </FormControl>
                           <SelectContent>
                             {ID_TYPES.map((type) => (
-                              <SelectItem key={type.value} value={type.value}>
-                                {type.label}
+                              <SelectItem key={type} value={type}>
+                                {ID_TYPE_LABELS[type]}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -331,13 +333,13 @@ export function BeneficialOwnershipStep({ form }: BeneficialOwnershipStepProps) 
                   />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
                     name={`beneficialOwners.${index}.idState`}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>State Issued ID</FormLabel>
+                        <FormLabel>Issuing State</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value}>
                           <FormControl>
                             <SelectTrigger>
@@ -359,10 +361,10 @@ export function BeneficialOwnershipStep({ form }: BeneficialOwnershipStepProps) 
 
                   <FormField
                     control={form.control}
-                    name={`beneficialOwners.${index}.idExpDate`}
+                    name={`beneficialOwners.${index}.idDateIssued`}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Expiration Date *</FormLabel>
+                        <FormLabel>ID Date Issued *</FormLabel>
                         <FormControl>
                           <Input type="date" {...field} />
                         </FormControl>
@@ -370,6 +372,78 @@ export function BeneficialOwnershipStep({ form }: BeneficialOwnershipStepProps) 
                       </FormItem>
                     )}
                   />
+
+                  <FormField
+                    control={form.control}
+                    name={`beneficialOwners.${index}.idExpDate`}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>ID Expiration Date *</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name={`beneficialOwners.${index}.country`}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Country *</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Enter country" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="space-y-4">
+                    <FormField
+                      control={form.control}
+                      name={`beneficialOwners.${index}.ssnOrTinFromUs`}
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel>
+                              SSN or TIN from US? *
+                            </FormLabel>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name={`beneficialOwners.${index}.controlPerson`}
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel>
+                              Control Person? *
+                            </FormLabel>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
 
                 {index < beneficialOwners.length - 1 && <Separator className="mt-6" />}
