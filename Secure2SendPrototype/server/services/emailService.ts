@@ -12,6 +12,8 @@ import { AllDocumentsApprovedEmail } from '../emails/AllDocumentsApprovedEmail';
 import { NewUserNotificationEmail } from '../emails/NewUserNotificationEmail';
 import { NewDocumentNotificationEmail } from '../emails/NewDocumentNotificationEmail';
 import { SecurityAlertEmail } from '../emails/SecurityAlertEmail';
+import { MfaEnabledEmail } from '../emails/MfaEnabledEmail';
+import { MfaDisabledEmail } from '../emails/MfaDisabledEmail';
 import type { User, Document, Client } from '@shared/schema';
 
 // Initialize email providers based on configuration
@@ -339,6 +341,50 @@ export class EmailService {
       console.log(`✅ Security alert email sent to ${admin.email} for ${alertDetails.type}`);
     } catch (error) {
       console.error('❌ Failed to send security alert email:', error);
+    }
+  }
+
+  /**
+   * Send MFA enabled notification email
+   */
+  static async sendMfaEnabledEmail(user: User): Promise<void> {
+    try {
+      const emailHtml = await render(MfaEnabledEmail({
+        firstName: user.firstName || 'there',
+        appUrl: env.APP_URL!,
+      }));
+
+      await this.sendEmail({
+        to: user.email,
+        subject: '🔐 Multi-Factor Authentication Enabled - Secure2Send',
+        html: emailHtml,
+      });
+
+      console.log(`✅ MFA enabled email sent to ${user.email}`);
+    } catch (error) {
+      console.error('❌ Failed to send MFA enabled email:', error);
+    }
+  }
+
+  /**
+   * Send MFA disabled notification email
+   */
+  static async sendMfaDisabledEmail(user: User): Promise<void> {
+    try {
+      const emailHtml = await render(MfaDisabledEmail({
+        firstName: user.firstName || 'there',
+        appUrl: env.APP_URL!,
+      }));
+
+      await this.sendEmail({
+        to: user.email,
+        subject: '⚠️ Multi-Factor Authentication Disabled - Secure2Send',
+        html: emailHtml,
+      });
+
+      console.log(`✅ MFA disabled email sent to ${user.email}`);
+    } catch (error) {
+      console.error('❌ Failed to send MFA disabled email:', error);
     }
   }
 

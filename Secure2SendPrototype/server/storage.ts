@@ -499,6 +499,55 @@ export class DatabaseStorage implements IStorage {
   async deleteMerchantApplication(id: string): Promise<void> {
     await db.delete(merchantApplications).where(eq(merchantApplications.id, id));
   }
+
+  // MFA-related methods
+  async enableUserMfa(userId: string, secret: string, backupCodes: string[]): Promise<void> {
+    await db
+      .update(users)
+      .set({
+        mfaEnabled: true,
+        mfaRequired: false, // No longer required once enabled
+        mfaSecret: secret,
+        mfaBackupCodes: backupCodes,
+        mfaSetupAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+  }
+
+  async disableUserMfa(userId: string): Promise<void> {
+    await db
+      .update(users)
+      .set({
+        mfaEnabled: false,
+        mfaSecret: null,
+        mfaBackupCodes: null,
+        mfaSetupAt: null,
+        mfaLastUsed: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+  }
+
+  async updateUserMfaLastUsed(userId: string): Promise<void> {
+    await db
+      .update(users)
+      .set({
+        mfaLastUsed: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+  }
+
+  async updateUserMfaBackupCodes(userId: string, backupCodes: string[]): Promise<void> {
+    await db
+      .update(users)
+      .set({
+        mfaBackupCodes: backupCodes,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+  }
 }
 
 export const storage = new DatabaseStorage();

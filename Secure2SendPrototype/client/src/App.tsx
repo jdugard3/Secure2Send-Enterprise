@@ -13,6 +13,8 @@ import Admin from "@/pages/admin";
 import Documents from "@/pages/documents";
 import MerchantApplications from "@/pages/merchant-applications";
 import Activity from "@/pages/activity";
+import SettingsPage from "@/pages/settings";
+import MfaSetupPage from "@/pages/mfa-setup";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -39,10 +41,12 @@ function Router() {
         </>
       ) : (
         <>
+          <Route path="/mfa-setup" component={MfaSetupPage} />
           <Route path="/" component={Home} />
           <Route path="/documents" component={Documents} />
           <Route path="/merchant-applications" component={MerchantApplications} />
           <Route path="/activity" component={Activity} />
+          <Route path="/settings" component={SettingsPage} />
           {user?.role === 'ADMIN' && (
             <>
               <Route path="/admin" component={Admin} />

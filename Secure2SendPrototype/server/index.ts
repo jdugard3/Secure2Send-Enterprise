@@ -4,6 +4,7 @@ import { setupVite, serveStatic, log } from "./vite";
 import { env } from "./env";
 import { generalLimiter } from "./middleware/rateLimiting";
 import { errorHandler, notFoundHandler, setupGracefulShutdown } from "./middleware/errorHandler";
+import { requireMfaSetup } from "./middleware/mfaRequired";
 import helmet from "helmet";
 import cors from "cors";
 
@@ -51,6 +52,9 @@ app.use(cors({
 
 // Apply general rate limiting to all API routes
 app.use("/api", generalLimiter);
+
+// Apply MFA requirement middleware to all routes
+app.use(requireMfaSetup);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));

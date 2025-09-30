@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Trash2, DollarSign, Package, Settings } from "lucide-react";
+import { Plus, Trash2, DollarSign, Package, Settings as SettingsIcon } from "lucide-react";
 import { MerchantApplicationForm, defaultEquipment } from "@/lib/merchantApplicationSchemas";
 
 interface FeeScheduleStepProps {
@@ -129,7 +129,7 @@ export function FeeScheduleStep({ form }: FeeScheduleStepProps) {
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
-              <Settings className="h-5 w-5 text-primary" />
+              <SettingsIcon className="h-5 w-5 text-primary" />
               <CardTitle>Supporting Information</CardTitle>
             </div>
           </CardHeader>

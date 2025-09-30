@@ -67,7 +67,13 @@ export const auditLogEnum = pgEnum('audit_action', [
   'MERCHANT_APPLICATION_CREATE',
   'MERCHANT_APPLICATION_UPDATE',
   'MERCHANT_APPLICATION_SUBMIT',
-  'MERCHANT_APPLICATION_REVIEW'
+  'MERCHANT_APPLICATION_REVIEW',
+  'MFA_ENABLED',
+  'MFA_DISABLED',
+  'MFA_BACKUP_CODE_USED',
+  'MFA_SETUP_COMPLETED',
+  'MFA_VERIFICATION_FAILED',
+  'MFA_VERIFICATION_SUCCESS'
 ]);
 
 // Users table
@@ -80,6 +86,13 @@ export const users = pgTable("users", {
   companyName: varchar("company_name"),
   role: userRoleEnum("role").default('CLIENT'),
   emailVerified: boolean("email_verified").default(false),
+  // MFA fields
+  mfaEnabled: boolean("mfa_enabled").default(false),
+  mfaRequired: boolean("mfa_required").default(true), // New users must set up MFA
+  mfaSecret: text("mfa_secret"),
+  mfaBackupCodes: text("mfa_backup_codes").array(),
+  mfaSetupAt: timestamp("mfa_setup_at"),
+  mfaLastUsed: timestamp("mfa_last_used"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

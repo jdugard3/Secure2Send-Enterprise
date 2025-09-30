@@ -33,7 +33,8 @@ import {
   Menu,
   ChevronLeft,
   ChevronRight,
-  CreditCard
+  CreditCard,
+  Settings as SettingsIcon
 } from "lucide-react";
 import type { User } from "@shared/schema";
 
@@ -143,6 +144,7 @@ export default function Sidebar({ isCollapsed = false, onToggle }: SidebarProps)
     { href: "/documents", icon: FileUp, label: "Documents", roles: ["CLIENT"] },
     { href: "/merchant-applications", icon: CreditCard, label: "Merchant Applications", roles: ["CLIENT"] },
     { href: "/activity", icon: History, label: "Activity", roles: ["CLIENT"] },
+    { href: "/settings", icon: SettingsIcon, label: "Settings", roles: ["CLIENT"] },
   ];
 
   const adminItems = [

@@ -3,13 +3,15 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     let errorMessage = res.statusText;
+    let errorData: any = null;
+    
     try {
       const text = await res.text();
       if (text) {
         // Try to parse as JSON first
         try {
-          const jsonError = JSON.parse(text);
-          errorMessage = jsonError.message || jsonError.error || text;
+          errorData = JSON.parse(text);
+          errorMessage = errorData.message || errorData.error || text;
         } catch {
           // If not JSON, use the text directly
           errorMessage = text;
@@ -18,6 +20,15 @@ async function throwIfResNotOk(res: Response) {
     } catch (e) {
       console.error("Error reading response:", e);
     }
+
+    // Handle MFA setup requirement
+    if (res.status === 403 && errorData?.mfaSetupRequired) {
+      console.log('🔐 MFA Setup Required - Redirecting to setup page');
+      // Redirect to MFA setup page
+      window.location.href = '/mfa-setup';
+      return; // Don't throw error, just redirect
+    }
+
     console.error(`API Error: ${res.status} - ${res.url}`, errorMessage);
     throw new Error(`${res.status}: ${errorMessage}`);
   }

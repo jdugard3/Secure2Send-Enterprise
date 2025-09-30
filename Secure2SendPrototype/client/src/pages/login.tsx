@@ -13,11 +13,16 @@ import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { loginSchema, type LoginData } from "@shared/schema";
+import { MfaVerification } from "@/components/MfaVerification";
 
 export default function Login() {
   const { isAuthenticated, isLoading } = useAuth();
   const [, navigate] = useLocation();
   const [showPassword, setShowPassword] = useState(false);
+  const [mfaChallenge, setMfaChallenge] = useState<{
+    userId: string;
+    email: string;
+  } | null>(null);
   const { toast } = useToast();
 
   const form = useForm<LoginData>({
@@ -33,13 +38,35 @@ export default function Login() {
       const response = await apiRequest("POST", "/api/login", data);
       return response.json();
     },
-    onSuccess: (user) => {
-      queryClient.setQueryData(["/api/auth/user"], user);
-      toast({
-        title: "Login Successful",
-        description: "Welcome back to Secure2Send!",
-      });
-      navigate("/");
+    onSuccess: (data) => {
+      if (data.mfaRequired) {
+        // MFA challenge required
+        setMfaChallenge({
+          userId: data.userId,
+          email: data.email,
+        });
+        toast({
+          title: "MFA Required",
+          description: "Please verify your identity with your authenticator app.",
+        });
+      } else if (data.mfaSetupRequired) {
+        // MFA setup required for new users
+        queryClient.setQueryData(["/api/auth/user"], data);
+        toast({
+          title: "Security Setup Required",
+          description: "Please set up multi-factor authentication to secure your account.",
+          variant: "default",
+        });
+        navigate("/mfa-setup");
+      } else {
+        // Normal login success
+        queryClient.setQueryData(["/api/auth/user"], data);
+        toast({
+          title: "Login Successful",
+          description: "Welcome back to Secure2Send!",
+        });
+        navigate("/");
+      }
     },
     onError: (error: Error) => {
       toast({
@@ -60,10 +87,61 @@ export default function Login() {
     loginMutation.mutate(data);
   };
 
+  const handleMfaSuccess = (userData: any) => {
+    queryClient.setQueryData(["/api/auth/user"], userData);
+    toast({
+      title: "Login Successful",
+      description: "Welcome back to Secure2Send!",
+    });
+    navigate("/");
+  };
+
+  const handleMfaCancel = () => {
+    setMfaChallenge(null);
+    form.reset();
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // Show MFA verification if challenge is active
+  if (mfaChallenge) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex flex-col items-center justify-center p-4">
+        <div className="w-full max-w-md space-y-8">
+          {/* Logo and Header */}
+          <div className="text-center">
+            <div className="flex items-center justify-center mb-4">
+              <Shield className="h-12 w-12 text-primary mr-3" />
+              <h1 className="text-3xl font-bold text-gray-900">Secure2Send</h1>
+            </div>
+            <p className="text-gray-600">
+              Cannabis Compliance Document Management
+            </p>
+          </div>
+
+          <MfaVerification
+            userId={mfaChallenge.userId}
+            email={mfaChallenge.email}
+            onVerificationSuccess={handleMfaSuccess}
+            onCancel={handleMfaCancel}
+          />
+
+          {/* Additional Info */}
+          <div className="text-center">
+            <p className="text-sm text-gray-600">
+              Need help? Contact support at{" "}
+              <a href="mailto:support@secure2send.com" className="text-primary hover:underline">
+                support@secure2send.com
+              </a>
+            </p>
+          </div>
+        </div>
       </div>
     );
   }

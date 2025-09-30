@@ -1150,6 +1150,175 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // MFA (Multi-Factor Authentication) routes
+  app.get('/api/mfa/status', requireAuth, async (req: any, res) => {
+    try {
+      const { MfaService } = await import('./services/mfaService');
+      const status = await MfaService.getMfaStatus(req.user.id);
+      res.json(status);
+    } catch (error) {
+      console.error('Failed to get MFA status:', error);
+      res.status(500).json({ message: 'Failed to get MFA status' });
+    }
+  });
+
+  app.post('/api/mfa/setup/generate', requireAuth, async (req: any, res) => {
+    try {
+      const { MfaService } = await import('./services/mfaService');
+      const { secret, qrCodeUrl, manualEntryKey } = MfaService.generateSecret(req.user.email);
+      const qrCodeDataUrl = await MfaService.generateQRCode(qrCodeUrl);
+      
+      res.json({
+        secret,
+        qrCodeDataUrl,
+        manualEntryKey,
+      });
+    } catch (error) {
+      console.error('Failed to generate MFA setup:', error);
+      res.status(500).json({ message: 'Failed to generate MFA setup' });
+    }
+  });
+
+  app.post('/api/mfa/setup/verify', requireAuth, async (req: any, res) => {
+    try {
+      const { secret, token } = req.body;
+      
+      if (!secret || !token) {
+        return res.status(400).json({ message: 'Secret and token are required' });
+      }
+
+      const { MfaService } = await import('./services/mfaService');
+      const result = await MfaService.enableMfa(req.user.id, secret, token);
+      
+      if (result.success) {
+        // Log MFA setup completion
+        await AuditService.logAction(req.user, 'MFA_SETUP_COMPLETED', req, {
+          resourceType: 'user',
+          resourceId: req.user.id,
+        });
+
+        res.json({
+          success: true,
+          backupCodes: result.backupCodes,
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          error: result.error,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to verify MFA setup:', error);
+      res.status(500).json({ message: 'Failed to verify MFA setup' });
+    }
+  });
+
+  app.post('/api/mfa/disable', requireAuth, async (req: any, res) => {
+    try {
+      const { password } = req.body;
+      
+      if (!password) {
+        return res.status(400).json({ message: 'Current password is required' });
+      }
+
+      const { MfaService } = await import('./services/mfaService');
+      const result = await MfaService.disableMfa(req.user.id, password);
+      
+      if (result.success) {
+        // Log MFA disable
+        await AuditService.logAction(req.user, 'MFA_DISABLED', req, {
+          resourceType: 'user',
+          resourceId: req.user.id,
+        });
+
+        res.json({ success: true });
+      } else {
+        res.status(400).json({
+          success: false,
+          error: result.error,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to disable MFA:', error);
+      res.status(500).json({ message: 'Failed to disable MFA' });
+    }
+  });
+
+  app.post('/api/mfa/backup-codes/regenerate', requireAuth, async (req: any, res) => {
+    try {
+      const { password } = req.body;
+      
+      if (!password) {
+        return res.status(400).json({ message: 'Current password is required' });
+      }
+
+      const { MfaService } = await import('./services/mfaService');
+      const result = await MfaService.regenerateBackupCodes(req.user.id, password);
+      
+      if (result.success) {
+        res.json({
+          success: true,
+          backupCodes: result.backupCodes,
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          error: result.error,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to regenerate backup codes:', error);
+      res.status(500).json({ message: 'Failed to regenerate backup codes' });
+    }
+  });
+
+  app.post('/api/mfa/verify', async (req, res) => {
+    try {
+      const { userId, code } = req.body;
+      
+      if (!userId || !code) {
+        return res.status(400).json({ message: 'User ID and code are required' });
+      }
+
+      const { MfaService } = await import('./services/mfaService');
+      const result = await MfaService.verifyMfaForLogin(userId, code);
+      
+      if (result.success) {
+        // Log successful MFA verification
+        const user = await storage.getUser(userId);
+        if (user) {
+          await AuditService.logAction(user, 'MFA_VERIFICATION_SUCCESS', req, {
+            resourceType: 'user',
+            resourceId: userId,
+            metadata: { isBackupCode: result.isBackupCode },
+          });
+        }
+
+        res.json({
+          success: true,
+          isBackupCode: result.isBackupCode,
+        });
+      } else {
+        // Log failed MFA verification
+        const user = await storage.getUser(userId);
+        if (user) {
+          await AuditService.logAction(user, 'MFA_VERIFICATION_FAILED', req, {
+            resourceType: 'user',
+            resourceId: userId,
+          });
+        }
+
+        res.status(400).json({
+          success: false,
+          error: result.error,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to verify MFA:', error);
+      res.status(500).json({ message: 'Failed to verify MFA' });
+    }
+  });
+
   // Email preview routes for development
   if (env.NODE_ENV === 'development') {
     app.get('/api/emails/preview', (req, res) => {

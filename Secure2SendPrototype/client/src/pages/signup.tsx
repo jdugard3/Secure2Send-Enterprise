@@ -55,11 +55,21 @@ export default function Signup() {
     },
     onSuccess: (user) => {
       queryClient.setQueryData(["/api/auth/user"], user);
-      toast({
-        title: "Account Created Successfully",
-        description: "Welcome to Secure2Send! Your account is ready.",
-      });
-      navigate("/");
+      
+      // Check if user needs MFA setup (new users)
+      if (user.mfaRequired && !user.mfaEnabled) {
+        toast({
+          title: "Account Created Successfully",
+          description: "Please set up multi-factor authentication to secure your account.",
+        });
+        navigate("/mfa-setup");
+      } else {
+        toast({
+          title: "Account Created Successfully",
+          description: "Welcome to Secure2Send! Your account is ready.",
+        });
+        navigate("/");
+      }
     },
     onError: (error: Error) => {
       toast({

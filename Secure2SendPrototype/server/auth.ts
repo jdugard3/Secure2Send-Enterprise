@@ -122,6 +122,16 @@ export async function setupAuth(app: Express) {
         lastName,
         companyName,
         role: "CLIENT",
+        mfaRequired: true, // Explicitly require MFA for new users
+      });
+
+      // Debug logging for new user MFA status
+      console.log('🆕 New User Created - MFA Status:', {
+        userId: user.id,
+        email: user.email,
+        mfaEnabled: user.mfaEnabled,
+        mfaRequired: user.mfaRequired,
+        createdAt: user.createdAt
       });
 
       // Also create a client record for this user
@@ -170,12 +180,51 @@ export async function setupAuth(app: Express) {
   });
 
   app.post("/api/login", authLimiter, (req, res, next) => {
-    passport.authenticate("local", (err: any, user: User | false, info: any) => {
+    passport.authenticate("local", async (err: any, user: User | false, info: any) => {
       if (err) return next(err);
       if (!user) {
         return res.status(401).json({ message: info?.message || "Invalid credentials" });
       }
 
+      // Debug logging for MFA status
+      console.log('🔍 Login Debug - User MFA Status:', {
+        userId: user.id,
+        email: user.email,
+        mfaEnabled: user.mfaEnabled,
+        mfaRequired: user.mfaRequired,
+        createdAt: user.createdAt
+      });
+
+      // Check if user has MFA enabled
+      if (user.mfaEnabled) {
+        // Don't log the user in yet, return MFA challenge
+        const { password: _, ...userWithoutPassword } = user;
+        console.log('🔐 Returning MFA challenge for user:', user.email);
+        return res.json({
+          mfaRequired: true,
+          userId: user.id,
+          email: user.email,
+          message: "MFA verification required"
+        });
+      }
+
+      // Check if user needs to set up MFA (new users)
+      if (user.mfaRequired && !user.mfaEnabled) {
+        console.log('⚠️ User needs MFA setup:', user.email);
+        // Log the user in but indicate MFA setup is required
+        req.login(user, (err) => {
+          if (err) return next(err);
+          const { password: _, ...userWithoutPassword } = user;
+          return res.json({
+            ...userWithoutPassword,
+            mfaSetupRequired: true,
+            message: "MFA setup required for account security"
+          });
+        });
+        return;
+      }
+
+      // No MFA required, proceed with normal login
       req.login(user, (err) => {
         if (err) return next(err);
         // Don't send password in response
@@ -183,6 +232,48 @@ export async function setupAuth(app: Express) {
         res.json(userWithoutPassword);
       });
     })(req, res, next);
+  });
+
+  // MFA login completion route
+  app.post("/api/login/mfa", authLimiter, async (req, res, next) => {
+    try {
+      const { userId, code } = req.body;
+      
+      if (!userId || !code) {
+        return res.status(400).json({ message: "User ID and MFA code are required" });
+      }
+
+      // Import MFA service
+      const { MfaService } = await import('./services/mfaService');
+      
+      // Verify the MFA code
+      const mfaResult = await MfaService.verifyMfaForLogin(userId, code);
+      
+      if (!mfaResult.success) {
+        return res.status(401).json({ message: mfaResult.error || "Invalid MFA code" });
+      }
+
+      // Get the user and log them in
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      // Log the user in
+      req.login(user, (err) => {
+        if (err) return next(err);
+        // Don't send password in response
+        const { password: _, ...userWithoutPassword } = user;
+        res.json({
+          ...userWithoutPassword,
+          mfaVerified: true,
+          usedBackupCode: mfaResult.isBackupCode
+        });
+      });
+    } catch (error) {
+      console.error("MFA login error:", error);
+      res.status(500).json({ message: "MFA login failed" });
+    }
   });
 
   app.post("/api/logout", (req, res, next) => {
