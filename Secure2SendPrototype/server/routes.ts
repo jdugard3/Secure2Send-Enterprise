@@ -13,12 +13,16 @@ import { EmailService } from "./services/emailService";
 import { env } from "./env";
 import { cloudflareR2 } from "./services/cloudflareR2";
 import { AuditService } from "./services/auditService";
+import { requireMfaSetup } from "./middleware/mfaRequired";
 
 // File upload configuration is now handled in fileValidation middleware
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
+
+  // Apply MFA requirement middleware after authentication is set up
+  app.use(requireMfaSetup);
 
   // Auth routes are now handled in auth.ts
 
@@ -1532,6 +1536,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     console.log('📧 Email preview routes available at /api/emails/preview');
   }
+
+  // Health check endpoint for Fly.io monitoring
+  app.get("/api/health", (req, res) => {
+    res.status(200).json({ 
+      status: "ok", 
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      version: process.env.npm_package_version || "unknown"
+    });
+  });
 
   const httpServer = createServer(app);
   return httpServer;

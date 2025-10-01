@@ -20,6 +20,9 @@ export const requireMfaSetup = (req: any, res: Response, next: NextFunction) => 
     '/api/mfa/setup/verify',
     '/api/mfa/verify',
     
+    // Health check (for Fly.io monitoring)
+    '/api/health',
+    
     // Email preview routes (development)
     '/api/emails/preview'
   ];
@@ -66,5 +69,6 @@ export const mfaExemptRoutes = [
   '/api/mfa/setup/generate',
   '/api/mfa/setup/verify',
   '/api/mfa/verify',
+  '/api/health',
   '/api/emails/preview'
 ];
