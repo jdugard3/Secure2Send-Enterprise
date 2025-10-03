@@ -42,8 +42,132 @@ export interface ZapierDocumentPayload {
 }
 
 export class IrisCrmService {
-  private static readonly ZAPIER_DOCUMENT_WEBHOOK_URL = 'https://hooks.zapier.com/hooks/catch/15790762/umq3mle/';
+  private static readonly ZAPIER_DOCUMENT_WEBHOOK_URL = 'https://hooks.zapier.com/hooks/catch/15790762/umqr4bb/';
   private static readonly ZAPIER_APPLICATION_WEBHOOK_URL = 'https://hooks.zapier.com/hooks/catch/15790762/umqr4bb/';
+
+  /**
+   * Format date to IRIS CRM expected format (mm/dd/yyyy)
+   */
+  private static formatDate(dateString: string): string {
+    if (!dateString) return '';
+    
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return '';
+      
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const day = date.getDate().toString().padStart(2, '0');
+      const year = date.getFullYear();
+      
+      return `${month}/${day}/${year}`;
+    } catch {
+      return '';
+    }
+  }
+
+  /**
+   * Format phone number to IRIS CRM expected format (111-111-1111)
+   */
+  private static formatPhone(phoneString: string): string {
+    if (!phoneString) return '';
+    
+    // Remove all non-digits
+    const digits = phoneString.replace(/\D/g, '');
+    
+    // Must be exactly 10 digits
+    if (digits.length !== 10) return '';
+    
+    // Format as 111-111-1111
+    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+  }
+
+  /**
+   * Map application values to valid IRIS dropdown options
+   */
+  private static mapDropdownValue(fieldId: string, value: any): string {
+    // Handle boolean conversion first
+    if (typeof value === 'boolean') {
+      value = value.toString();
+    }
+    
+    const dropdownMappings: Record<string, Record<string, string>> = {
+      '3861': { // Entity Type - Use exact IRIS values
+        'SOLE_PROPRIETORSHIP': 'Sole Proprietorship',
+        'LLC': 'LLC', 
+        'CORPORATION_PRIVATELY_HELD': 'Corporation',
+        'CORPORATION': 'Corporation',
+        'PARTNERSHIP_LLP': 'Partnership',
+        'PARTNERSHIP': 'Partnership',
+        'S_CORP': 'S-Corporation',
+      },
+      '4269': { // Owner Country - Must be exact IRIS values
+        'US': 'US',
+        'USA': 'US', 
+        'United States': 'US',
+      },
+      '4270': { // FR Country - Must be exact IRIS values
+        'US': 'US',
+        'USA': 'US',
+        'United States': 'US',
+      },
+      '4298': { // BO's ID Type - Use exact IRIS values
+        'DRIVERS_LICENSE': "Driver's License",
+        'DRIVER_LICENSE': "Driver's License",
+        'PASSPORT': 'Passport',
+        'STATE_ID': 'State ID',
+      },
+      '4273': { // Multiple Locations - Boolean to Yes/No
+        'true': 'Yes',
+        'false': 'No',
+        'Yes': 'Yes',
+        'No': 'No',
+      },
+      '4297': { // BO Control Person - Boolean to Yes/No
+        'true': 'Yes',
+        'false': 'No', 
+        'Yes': 'Yes',
+        'No': 'No',
+      },
+      '4307': { // BO SSN or TIN from US - Boolean to Yes/No
+        'true': 'Yes',
+        'false': 'No',
+        'Yes': 'Yes', 
+        'No': 'No',
+      },
+      '3792': { // FR Owner/Officer
+        'Owner': 'Owner',
+        'OWNER': 'Owner',
+        'Officer': 'Officer',
+        'OFFICER': 'Officer',
+      },
+      '4278': { // Business Type
+        'Retail': 'Retail',
+        'RETAIL': 'Retail',
+        'E-commerce': 'E-commerce',
+        'Restaurant': 'Restaurant',
+      },
+      '4174': { // Previously Processed
+        'true': 'Yes',
+        'false': 'No',
+        'Yes': 'Yes',
+        'No': 'No',
+      },
+      '4316': { // Automatic Billing
+        'true': 'Yes',
+        'false': 'No', 
+        'Yes': 'Yes',
+        'No': 'No',
+      },
+      '4181': { // Refund/Guarantee
+        'true': 'Yes',
+        'false': 'No',
+        'Yes': 'Yes',
+        'No': 'No',
+      }
+    };
+    
+    return dropdownMappings[fieldId]?.[value] || value;
+  }
 
   /**
    * Get the IRIS CRM API base URL
@@ -483,79 +607,155 @@ export class IrisCrmService {
 
       console.log('🔄 Updating IRIS CRM lead with merchant application data:', leadId);
 
-      // IRIS CRM Field ID Mapping
-      // Note: These field IDs should be updated based on your actual IRIS CRM configuration
+      // IRIS CRM Field ID Mapping - Using ACTUAL field IDs with proper formatting
       const fieldMappings = [
-        // Basic Business Information
-        { id: 'field_legal_business_name', value: application.legalBusinessName || '' },
-        { id: 'field_dba_name', value: application.dbaBusinessName || '' },
-        { id: 'field_dba_website', value: application.dbaWebsite || '' },
-        { id: 'field_business_phone', value: application.businessPhone || '' },
-        { id: 'field_contact_email', value: application.contactEmail || '' },
-        { id: 'field_federal_tax_id', value: application.federalTaxIdNumber || '' },
+        // MPA and Sales Information  
+        { id: '3920', value: this.formatDate(application.mpaSignedDate) }, // MPA Signed Date
+        { id: '4190', value: application.salesRepName || '' }, // Sales Rep Name
         
-        // Address Information
-        { id: 'field_location_address', value: application.locationAddress || '' },
-        { id: 'field_city', value: application.city || '' },
-        { id: 'field_state', value: application.state || '' },
-        { id: 'field_zip_code', value: application.zip || '' },
+        // DBA Information
+        { id: '1', value: application.dbaBusinessName || '' }, // *DBA Name
+        { id: '3887', value: application.locationAddress || '' }, // *Location Address
+        { id: '3888', value: application.city || '' }, // *Location City
+        { id: '3889', value: application.state || '' }, // *Location State
+        { id: '3890', value: application.zip || '' }, // *Location ZIP
+        { id: '9', value: this.formatPhone(application.businessPhone) }, // *Location Phone Number
+        { id: '3895', value: application.contactEmail || '' }, // *Location Contact Email
+        { id: '3858', value: application.productOrServiceSold || '' }, // *Product or Service Sold
+        { id: '3853', value: application.dbaWebsite || '' }, // DBA Website
+        { id: '4273', value: this.mapDropdownValue('4273', application.multipleLocations ? 'Yes' : 'No') }, // Multiple Locations?
         
         // Corporate Information
-        { id: 'field_legal_contact_name', value: application.legalContactName || '' },
-        { id: 'field_legal_phone', value: application.legalPhone || '' },
-        { id: 'field_legal_email', value: application.legalEmail || '' },
-        { id: 'field_ownership_type', value: application.ownershipType || '' },
-        { id: 'field_incorporation_state', value: application.incorporationState || '' },
-        { id: 'field_entity_start_date', value: application.entityStartDate || '' },
+        { id: '2', value: application.legalBusinessName || '' }, // *Legal Name
+        { id: '4', value: application.billingAddress || '' }, // *Legal Address
+        { id: '6', value: application.city || '' }, // *Legal City (using same city as location)
+        { id: '7', value: application.state || '' }, // *Legal State (using same state as location)
+        { id: '8', value: application.zip || '' }, // *Legal ZIP (using same zip as location)
+        { id: '4271', value: application.legalContactName || '' }, // Legal Contact Name
+        { id: '27', value: this.formatPhone(application.legalPhone) }, // *Legal Phone
+        { id: '3852', value: application.legalEmail || '' }, // *Legal Email
+        { id: '3861', value: this.mapDropdownValue('3861', application.ownershipType) }, // *Entity Type
+        { id: '22', value: application.federalTaxIdNumber || '' }, // *Federal Tax ID
+        { id: '21', value: application.incorporationState || '' }, // *Incorporation State
+        { id: '20', value: this.formatDate(application.entityStartDate) }, // *Entity Start Date
         
         // Transaction and Volume
-        { id: 'field_average_ticket', value: application.averageTicket || '' },
-        { id: 'field_high_ticket', value: application.highTicket || '' },
-        { id: 'field_monthly_sales_volume', value: application.monthlySalesVolume || '' },
-        { id: 'field_monthly_transactions', value: application.monthlyTransactions?.toString() || '' },
-        { id: 'field_annual_volume', value: application.annualVolume || '' },
-        { id: 'field_annual_transactions', value: application.annualTransactions?.toString() || '' },
+        { id: '3950', value: application.averageTicket || '' }, // Average Ticket
+        { id: '3952', value: application.highTicket || '' }, // High Ticket
+        { id: '4061', value: application.monthlySalesVolume || '' }, // Monthly Sales Volume
+        { id: '3951', value: application.annualVolume || '' }, // Annual Volume
+        { id: '4062', value: application.monthlyTransactions?.toString() || '' }, // Monthly # of Transactions
+        { id: '4248', value: application.annualTransactions?.toString() || '' }, // Annual # of Transactions
         
         // Banking Information
-        { id: 'field_account_owner_first_name', value: application.accountOwnerFirstName || '' },
-        { id: 'field_account_owner_last_name', value: application.accountOwnerLastName || '' },
-        { id: 'field_name_on_bank_account', value: application.nameOnBankAccount || '' },
-        { id: 'field_bank_name', value: application.bankName || '' },
-        { id: 'field_aba_routing_number', value: application.abaRoutingNumber || '' },
-        { id: 'field_account_number', value: application.ddaNumber || '' },
-        { id: 'field_bank_officer_name', value: application.bankOfficerName || '' },
-        { id: 'field_bank_officer_phone', value: application.bankOfficerPhone || '' },
-        { id: 'field_bank_officer_email', value: application.bankOfficerEmail || '' },
-        
-        // Business Operations
-        { id: 'field_business_type', value: application.businessType || '' },
-        { id: 'field_product_service_sold', value: application.productOrServiceSold || '' },
-        { id: 'field_pos_system', value: application.posSystem || '' },
-        { id: 'field_refund_guarantee', value: application.refundGuarantee ? 'Yes' : 'No' },
-        { id: 'field_refund_days', value: application.refundDays?.toString() || '' },
-        { id: 'field_multiple_locations', value: application.multipleLocations ? 'Yes' : 'No' },
-        
-        // MPA and Sales Information
-        { id: 'field_mpa_signed_date', value: application.mpaSignedDate || '' },
-        { id: 'field_sales_rep_name', value: application.salesRepName || '' },
+        { id: '4254', value: application.accountOwnerFirstName || '' }, // Account Owner First Name
+        { id: '4255', value: application.accountOwnerLastName || '' }, // Account Owner Last Name
+        { id: '3916', value: application.nameOnBankAccount || '' }, // Name on Bank Account
+        { id: '3909', value: application.bankName || '' }, // *Bank Name
+        { id: '3910', value: application.abaRoutingNumber || '' }, // *Routing Number
+        { id: '3911', value: application.ddaNumber || '' }, // *Account Number
+        { id: '4326', value: application.bankOfficerName || '' }, // Bank Officer Name
+        { id: '4327', value: this.formatPhone(application.bankOfficerPhone) }, // Bank Officer Phone
+        { id: '4328', value: application.bankOfficerEmail || '' }, // Bank Officer Email
         
         // Owner Information
-        { id: 'field_owner_full_name', value: application.ownerFullName || '' },
-        { id: 'field_owner_first_name', value: application.ownerFirstName || '' },
-        { id: 'field_owner_last_name', value: application.ownerLastName || '' },
-        { id: 'field_owner_title', value: application.ownerTitle || '' },
-        { id: 'field_owner_ownership_percentage', value: application.ownerOwnershipPercentage?.toString() || '' },
-        { id: 'field_owner_mobile_phone', value: application.ownerMobilePhone || '' },
-        { id: 'field_owner_email', value: application.ownerEmail || '' },
-        { id: 'field_owner_country', value: application.ownerCountry || '' },
+        { id: '4274', value: application.ownerFullName || '' }, // Owner Full Name
+        { id: '3782', value: application.ownerFirstName || '' }, // *First Name
+        { id: '3781', value: application.ownerLastName || '' }, // *Last Name
+        { id: '3779', value: application.ownerOfficer || '' }, // Owner/Officer
+        { id: '3780', value: application.ownerTitle || '' }, // *Title
+        { id: '3778', value: application.ownerOwnershipPercentage?.toString() || '' }, // *Ownership
+        { id: '3777', value: application.ownerMobilePhone || '' }, // Owner Mobile Phone Number
+        { id: '3871', value: application.ownerEmail || '' }, // Owner Email
+        { id: '3872', value: application.ownerSsn || '' }, // Owner SS#
+        { id: '3870', value: application.ownerBirthday || '' }, // Owner Birthday
+        { id: '3868', value: application.ownerStateIssuedIdNumber || '' }, // State Issued ID Number
+        { id: '4245', value: application.ownerIdExpDate || '' }, // Exp Date
+        { id: '3869', value: application.ownerIssuingState || '' }, // Issuing State
+        { id: '4322', value: application.ownerIdDateIssued || '' }, // Owner ID Date Issued
+        { id: '3775', value: application.ownerLegalAddress || '' }, // Owner Legal Address
+        { id: '3774', value: application.ownerCity || '' }, // Owner City
+        { id: '3773', value: application.ownerState || '' }, // Owner State
+        { id: '3772', value: application.ownerZip || '' }, // Owner Zip
+        { id: '4269', value: application.ownerCountry || '' }, // Owner Country
         
-        // Application Status
-        { id: 'field_application_status', value: application.status || '' },
-        { id: 'field_agreement_accepted', value: application.agreementAccepted ? 'Yes' : 'No' },
+        // Financial Representative (if exists)
+        ...(application.financialRepresentative ? [
+          { id: '4318', value: application.financialRepresentative.fullName || '' }, // FR Full Name
+          { id: '3796', value: application.financialRepresentative.firstName || '' }, // FR First Name
+          { id: '3797', value: application.financialRepresentative.lastName || '' }, // FR Last Name
+          { id: '3795', value: application.financialRepresentative.title || '' }, // FR Title
+          { id: '3792', value: application.financialRepresentative.ownerOfficer || '' }, // FR Owner/Officer
+          { id: '4150', value: application.financialRepresentative.ownershipPercentage?.toString() || '' }, // FR Ownership %
+          { id: '3786', value: application.financialRepresentative.officePhone || '' }, // FR Office Phone Number
+          { id: '3787', value: application.financialRepresentative.mobilePhone || '' }, // FR Mobile Phone Number
+          { id: '4048', value: application.financialRepresentative.email || '' }, // Financial Rep Email
+          { id: '3794', value: application.financialRepresentative.ssn || '' }, // FR Social Security Number
+          { id: '3783', value: application.financialRepresentative.birthday || '' }, // FR Birthday
+          { id: '3785', value: application.financialRepresentative.stateIssuedIdNumber || '' }, // FR State Issued ID Number
+          { id: '4244', value: application.financialRepresentative.idExpDate || '' }, // FR Exp Date
+          { id: '3784', value: application.financialRepresentative.issuingState || '' }, // FR Issuing State
+          { id: '3791', value: application.financialRepresentative.legalStreetAddress || '' }, // FR Legal Street Address
+          { id: '3790', value: application.financialRepresentative.city || '' }, // FR City
+          { id: '3789', value: application.financialRepresentative.state || '' }, // FR State
+          { id: '3788', value: application.financialRepresentative.zip || '' }, // FR Zip
+          { id: '4270', value: application.financialRepresentative.country || '' }, // FR Country
+        ] : []),
+        
+        // Business Operations - Auto-filled fields as specified
+        { id: '4278', value: 'Retail' }, // Business Type - Autofill "Retail"
+        { id: '3860', value: 'No' }, // Processed Cards in Past? - Autofill "No"
+        { id: '4174', value: 'No' }, // Previously Processed? - Autofill "No"
+        { id: '3859', value: 'N/A' }, // If Yes, Under What Name? - Autofill "N/A"
+        { id: '4316', value: 'No' }, // Automatic Billing? - Autofill "No"
+        { id: '4107', value: 'No' }, // Cardholder Data 3rd Party - Autofill "No"
+        
+        // Refund/Guarantee Information
+        { id: '4181', value: application.refundGuarantee ? 'Yes' : 'No' }, // Refund/Guarantee?
+        { id: '4141', value: application.refundDays?.toString() || '' }, // Refund # Days
+        
+        // POS System
+        { id: '4234', value: application.posSystem || '' }, // POS System
+        
+        // Beneficial Owners (if any)
+        ...(application.beneficialOwners && application.beneficialOwners.length > 0 ? [
+          { id: '4288', value: application.beneficialOwners[0]?.name || '' }, // BO FullName
+          { id: '4289', value: application.beneficialOwners[0]?.title || '' }, // BO Title
+          { id: '4290', value: application.beneficialOwners[0]?.ownershipPercentage?.toString() || '' }, // BO Entity Ownership %
+          { id: '4291', value: application.beneficialOwners[0]?.residentialAddress || '' }, // BO's Home Address
+          { id: '4292', value: application.beneficialOwners[0]?.city || '' }, // BO's City
+          { id: '4293', value: application.beneficialOwners[0]?.state || '' }, // BO's State
+          { id: '4294', value: application.beneficialOwners[0]?.zip || '' }, // BO's ZIP
+          { id: '4305', value: application.beneficialOwners[0]?.country || '' }, // BO's Issuing Country
+          { id: '4298', value: application.beneficialOwners[0]?.idType || '' }, // BO's ID Type
+          { id: '4302', value: application.beneficialOwners[0]?.idNumber || '' }, // BO's Number on ID
+          { id: '4306', value: application.beneficialOwners[0]?.idDateIssued || '' }, // BO ID Date Issued
+          { id: '4301', value: application.beneficialOwners[0]?.idExpDate || '' }, // BO ID Expiration Date
+          { id: '4295', value: application.beneficialOwners[0]?.dob || '' }, // BO Date of Birth
+          { id: '4307', value: application.beneficialOwners[0]?.ssnOrTinFromUs ? 'Yes' : 'No' }, // BO SSN or TIN from US?
+          { id: '4296', value: application.beneficialOwners[0]?.ssn || '' }, // BO Social Security Number
+          { id: '4297', value: application.beneficialOwners[0]?.controlPerson ? 'Yes' : 'No' }, // BO Control Person?
+        ] : []),
+        
+        // Authorized Contacts (if any)
+        ...(application.authorizedContacts && application.authorizedContacts.length > 0 ? [
+          { id: '3848', value: application.authorizedContacts[0]?.firstName || '' }, // AC1 First Name
+          { id: '3917', value: application.authorizedContacts[0]?.lastName || '' }, // AC1 Last Name
+          { id: '4050', value: application.authorizedContacts[0]?.title || '' }, // AC1 Title
+          { id: '3847', value: application.authorizedContacts[0]?.email || '' }, // AC1 Email
+          { id: '3846', value: application.authorizedContacts[0]?.officePhone || '' }, // AC1 Office Phone Number
+          { id: '4151', value: application.authorizedContacts[0]?.mobilePhone || '' }, // AC1 Mobile Phone Number
+        ] : []),
+        
+        // Application Status and Agreement
+        { id: '4317', value: `Application ${application.status} - Submitted via Secure2Send` }, // Application Notes
       ];
 
       // Filter out empty values to avoid overwriting existing data with blanks
-      const validFields = fieldMappings.filter(field => field.value && field.value.trim() !== '');
+      const validFields = fieldMappings.filter(field => 
+        field.value && 
+        field.value.toString().trim() !== ''
+      );
 
       if (validFields.length === 0) {
         console.log('⚠️ No valid fields to update in IRIS CRM');
@@ -565,7 +765,7 @@ export class IrisCrmService {
       const updateData: Partial<IrisLead> = {
         fields: validFields.map(field => ({
           id: field.id,
-          record: leadId,
+          record: "1", // Use "1" as the record number for main lead record
           value: field.value
         }))
       };
@@ -574,7 +774,7 @@ export class IrisCrmService {
       console.log('🔍 Fields being updated:', validFields.map(f => `${f.id}: ${f.value}`).join(', '));
 
       const response = await fetch(`${this.getApiBaseUrl()}/leads/${leadId}`, {
-        method: 'PUT',
+        method: 'PATCH', // Use PATCH instead of PUT
         headers: {
           'Content-Type': 'application/json',
           'X-API-KEY': env.IRIS_CRM_API_KEY,

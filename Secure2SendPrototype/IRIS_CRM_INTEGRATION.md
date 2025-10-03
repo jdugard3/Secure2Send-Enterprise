@@ -61,7 +61,7 @@ COMMENT ON COLUMN clients.iris_lead_id IS 'IRIS CRM lead ID for integration trac
 
 The document sync uses this Zapier webhook:
 ```
-https://hooks.zapier.com/hooks/catch/15790762/umq3mle/
+https://hooks.zapier.com/hooks/catch/15790762/umqr4bb/
 ```
 
 Configure your Zapier automation to:
