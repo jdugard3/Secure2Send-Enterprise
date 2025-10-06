@@ -3,6 +3,7 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
 # Environment variables
 .env
@@ -16,8 +17,18 @@ dist/
 build/
 *.tsbuildinfo
 
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+logs/
+*.log
+server.log
+
 # Runtime data
-pids
+pids/
 *.pid
 *.seed
 *.pid.lock
@@ -29,51 +40,8 @@ coverage/
 # nyc test coverage
 .nyc_output
 
-# Logs
-logs
-*.log
-
-# Runtime data
-tmp/
-temp/
-
-# IDE/Editor files
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Security sensitive files
-*.key
-*.pem
-*.crt
-*.p12
-*.pfx
-secrets/
-private/
-
-# Database files
-*.db
-*.sqlite
-*.sqlite3
-
-# Uploaded files (keep structure but not actual files)
-uploads/*
-!uploads/.gitkeep
-
-# Cache directories
-.cache/
-.parcel-cache/
+# Dependency directories
+jspm_packages/
 
 # TypeScript cache
 *.tsbuildinfo
@@ -99,40 +67,87 @@ uploads/*
 # Yarn Integrity file
 .yarn-integrity
 
-# Serverless directories
-.serverless/
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
 
-# FuseBox cache
-.fusebox/
+# Next.js build output
+.next
 
-# DynamoDB Local files
-.dynamodb/
+# Nuxt.js build / generate output
+.nuxt
 
-# TernJS port file
-.tern-port
+# Gatsby files
+.cache/
+public
 
-# Stores VSCode versions used for testing VSCode extensions
-.vscode-test
+# Vite build tool
+.vite/
+
+# Rollup.js default build output
+dist/
 
 # Temporary folders
 tmp/
 temp/
 
-# Local development files
-.local
-.env.example.local
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
-# Security testing results
-security-scan-results/
-penetration-test-reports/
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Uploads directory (contains user files)
+uploads/
+
+# SSL certificates
+*.pem
+*.key
+*.crt
+*.csr
+
+# Docker
+.dockerignore
 
 # Backup files
 *.backup
 *.bak
 
-# Lock files (uncomment if using npm)
-# package-lock.json
+# Session files
+sessions/
 
-# Replit specific
-.replit
-replit.nix
+# Temporary files
+*.tmp
+
+# IDE specific files
+.vscode/settings.json
+.vscode/launch.json
+.vscode/extensions.json
+
+# MacOS
+.AppleDouble
+.LSOverride
+
+# Windows
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+
+# Cloudflare
+wrangler.toml
+
+# Sensitive configuration files
+tunnel-config.yml
+cloudflare-access-policies.json

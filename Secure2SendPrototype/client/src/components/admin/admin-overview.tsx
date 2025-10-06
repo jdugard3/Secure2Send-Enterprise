@@ -186,6 +186,10 @@ export default function AdminOverview() {
                       </span>
                       <span className="text-sm text-gray-400">•</span>
                       <span className="text-sm text-gray-600">{company.user.email}</span>
+                      <span className="text-sm text-gray-400">•</span>
+                      <Badge variant={company.user.role === 'ADMIN' ? 'destructive' : 'secondary'} className="text-xs">
+                        {company.user.role || 'CLIENT'}
+                      </Badge>
                     </div>
                   </div>
                 </div>
@@ -210,6 +214,7 @@ export default function AdminOverview() {
                           </AlertDialogDescription>
                           <div className="mt-2 space-y-1">
                             <div className="font-medium">• User: {company.user.firstName} {company.user.lastName} ({company.user.email})</div>
+                            <div className="font-medium">• Role: {company.user.role || 'CLIENT'}</div>
                             <div className="font-medium">• Company: {company.companyName || 'No Company Name'}</div>
                             <div className="font-medium">• All associated documents and data</div>
                           </div>

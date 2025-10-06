@@ -38,6 +38,11 @@ const envSchema = z.object({
   // IRIS CRM Integration
   IRIS_CRM_API_KEY: z.string().optional(),
   IRIS_CRM_SUBDOMAIN: z.string().optional(),
+  
+  // Cloudflare Zero Trust Configuration
+  CLOUDFLARE_TEAM_DOMAIN: z.string().optional(),
+  CLOUDFLARE_ACCESS_AUD: z.string().optional(),
+  CLOUDFLARE_ACCESS_ISSUER: z.string().url().optional(),
 });
 
 // Parse and validate environment variables
@@ -91,3 +96,6 @@ console.log(`   - MAILGUN_DOMAIN: ${env.MAILGUN_DOMAIN || "✗ Missing"}`);
 console.log(`   - APP_URL: ${env.APP_URL}`);
 console.log(`   - IRIS_CRM_API_KEY: ${env.IRIS_CRM_API_KEY ? "✓ Set" : "✗ Missing"}`);
 console.log(`   - IRIS_CRM_SUBDOMAIN: ${env.IRIS_CRM_SUBDOMAIN || "✗ Missing"}`);
+console.log(`   - CLOUDFLARE_TEAM_DOMAIN: ${env.CLOUDFLARE_TEAM_DOMAIN || "✗ Missing"}`);
+console.log(`   - CLOUDFLARE_ACCESS_AUD: ${env.CLOUDFLARE_ACCESS_AUD ? "✓ Set" : "✗ Missing"}`);
+console.log(`   - CLOUDFLARE_ACCESS_ISSUER: ${env.CLOUDFLARE_ACCESS_ISSUER || "✗ Missing"}`);

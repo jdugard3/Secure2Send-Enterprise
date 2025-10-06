@@ -142,11 +142,16 @@ export class DatabaseStorage implements IStorage {
         await db.delete(clients).where(eq(clients.id, client.id));
       }
       
+      // Clear reviewedBy field in merchant applications where this user was the reviewer
+      await db.update(merchantApplications)
+        .set({ reviewedBy: null })
+        .where(eq(merchantApplications.reviewedBy, id));
+      
       // Delete sensitive data for this user
       await db.delete(sensitiveData).where(eq(sensitiveData.userId, id));
       
-      // Delete audit logs for this user (skip for now to avoid enum error)
-      // await db.delete(auditLogs).where(eq(auditLogs.userId, id));
+      // Delete audit logs for this user
+      await db.delete(auditLogs).where(eq(auditLogs.userId, id));
       
       // Finally delete the user
       await db.delete(users).where(eq(users.id, id));
