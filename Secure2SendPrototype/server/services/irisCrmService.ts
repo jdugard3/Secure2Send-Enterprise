@@ -47,6 +47,7 @@ export class IrisCrmService {
 
   /**
    * Format date to IRIS CRM expected format (mm/dd/yyyy)
+   * Uses UTC methods to avoid timezone conversion issues
    */
   private static formatDate(dateString: string): string {
     if (!dateString) return '';
@@ -55,9 +56,10 @@ export class IrisCrmService {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return '';
       
-      const month = (date.getMonth() + 1).toString().padStart(2, '0');
-      const day = date.getDate().toString().padStart(2, '0');
-      const year = date.getFullYear();
+      // Use UTC methods to avoid timezone conversion issues
+      const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+      const day = date.getUTCDate().toString().padStart(2, '0');
+      const year = date.getUTCFullYear();
       
       return `${month}/${day}/${year}`;
     } catch {
