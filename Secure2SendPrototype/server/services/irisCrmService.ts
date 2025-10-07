@@ -533,7 +533,10 @@ export class IrisCrmService {
           processingCategories: application.processingCategories,
           
           // Complex Objects - Format dates in nested objects
-          principalOfficers: application.principalOfficers,
+          principalOfficers: application.principalOfficers ? application.principalOfficers.map((officer: any) => ({
+            ...officer,
+            dob: this.formatDate(officer.dob)
+          })) : application.principalOfficers,
           beneficialOwners: application.beneficialOwners ? application.beneficialOwners.map((bo: any) => ({
             ...bo,
             dob: this.formatDate(bo.dob),
