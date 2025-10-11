@@ -218,8 +218,19 @@ export default function MerchantApplicationWizard({
   const formatDateForInput = (isoDate: string | null | undefined): string => {
     if (!isoDate) return "";
     try {
-      const date = new Date(isoDate);
+      // Clean up malformed date strings (remove invalid prefixes like "+05")
+      let cleanDate = String(isoDate).trim();
+      
+      // Remove leading + or other non-numeric prefixes before year
+      cleanDate = cleanDate.replace(/^[^\d]*(\d{4})/, '$1');
+      
+      const date = new Date(cleanDate);
       if (isNaN(date.getTime())) return "";
+      
+      // Ensure the date is reasonable (between 1900 and 2100)
+      const year = date.getFullYear();
+      if (year < 1900 || year > 2100) return "";
+      
       return date.toISOString().split('T')[0];
     } catch {
       return "";

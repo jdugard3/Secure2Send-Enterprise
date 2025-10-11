@@ -47,6 +47,7 @@ export class IrisCrmService {
 
   /**
    * Format date to IRIS CRM expected format (mm/dd/yyyy)
+   * Uses UTC methods to avoid timezone conversion issues
    */
   private static formatDate(dateString: string): string {
     if (!dateString) return '';
@@ -55,9 +56,10 @@ export class IrisCrmService {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return '';
       
-      const month = (date.getMonth() + 1).toString().padStart(2, '0');
-      const day = date.getDate().toString().padStart(2, '0');
-      const year = date.getFullYear();
+      // Use UTC methods to avoid timezone conversion issues
+      const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+      const day = date.getUTCDate().toString().padStart(2, '0');
+      const year = date.getUTCFullYear();
       
       return `${month}/${day}/${year}`;
     } catch {
@@ -457,7 +459,7 @@ export class IrisCrmService {
           updatedAt: application.updatedAt,
           
           // MPA and Sales Information
-          mpaSignedDate: application.mpaSignedDate,
+          mpaSignedDate: this.formatDate(application.mpaSignedDate),
           salesRepName: application.salesRepName,
           
           // DBA Information
@@ -481,7 +483,7 @@ export class IrisCrmService {
           ownershipType: application.ownershipType,
           federalTaxIdNumber: application.federalTaxIdNumber,
           incorporationState: application.incorporationState,
-          entityStartDate: application.entityStartDate,
+          entityStartDate: this.formatDate(application.entityStartDate),
           
           // Transaction and Volume
           averageTicket: application.averageTicket,
@@ -512,11 +514,11 @@ export class IrisCrmService {
           ownerMobilePhone: application.ownerMobilePhone,
           ownerEmail: application.ownerEmail,
           ownerSsn: application.ownerSsn,
-          ownerBirthday: application.ownerBirthday,
+          ownerBirthday: this.formatDate(application.ownerBirthday),
           ownerStateIssuedIdNumber: application.ownerStateIssuedIdNumber,
-          ownerIdExpDate: application.ownerIdExpDate,
+          ownerIdExpDate: this.formatDate(application.ownerIdExpDate),
           ownerIssuingState: application.ownerIssuingState,
-          ownerIdDateIssued: application.ownerIdDateIssued,
+          ownerIdDateIssued: this.formatDate(application.ownerIdDateIssued),
           ownerLegalAddress: application.ownerLegalAddress,
           ownerCity: application.ownerCity,
           ownerState: application.ownerState,
@@ -530,10 +532,22 @@ export class IrisCrmService {
           posSystem: application.posSystem,
           processingCategories: application.processingCategories,
           
-          // Complex Objects
-          principalOfficers: application.principalOfficers,
-          beneficialOwners: application.beneficialOwners,
-          financialRepresentative: application.financialRepresentative,
+          // Complex Objects - Format dates in nested objects
+          principalOfficers: application.principalOfficers ? application.principalOfficers.map((officer: any) => ({
+            ...officer,
+            dob: this.formatDate(officer.dob)
+          })) : application.principalOfficers,
+          beneficialOwners: application.beneficialOwners ? application.beneficialOwners.map((bo: any) => ({
+            ...bo,
+            dob: this.formatDate(bo.dob),
+            idDateIssued: this.formatDate(bo.idDateIssued),
+            idExpDate: this.formatDate(bo.idExpDate)
+          })) : application.beneficialOwners,
+          financialRepresentative: application.financialRepresentative ? {
+            ...application.financialRepresentative,
+            birthday: this.formatDate(application.financialRepresentative.birthday),
+            idExpDate: this.formatDate(application.financialRepresentative.idExpDate)
+          } : application.financialRepresentative,
           authorizedContacts: application.authorizedContacts,
           
           // Legacy Fields (for backward compatibility)
@@ -556,12 +570,12 @@ export class IrisCrmService {
           merchantSignature: application.merchantSignature,
           merchantName: application.merchantName,
           merchantTitle: application.merchantTitle,
-          merchantDate: application.merchantDate,
+          merchantDate: this.formatDate(application.merchantDate),
           agreementAccepted: application.agreementAccepted,
           corduroSignature: application.corduroSignature,
           corduroName: application.corduroName,
           corduroTitle: application.corduroTitle,
-          corduroDate: application.corduroDate
+          corduroDate: this.formatDate(application.corduroDate)
         },
         client: {
           firstName: user.firstName || '',
@@ -570,6 +584,9 @@ export class IrisCrmService {
           companyName: user.companyName || '',
         },
       };
+
+      // Debug: Log the payload being sent to Zapier
+      console.log('📤 Sending payload to Zapier webhook:', JSON.stringify(payload, null, 2));
 
       const response = await fetch(this.ZAPIER_APPLICATION_WEBHOOK_URL, {
         method: 'POST',
@@ -668,11 +685,11 @@ export class IrisCrmService {
         { id: '3777', value: application.ownerMobilePhone || '' }, // Owner Mobile Phone Number
         { id: '3871', value: application.ownerEmail || '' }, // Owner Email
         { id: '3872', value: application.ownerSsn || '' }, // Owner SS#
-        { id: '3870', value: application.ownerBirthday || '' }, // Owner Birthday
+        { id: '3870', value: this.formatDate(application.ownerBirthday) }, // Owner Birthday
         { id: '3868', value: application.ownerStateIssuedIdNumber || '' }, // State Issued ID Number
-        { id: '4245', value: application.ownerIdExpDate || '' }, // Exp Date
+        { id: '4245', value: this.formatDate(application.ownerIdExpDate) }, // Exp Date
         { id: '3869', value: application.ownerIssuingState || '' }, // Issuing State
-        { id: '4322', value: application.ownerIdDateIssued || '' }, // Owner ID Date Issued
+        { id: '4322', value: this.formatDate(application.ownerIdDateIssued) }, // Owner ID Date Issued
         { id: '3775', value: application.ownerLegalAddress || '' }, // Owner Legal Address
         { id: '3774', value: application.ownerCity || '' }, // Owner City
         { id: '3773', value: application.ownerState || '' }, // Owner State
@@ -691,9 +708,9 @@ export class IrisCrmService {
           { id: '3787', value: application.financialRepresentative.mobilePhone || '' }, // FR Mobile Phone Number
           { id: '4048', value: application.financialRepresentative.email || '' }, // Financial Rep Email
           { id: '3794', value: application.financialRepresentative.ssn || '' }, // FR Social Security Number
-          { id: '3783', value: application.financialRepresentative.birthday || '' }, // FR Birthday
+          { id: '3783', value: this.formatDate(application.financialRepresentative.birthday) }, // FR Birthday
           { id: '3785', value: application.financialRepresentative.stateIssuedIdNumber || '' }, // FR State Issued ID Number
-          { id: '4244', value: application.financialRepresentative.idExpDate || '' }, // FR Exp Date
+          { id: '4244', value: this.formatDate(application.financialRepresentative.idExpDate) }, // FR Exp Date
           { id: '3784', value: application.financialRepresentative.issuingState || '' }, // FR Issuing State
           { id: '3791', value: application.financialRepresentative.legalStreetAddress || '' }, // FR Legal Street Address
           { id: '3790', value: application.financialRepresentative.city || '' }, // FR City
@@ -714,8 +731,7 @@ export class IrisCrmService {
         { id: '4181', value: application.refundGuarantee ? 'Yes' : 'No' }, // Refund/Guarantee?
         { id: '4141', value: application.refundDays?.toString() || '' }, // Refund # Days
         
-        // POS System
-        { id: '4234', value: application.posSystem || '' }, // POS System
+        // POS System - Removed as it's a label field that shouldn't be updated
         
         // Beneficial Owners (if any)
         ...(application.beneficialOwners && application.beneficialOwners.length > 0 ? [
@@ -729,9 +745,9 @@ export class IrisCrmService {
           { id: '4305', value: application.beneficialOwners[0]?.country || '' }, // BO's Issuing Country
           { id: '4298', value: application.beneficialOwners[0]?.idType || '' }, // BO's ID Type
           { id: '4302', value: application.beneficialOwners[0]?.idNumber || '' }, // BO's Number on ID
-          { id: '4306', value: application.beneficialOwners[0]?.idDateIssued || '' }, // BO ID Date Issued
-          { id: '4301', value: application.beneficialOwners[0]?.idExpDate || '' }, // BO ID Expiration Date
-          { id: '4295', value: application.beneficialOwners[0]?.dob || '' }, // BO Date of Birth
+          { id: '4306', value: this.formatDate(application.beneficialOwners[0]?.idDateIssued) }, // BO ID Date Issued
+          { id: '4301', value: this.formatDate(application.beneficialOwners[0]?.idExpDate) }, // BO ID Expiration Date
+          { id: '4295', value: this.formatDate(application.beneficialOwners[0]?.dob) }, // BO Date of Birth
           { id: '4307', value: application.beneficialOwners[0]?.ssnOrTinFromUs ? 'Yes' : 'No' }, // BO SSN or TIN from US?
           { id: '4296', value: application.beneficialOwners[0]?.ssn || '' }, // BO Social Security Number
           { id: '4297', value: application.beneficialOwners[0]?.controlPerson ? 'Yes' : 'No' }, // BO Control Person?

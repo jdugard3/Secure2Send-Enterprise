@@ -14,12 +14,30 @@ import { env } from "./env";
 import { cloudflareR2 } from "./services/cloudflareR2";
 import { AuditService } from "./services/auditService";
 import { requireMfaSetup } from "./middleware/mfaRequired";
+import { verifyCloudflareAccess, requireAdminAccess, requireEmailDomain, checkTokenExpiration } from "./middleware/cloudflareAccess";
 
 // File upload configuration is now handled in fileValidation middleware
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
+
+  // Apply Cloudflare Access verification in production
+  if (env.NODE_ENV === 'production' && env.CLOUDFLARE_ACCESS_AUD) {
+    console.log('🔒 Cloudflare Zero Trust enabled - applying access verification');
+    
+    // Apply Cloudflare Access verification to all API routes
+    app.use('/api', verifyCloudflareAccess);
+    
+    // Apply token expiration checking
+    app.use('/api', checkTokenExpiration);
+    
+    // Apply admin-specific access controls
+    app.use('/api/admin', requireAdminAccess(['secure2send-admins']));
+    
+    // Apply email domain restrictions (optional - uncomment if needed)
+    // app.use('/api', requireEmailDomain(['yourdomain.com', 'partnerdomain.com']));
+  }
 
   // Apply MFA requirement middleware after authentication is set up
   app.use(requireMfaSetup);
@@ -1020,17 +1038,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Sync merchant application to IRIS CRM via Zapier webhook (async, don't block response)
       const client = await storage.getClientById(application.clientId);
-      if (client && client.irisLeadId) {
+      if (client) {
         const applicationOwner = await storage.getUser(client.userId);
         if (applicationOwner) {
-          import('./services/irisCrmService').then(({ IrisCrmService }) => {
+          import('./services/irisCrmService').then(async ({ IrisCrmService }) => {
+            let irisLeadId = client.irisLeadId;
+            
+            // Create IRIS lead ID if it doesn't exist
+            if (!irisLeadId) {
+              console.log('🔄 No IRIS lead ID found, creating new lead for client:', client.id);
+              try {
+                irisLeadId = await IrisCrmService.createLead(applicationOwner);
+                if (irisLeadId) {
+                  // Update client with the new IRIS lead ID
+                  await storage.updateClientIrisLeadId(client.id, irisLeadId);
+                  console.log('✅ Created and assigned IRIS lead ID:', irisLeadId);
+                } else {
+                  console.warn('⚠️ Failed to create IRIS lead ID, skipping sync');
+                  return;
+                }
+              } catch (error) {
+                console.error('❌ Failed to create IRIS lead ID:', error);
+                return;
+              }
+            }
+            
             // Sync via Zapier webhook (comprehensive payload)
-            IrisCrmService.syncMerchantApplicationToIris(applicationOwner, application, client.irisLeadId!).catch(error => {
+            IrisCrmService.syncMerchantApplicationToIris(applicationOwner, application, irisLeadId).catch(error => {
               console.error('Failed to sync merchant application to IRIS CRM via Zapier:', error);
             });
             
             // Also update lead fields directly (field ID mapping)
-            IrisCrmService.updateLeadWithMerchantApplication(client.irisLeadId!, application).catch(error => {
+            IrisCrmService.updateLeadWithMerchantApplication(irisLeadId, application).catch(error => {
               console.error('Failed to update IRIS CRM lead with field mapping:', error);
             });
           }).catch(error => {
@@ -1038,7 +1077,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
       } else {
-        console.warn('⚠️ No IRIS lead ID found for client, skipping merchant application sync');
+        console.warn('⚠️ No client found for merchant application, skipping IRIS CRM sync');
       }
 
       res.json(application);
@@ -1104,17 +1143,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Trigger on any status change (SUBMITTED, UNDER_REVIEW, APPROVED, REJECTED)
       if (['SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'REJECTED'].includes(status)) {
         const client = await storage.getClientById(application.clientId);
-        if (client && client.irisLeadId) {
+        if (client) {
           const applicationOwner = await storage.getUser(client.userId);
           if (applicationOwner) {
-            import('./services/irisCrmService').then(({ IrisCrmService }) => {
+            import('./services/irisCrmService').then(async ({ IrisCrmService }) => {
+              let irisLeadId = client.irisLeadId;
+              
+              // Create IRIS lead ID if it doesn't exist
+              if (!irisLeadId) {
+                console.log('🔄 No IRIS lead ID found, creating new lead for client:', client.id);
+                try {
+                  irisLeadId = await IrisCrmService.createLead(applicationOwner);
+                  if (irisLeadId) {
+                    // Update client with the new IRIS lead ID
+                    await storage.updateClientIrisLeadId(client.id, irisLeadId);
+                    console.log('✅ Created and assigned IRIS lead ID:', irisLeadId);
+                  } else {
+                    console.warn('⚠️ Failed to create IRIS lead ID, skipping sync');
+                    return;
+                  }
+                } catch (error) {
+                  console.error('❌ Failed to create IRIS lead ID:', error);
+                  return;
+                }
+              }
+              
               // Sync via Zapier webhook (comprehensive payload)
-              IrisCrmService.syncMerchantApplicationToIris(applicationOwner, application, client.irisLeadId!).catch(error => {
+              IrisCrmService.syncMerchantApplicationToIris(applicationOwner, application, irisLeadId).catch(error => {
                 console.error('Failed to sync merchant application to IRIS CRM via Zapier:', error);
               });
               
               // Also update lead fields directly (field ID mapping)
-              IrisCrmService.updateLeadWithMerchantApplication(client.irisLeadId!, application).catch(error => {
+              IrisCrmService.updateLeadWithMerchantApplication(irisLeadId, application).catch(error => {
                 console.error('Failed to update IRIS CRM lead with field mapping:', error);
               });
             }).catch(error => {
@@ -1122,7 +1182,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             });
           }
         } else {
-          console.warn('⚠️ No IRIS lead ID found for client, skipping merchant application sync');
+          console.warn('⚠️ No client found for merchant application, skipping IRIS CRM sync');
         }
       }
 

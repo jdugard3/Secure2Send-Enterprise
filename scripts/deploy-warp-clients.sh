@@ -15,6 +15,7 @@ NC='\033[0m' # No Color
 # Configuration
 TEAM_NAME="yourteam"  # Replace with your Cloudflare team name
 ORG_ID="your-cloudflare-org-id"  # Replace with your org ID
+DOMAIN="yourdomain.com"  # Replace with your actual domain
 
 echo -e "${BLUE}🔧 Secure2Send Enterprise - WARP Client Deployment${NC}"
 echo "========================================================="
@@ -133,10 +134,10 @@ configure_split_tunnel() {
     
     # Include Secure2Send domains
     echo "Including Secure2Send domains in tunnel..."
-    warp-cli include secure2send.yourdomain.com || true
-    warp-cli include admin.secure2send.yourdomain.com || true
-    warp-cli include api.secure2send.yourdomain.com || true
-    warp-cli include files.secure2send.yourdomain.com || true
+    warp-cli include secure2send.$DOMAIN || true
+    warp-cli include admin.secure2send.$DOMAIN || true
+    warp-cli include api.secure2send.$DOMAIN || true
+    warp-cli include files.secure2send.$DOMAIN || true
     
     echo -e "${GREEN}✅ Split tunneling configured${NC}"
 }
@@ -151,7 +152,7 @@ test_connection() {
     
     # Test connectivity to Secure2Send
     echo -e "\nTesting connectivity to Secure2Send..."
-    if curl -s --max-time 10 https://secure2send.yourdomain.com/api/health &> /dev/null; then
+    if curl -s --max-time 10 https://secure2send.$DOMAIN/api/health &> /dev/null; then
         echo -e "${GREEN}✅ Successfully connected to Secure2Send${NC}"
     else
         echo -e "${YELLOW}⚠️  Could not reach Secure2Send (may not be deployed yet)${NC}"
@@ -159,7 +160,7 @@ test_connection() {
     
     # Check DNS resolution
     echo -e "\nTesting DNS resolution..."
-    if nslookup secure2send.yourdomain.com &> /dev/null; then
+    if nslookup secure2send.$DOMAIN &> /dev/null; then
         echo -e "${GREEN}✅ DNS resolution working${NC}"
     else
         echo -e "${YELLOW}⚠️  DNS resolution issues detected${NC}"
@@ -235,7 +236,7 @@ else
     echo "❌ Internet connectivity: FAILED"
 fi
 
-if curl -s --max-time 5 https://secure2send.yourdomain.com &> /dev/null; then
+if curl -s --max-time 5 https://secure2send.$DOMAIN &> /dev/null; then
     echo "✅ Secure2Send connectivity: OK"
 else
     echo "❌ Secure2Send connectivity: FAILED"
@@ -308,5 +309,9 @@ case "${1:-}" in
         main
         ;;
 esac
+
+
+
+
 
 

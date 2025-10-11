@@ -29,8 +29,8 @@ if (env.MAILGUN_API_KEY && env.MAILGUN_DOMAIN) {
 }
 
 export class EmailService {
-  private static readonly FROM_EMAIL = 'Secure2Send <noreply@secure2send.com>';
-  private static readonly ADMIN_EMAIL = 'admin@secure2send.com'; // TODO: Make this configurable
+  private static readonly FROM_EMAIL = 'Secure2Send <noreply@sandbox865d9327df914e1485b944a7249f5838.mailgun.org>';
+  private static readonly ADMIN_EMAIL = env.ADMIN_EMAIL || 'james@smartclick.systems';
 
   /**
    * Send welcome email to new user

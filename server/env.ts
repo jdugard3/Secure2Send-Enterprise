@@ -21,6 +21,7 @@ const envSchema = z.object({
   RESEND_API_KEY: z.string().optional(),
   MAILGUN_API_KEY: z.string().optional(),
   MAILGUN_DOMAIN: z.string().optional(),
+  ADMIN_EMAIL: z.string().email().optional().default("james@smartclick.systems"),
   APP_URL: z.string().url().optional().default("http://localhost:3000"),
   
   // Replit-specific (optional in production)
@@ -93,6 +94,7 @@ console.log(`   - EMAIL_PROVIDER: ${env.EMAIL_PROVIDER}`);
 console.log(`   - RESEND_API_KEY: ${env.RESEND_API_KEY ? "✓ Set" : "✗ Missing"}`);
 console.log(`   - MAILGUN_API_KEY: ${env.MAILGUN_API_KEY ? "✓ Set" : "✗ Missing"}`);
 console.log(`   - MAILGUN_DOMAIN: ${env.MAILGUN_DOMAIN || "✗ Missing"}`);
+console.log(`   - ADMIN_EMAIL: ${env.ADMIN_EMAIL}`);
 console.log(`   - APP_URL: ${env.APP_URL}`);
 console.log(`   - IRIS_CRM_API_KEY: ${env.IRIS_CRM_API_KEY ? "✓ Set" : "✗ Missing"}`);
 console.log(`   - IRIS_CRM_SUBDOMAIN: ${env.IRIS_CRM_SUBDOMAIN || "✗ Missing"}`);
