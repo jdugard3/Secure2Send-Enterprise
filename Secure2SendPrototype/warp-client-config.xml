@@ -1,0 +1,254 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Cloudflare WARP Client Configuration for Secure2Send Enterprise
+  
+  This configuration file sets up WARP client for enterprise deployment
+  Deploy this configuration to all team devices for consistent security policies
+  
+  Deployment methods:
+  - Windows: Group Policy, SCCM, or Intune
+  - macOS: Jamf Pro, Munki, or manual deployment
+  - Mobile: MDM solution (Intune, Jamf, etc.)
+-->
+
+<cloudflare-warp-config>
+  <!-- Organization Configuration -->
+  <organization>
+    <team_name>yourteam</team_name>
+    <organization_id>your-cloudflare-org-id</organization_id>
+    <auth_client_id>your-auth-client-id</auth_client_id>
+    <auth_client_secret>your-auth-client-secret</auth_client_secret>
+  </organization>
+
+  <!-- WARP Settings -->
+  <warp>
+    <!-- Enable WARP+ for better performance -->
+    <mode>warp_plus</mode>
+    
+    <!-- Auto-connect on network changes -->
+    <auto_connect>true</auto_connect>
+    
+    <!-- Switch teams automatically based on network -->
+    <switch_locked>false</switch_locked>
+    
+    <!-- Enable local network access for office resources -->
+    <local_domain_fallback>
+      <domain>yourdomain.local</domain>
+      <domain>*.corp.yourdomain.com</domain>
+    </local_domain_fallback>
+    
+    <!-- Exclude local networks from WARP tunnel -->
+    <exclude_networks>
+      <network>192.168.1.0/24</network>    <!-- Office network -->
+      <network>10.0.0.0/8</network>        <!-- Private networks -->
+      <network>172.16.0.0/12</network>     <!-- Private networks -->
+    </exclude_networks>
+  </warp>
+
+  <!-- Gateway Configuration -->
+  <gateway>
+    <!-- Enable DNS filtering -->
+    <dns_filtering>true</dns_filtering>
+    
+    <!-- Gateway policies from Zero Trust dashboard -->
+    <policy_id>your-gateway-policy-id</policy_id>
+    
+    <!-- Custom DNS servers (optional) -->
+    <custom_dns>
+      <server>1.1.1.1</server>
+      <server>1.0.0.1</server>
+    </custom_dns>
+    
+    <!-- Block malware and phishing -->
+    <security_categories>
+      <category>malware</category>
+      <category>phishing</category>
+      <category>command_and_control</category>
+      <category>botnet</category>
+    </security_categories>
+    
+    <!-- Cannabis industry specific blocking -->
+    <blocked_categories>
+      <category>social_networking</category>    <!-- During work hours -->
+      <category>gambling</category>
+      <category>adult_content</category>
+      <category>file_sharing</category>         <!-- Security risk -->
+    </blocked_categories>
+    
+    <!-- Allow business applications -->
+    <allowed_applications>
+      <application>Office 365</application>
+      <application>Google Workspace</application>
+      <application>Slack</application>
+      <application>Zoom</application>
+      <application>Microsoft Teams</application>
+    </allowed_applications>
+  </gateway>
+
+  <!-- Device Posture Settings -->
+  <device_posture>
+    <!-- Enable device posture checks -->
+    <enabled>true</enabled>
+    
+    <!-- Check interval (in minutes) -->
+    <check_interval>30</check_interval>
+    
+    <!-- Required checks for Secure2Send access -->
+    <required_checks>
+      <!-- Operating System Version -->
+      <check type="os_version">
+        <windows>
+          <min_version>10.0.19041</min_version>   <!-- Windows 10 2004+ -->
+        </windows>
+        <macos>
+          <min_version>10.15</min_version>        <!-- macOS Catalina+ -->
+        </macos>
+        <ios>
+          <min_version>14.0</min_version>         <!-- iOS 14+ -->
+        </ios>
+        <android>
+          <min_version>10.0</min_version>         <!-- Android 10+ -->
+        </android>
+      </check>
+      
+      <!-- Domain Join Status (for corporate devices) -->
+      <check type="domain_joined">
+        <required>false</required>               <!-- Optional for BYOD -->
+        <domains>
+          <domain>yourdomain.local</domain>
+          <domain>corp.yourdomain.com</domain>
+        </domains>
+      </check>
+      
+      <!-- Antivirus Software -->
+      <check type="antivirus">
+        <required>true</required>
+        <running>true</running>
+        <updated>true</updated>
+        <accepted_products>
+          <product>Windows Defender</product>
+          <product>CrowdStrike</product>
+          <product>Sophos</product>
+          <product>Trend Micro</product>
+        </accepted_products>
+      </check>
+      
+      <!-- Firewall Status -->
+      <check type="firewall">
+        <required>true</required>
+        <enabled>true</enabled>
+      </check>
+      
+      <!-- Disk Encryption -->
+      <check type="disk_encryption">
+        <required>true</required>                <!-- Critical for cannabis docs -->
+        <encrypted>true</encrypted>
+      </check>
+      
+      <!-- Screen Lock -->
+      <check type="screen_lock">
+        <required>true</required>
+        <enabled>true</enabled>
+        <max_idle_time>900</max_idle_time>       <!-- 15 minutes -->
+      </check>
+      
+      <!-- Application Presence (Security Software) -->
+      <check type="application">
+        <name>CrowdStrike Falcon</name>
+        <required>false</required>              <!-- Optional -->
+        <running>true</running>
+      </check>
+    </required_checks>
+  </device_posture>
+
+  <!-- Split Tunnel Configuration -->
+  <split_tunnel>
+    <!-- Mode: include (only tunnel specified traffic) or exclude (tunnel all except specified) -->
+    <mode>exclude</mode>
+    
+    <!-- Exclude internal applications from tunnel -->
+    <excluded_routes>
+      <!-- Local file servers -->
+      <route>192.168.1.100/32</route>
+      
+      <!-- Internal applications -->
+      <route>intranet.yourdomain.local</route>
+      
+      <!-- Development servers -->
+      <route>dev.yourdomain.local</route>
+    </excluded_routes>
+    
+    <!-- Include specific applications in tunnel (if using include mode) -->
+    <included_routes>
+      <route>secure2send.yourdomain.com</route>
+      <route>admin.secure2send.yourdomain.com</route>
+      <route>api.secure2send.yourdomain.com</route>
+      <route>files.secure2send.yourdomain.com</route>
+    </included_routes>
+  </split_tunnel>
+
+  <!-- User Interface Settings -->
+  <ui>
+    <!-- Hide WARP settings from end users -->
+    <hide_settings>true</hide_settings>
+    
+    <!-- Prevent users from disabling WARP -->
+    <allow_user_disable>false</allow_user_disable>
+    
+    <!-- Show connection status -->
+    <show_connection_status>true</show_connection_status>
+    
+    <!-- Custom branding -->
+    <organization_name>Your Company - Secure2Send</organization_name>
+    <support_url>https://support.yourdomain.com</support_url>
+    <support_email>it-support@yourdomain.com</support_email>
+  </ui>
+
+  <!-- Logging and Monitoring -->
+  <logging>
+    <!-- Enable enhanced logging -->
+    <level>info</level>
+    
+    <!-- Log rotation -->
+    <max_log_files>10</max_log_files>
+    <max_log_size>10MB</max_log_size>
+    
+    <!-- Send logs to SIEM (optional) -->
+    <syslog>
+      <enabled>false</enabled>
+      <server>siem.yourdomain.com</server>
+      <port>514</port>
+    </syslog>
+  </logging>
+
+  <!-- Auto-Update Settings -->
+  <auto_update>
+    <!-- Enable automatic updates -->
+    <enabled>true</enabled>
+    
+    <!-- Update channel -->
+    <channel>stable</channel>
+    
+    <!-- Update window (UTC) -->
+    <maintenance_window>
+      <start>02:00</start>
+      <end>06:00</end>
+    </maintenance_window>
+  </auto_update>
+
+  <!-- Emergency Settings -->
+  <emergency>
+    <!-- Allow bypass for critical issues -->
+    <bypass_enabled>true</bypass_enabled>
+    <bypass_duration>4h</bypass_duration>
+    
+    <!-- Emergency contacts -->
+    <admin_email>admin@yourdomain.com</admin_email>
+    <emergency_phone>+1-555-0123</emergency_phone>
+  </emergency>
+
+</cloudflare-warp-config>
+
+
+
+
