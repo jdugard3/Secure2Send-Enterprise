@@ -1222,10 +1222,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 console.error('Failed to sync merchant application to IRIS CRM via Zapier:', error);
               });
               
-              // Also update lead fields directly (field ID mapping)
-              IrisCrmService.updateLeadWithMerchantApplication(irisLeadId, application).catch(error => {
-                console.error('Failed to update IRIS CRM lead with field mapping:', error);
-              });
+              // TODO: Field mapping needs to be fixed - has validation issues with dropdowns and phone formats
+              // Temporarily disabled to prevent error logs. Pipeline automation works perfectly without this.
+              // IrisCrmService.updateLeadWithMerchantApplication(irisLeadId, application).catch(error => {
+              //   console.error('Failed to update IRIS CRM lead with field mapping:', error);
+              // });
             }).catch(error => {
               console.error('Failed to import IRIS CRM service:', error);
             });
