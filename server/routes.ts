@@ -912,6 +912,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         metadata: { applicationId: application.id, status: 'DRAFT' }
       });
 
+      // Move IRIS lead to Sales - Pre-Sale when application is created (async, don't block response)
+      import('./services/irisCrmService').then(async ({ IrisCrmService }) => {
+        let irisLeadId = client.irisLeadId;
+        
+        // Create IRIS lead ID if it doesn't exist
+        if (!irisLeadId) {
+          console.log('🔄 No IRIS lead ID found, creating new lead for client:', client.id);
+          try {
+            irisLeadId = await IrisCrmService.createLead(user);
+            if (irisLeadId) {
+              await storage.updateClientIrisLeadId(client.id, irisLeadId);
+              console.log('✅ Created and assigned IRIS lead ID:', irisLeadId);
+            } else {
+              console.warn('⚠️ Failed to create IRIS lead ID, skipping IRIS sync');
+              return;
+            }
+          } catch (error) {
+            console.error('❌ Failed to create IRIS lead ID:', error);
+            return;
+          }
+        }
+        
+        // Move lead to Sales - Pre-Sale (application started)
+        IrisCrmService.updateLeadStatus(irisLeadId, 'SALES_PRE_SALE').catch(error => {
+          console.error('Failed to update IRIS CRM lead status to SALES_PRE_SALE:', error);
+        });
+      }).catch(error => {
+        console.error('Failed to import IRIS CRM service:', error);
+      });
+
       res.json(application);
     } catch (error) {
       console.error("Error creating merchant application:", error);
@@ -1063,6 +1093,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
             }
             
+            // Note: Pipeline stage updates happen in the status change endpoint or on creation
+            // Don't update pipeline here as it could conflict with explicit status changes
+            
             // Sync via Zapier webhook (comprehensive payload)
             IrisCrmService.syncMerchantApplicationToIris(applicationOwner, application, irisLeadId).catch(error => {
               console.error('Failed to sync merchant application to IRIS CRM via Zapier:', error);
@@ -1166,6 +1199,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   console.error('❌ Failed to create IRIS lead ID:', error);
                   return;
                 }
+              }
+              
+              // Update IRIS pipeline stage based on application status
+              const pipelineStageMap: Record<string, keyof typeof IrisCrmService['PIPELINE_STAGES']> = {
+                'DRAFT': 'SALES_PRE_SALE',
+                'SUBMITTED': 'SALES_READY_FOR_REVIEW',
+                'UNDER_REVIEW': 'SALES_READY_FOR_REVIEW', // Keep in Sales - Ready for Review during admin review
+                'APPROVED': 'UNDERWRITING_READY_FOR_REVIEW',
+                'REJECTED': 'SALES_DECLINED',
+              };
+
+              const pipelineStage = pipelineStageMap[status];
+              if (pipelineStage) {
+                IrisCrmService.updateLeadStatus(irisLeadId, pipelineStage).catch(error => {
+                  console.error(`Failed to update IRIS CRM lead status to ${pipelineStage}:`, error);
+                });
               }
               
               // Sync via Zapier webhook (comprehensive payload)

@@ -45,6 +45,16 @@ export class IrisCrmService {
   private static readonly ZAPIER_DOCUMENT_WEBHOOK_URL = 'https://hooks.zapier.com/hooks/catch/15790762/umqr4bb/';
   private static readonly ZAPIER_APPLICATION_WEBHOOK_URL = 'https://hooks.zapier.com/hooks/catch/15790762/umqr4bb/';
 
+  // IRIS CRM Pipeline Stage Mappings
+  // Based on actual IRIS CRM configuration
+  private static readonly PIPELINE_STAGES = {
+    OPS_PRE_ACTIVE: { status: 158, group: 51 },              // When account is initially created
+    SALES_PRE_SALE: { status: 187, group: 48 },              // When application is saved as draft
+    SALES_READY_FOR_REVIEW: { status: 193, group: 1 },       // When application is submitted
+    UNDERWRITING_READY_FOR_REVIEW: { status: 171, group: 1 }, // When application is approved
+    SALES_DECLINED: { status: 149, group: 28 },              // When application is denied/rejected
+  } as const;
+
   /**
    * Format date to IRIS CRM expected format (mm/dd/yyyy)
    * Uses UTC methods to avoid timezone conversion issues
@@ -253,6 +263,51 @@ export class IrisCrmService {
       console.error('❌ Failed to create IRIS CRM lead:', error);
       // Don't throw - we want to continue with normal flow
       return null;
+    }
+  }
+
+  /**
+   * Update lead status and group (move to different pipeline stage)
+   */
+  static async updateLeadStatus(
+    leadId: string,
+    stage: keyof typeof IrisCrmService.PIPELINE_STAGES
+  ): Promise<void> {
+    try {
+      if (!env.IRIS_CRM_API_KEY || !env.IRIS_CRM_SUBDOMAIN) {
+        console.warn('⚠️ IRIS CRM API key or subdomain not configured, skipping lead status update');
+        return;
+      }
+
+      const { status, group } = this.PIPELINE_STAGES[stage];
+
+      console.log(`🔄 Updating IRIS CRM lead ${leadId} to pipeline stage: ${stage}`);
+      console.log(`   Status: ${status}, Group: ${group}`);
+
+      const updateData = {
+        status,
+        group,
+      };
+
+      const response = await fetch(`${this.getApiBaseUrl()}/leads/${leadId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-KEY': env.IRIS_CRM_API_KEY,
+          'accept': 'application/json',
+        },
+        body: JSON.stringify(updateData),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`IRIS CRM status update API error: ${response.status} - ${errorText}`);
+      }
+
+      console.log(`✅ IRIS CRM lead ${leadId} successfully moved to ${stage}`);
+    } catch (error) {
+      console.error(`❌ Failed to update IRIS CRM lead status to ${stage}:`, error);
+      // Don't throw - we want to continue with normal flow
     }
   }
 
