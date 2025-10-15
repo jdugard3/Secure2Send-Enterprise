@@ -887,6 +887,438 @@ export function BusinessInformationStep({ form }: BusinessInformationStepProps) 
           </CardContent>
         </Card>
 
+        {/* Enhanced Owner Information */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-primary" />
+              <CardTitle>Owner Information</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="ownerFirstName"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      First Name *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Enter first name" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="ownerLastName"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Last Name *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Enter last name" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="ownerFullName"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Full Name *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Enter full name" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="ownerTitle"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Title *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Enter title (e.g., CEO, President)" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="ownerOfficer"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Owner/Officer *
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}>
+                          <SelectValue placeholder="Select role" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Owner">Owner</SelectItem>
+                        <SelectItem value="Officer">Officer</SelectItem>
+                        <SelectItem value="N/A">N/A</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="ownerOwnershipPercentage"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Ownership % *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Enter ownership percentage" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="ownerMobilePhone"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Mobile Phone *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Enter mobile phone" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="ownerEmail"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Email *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="email"
+                        placeholder="Enter email" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <Separator />
+            <h5 className="font-medium">Personal Information</h5>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="ownerSsn"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      SSN *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="XXX-XX-XXXX" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="ownerBirthday"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Date of Birth *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="date"
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="ownerStateIssuedIdNumber"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      State Issued ID Number *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Enter ID number" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="ownerIssuingState"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Issuing State *
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}>
+                          <SelectValue placeholder="Select state" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {US_STATES.map((state) => (
+                          <SelectItem key={state} value={state}>
+                            {state}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="ownerIdDateIssued"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      ID Date Issued *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="date"
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="ownerIdExpDate"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      ID Expiration Date *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="date"
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <Separator />
+            <h5 className="font-medium">Residential Address</h5>
+
+            <FormField
+              control={form.control}
+              name="ownerLegalAddress"
+              render={({ field, fieldState }) => (
+                <FormItem>
+                  <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                    Legal Address *
+                  </FormLabel>
+                  <FormControl>
+                    <Input 
+                      placeholder="Enter legal address" 
+                      className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                      {...field} 
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <FormField
+                control={form.control}
+                name="ownerCity"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      City *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Enter city" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="ownerState"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      State *
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}>
+                          <SelectValue placeholder="Select state" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {US_STATES.map((state) => (
+                          <SelectItem key={state} value={state}>
+                            {state}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="ownerZip"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      ZIP Code *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Enter ZIP code" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="ownerCountry"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Country *
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value} defaultValue="US">
+                      <FormControl>
+                        <SelectTrigger className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}>
+                          <SelectValue placeholder="Select country" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="US">United States</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Business Operations */}
         <Card>
           <CardHeader>
