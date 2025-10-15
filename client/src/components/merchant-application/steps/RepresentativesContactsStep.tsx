@@ -112,9 +112,18 @@ export function RepresentativesContactsStep({ form }: RepresentativesContactsSte
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Owner/Officer *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter owner/officer status" {...field} />
-                    </FormControl>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select role" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Owner">Owner</SelectItem>
+                        <SelectItem value="Officer">Officer</SelectItem>
+                        <SelectItem value="N/A">N/A</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}

@@ -201,7 +201,22 @@ export class IrisCrmService {
       }
     };
     
-    return dropdownMappings[fieldId]?.[value] || value;
+    // Return mapped value if it exists, otherwise return empty string
+    // Empty strings will be filtered out before sending to IRIS
+    // This prevents sending invalid values that IRIS will reject
+    const mappedValue = dropdownMappings[fieldId]?.[value];
+    if (mappedValue !== undefined) {
+      return mappedValue;
+    }
+    
+    // For fields without mappings, return the value as-is (for text fields)
+    // For fields with mappings but unmapped values, return empty to skip them
+    if (dropdownMappings[fieldId]) {
+      console.warn(`⚠️ Unmapped value for field ${fieldId}: "${value}" - skipping field`);
+      return '';
+    }
+    
+    return value;
   }
 
   /**
