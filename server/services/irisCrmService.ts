@@ -79,6 +79,7 @@ export class IrisCrmService {
 
   /**
    * Format phone number to IRIS CRM expected format (111-111-1111)
+   * Rejects invalid area codes like 555, 000, 999
    */
   private static formatPhone(phoneString: string): string {
     if (!phoneString) return '';
@@ -88,6 +89,18 @@ export class IrisCrmService {
     
     // Must be exactly 10 digits
     if (digits.length !== 10) return '';
+    
+    // Get area code
+    const areaCode = digits.slice(0, 3);
+    
+    // Reject invalid area codes commonly used for testing
+    // 555 is reserved for fiction/testing
+    // 000, 999 are invalid
+    const invalidAreaCodes = ['000', '555', '999'];
+    if (invalidAreaCodes.includes(areaCode)) {
+      console.warn(`⚠️ Skipping invalid phone number with area code ${areaCode}: ${phoneString}`);
+      return '';
+    }
     
     // Format as 111-111-1111
     return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
@@ -103,38 +116,43 @@ export class IrisCrmService {
     }
     
     const dropdownMappings: Record<string, Record<string, string>> = {
-      '3861': { // Entity Type - Use exact IRIS values
+      '3861': { // Entity Type - Based on actual IRIS values
         'SOLE_PROPRIETORSHIP': 'Sole Proprietorship',
+        'SOLE PROPRIETORSHIP': 'Sole Proprietorship',
         'LLC': 'LLC', 
+        'NON_PROFIT': 'Non-Profit',
+        'NON-PROFIT': 'Non-Profit',
         'CORPORATION_PRIVATELY_HELD': 'Corporation',
         'CORPORATION': 'Corporation',
         'PARTNERSHIP_LLP': 'Partnership',
         'PARTNERSHIP': 'Partnership',
         'S_CORP': 'S-Corporation',
+        'S-CORP': 'S-Corporation',
       },
-      '4269': { // Owner Country - Must be exact IRIS values
+      '4269': { // Owner Country - US only
         'US': 'US',
         'USA': 'US', 
         'United States': 'US',
       },
-      '4270': { // FR Country - Must be exact IRIS values
+      '4270': { // FR Country - US only
         'US': 'US',
         'USA': 'US',
         'United States': 'US',
       },
-      '4298': { // BO's ID Type - Use exact IRIS values
+      '4298': { // BO's ID Type - IRIS accepts various formats
         'DRIVERS_LICENSE': "Driver's License",
         'DRIVER_LICENSE': "Driver's License",
+        "DRIVER'S LICENSE": "Driver's License",
         'PASSPORT': 'Passport',
         'STATE_ID': 'State ID',
       },
       '4273': { // Multiple Locations - Boolean to Yes/No
-        'true': 'Yes',
+        'true': 'No',  // Default to No if not specified
         'false': 'No',
         'Yes': 'Yes',
         'No': 'No',
       },
-      '4297': { // BO Control Person - Boolean to Yes/No
+      '4297': { // BO Control Person - Boolean to Yes/No (default Yes based on diagnostic)
         'true': 'Yes',
         'false': 'No', 
         'Yes': 'Yes',
@@ -146,35 +164,40 @@ export class IrisCrmService {
         'Yes': 'Yes', 
         'No': 'No',
       },
-      '3792': { // FR Owner/Officer
+      '3792': { // FR Owner/Officer - Default to N/A
         'Owner': 'Owner',
         'OWNER': 'Owner',
         'Officer': 'Officer',
         'OFFICER': 'Officer',
+        'N/A': 'N/A',
+        '': 'N/A',
       },
-      '4278': { // Business Type
+      '4278': { // Business Type - Keep Retail as primary
         'Retail': 'Retail',
         'RETAIL': 'Retail',
         'E-commerce': 'E-commerce',
         'Restaurant': 'Restaurant',
       },
-      '4174': { // Previously Processed
-        'true': 'Yes',
-        'false': 'No',
+      '4174': { // Previously Processed - Default to "(Please select)"
+        'true': '(Please select)',
+        'false': '(Please select)',
         'Yes': 'Yes',
         'No': 'No',
+        '': '(Please select)',
       },
-      '4316': { // Automatic Billing
-        'true': 'Yes',
-        'false': 'No', 
+      '4316': { // Automatic Billing - Default to "(Please select)"
+        'true': '(Please select)',
+        'false': '(Please select)', 
         'Yes': 'Yes',
         'No': 'No',
+        '': '(Please select)',
       },
-      '4181': { // Refund/Guarantee
-        'true': 'Yes',
-        'false': 'No',
+      '4181': { // Refund/Guarantee - Note different capitalization from 4174/4316
+        'true': '(Please Select)',
+        'false': '(Please Select)',
         'Yes': 'Yes',
         'No': 'No',
+        '': '(Please Select)',
       }
     };
     
@@ -776,14 +799,14 @@ export class IrisCrmService {
         
         // Business Operations - Auto-filled fields as specified
         { id: '4278', value: 'Retail' }, // Business Type - Autofill "Retail"
-        { id: '3860', value: 'No' }, // Processed Cards in Past? - Autofill "No"
-        { id: '4174', value: 'No' }, // Previously Processed? - Autofill "No"
+        // Field 3860 (Processed Cards in Past) is a LABEL - cannot be updated
+        { id: '4174', value: '(Please select)' }, // Previously Processed? - Default placeholder
         { id: '3859', value: 'N/A' }, // If Yes, Under What Name? - Autofill "N/A"
-        { id: '4316', value: 'No' }, // Automatic Billing? - Autofill "No"
-        { id: '4107', value: 'No' }, // Cardholder Data 3rd Party - Autofill "No"
+        { id: '4316', value: '(Please select)' }, // Automatic Billing? - Default placeholder
+        // Field 4107 (Cardholder Data 3rd Party) is a LABEL - cannot be updated
         
         // Refund/Guarantee Information
-        { id: '4181', value: application.refundGuarantee ? 'Yes' : 'No' }, // Refund/Guarantee?
+        { id: '4181', value: application.refundGuarantee ? 'Yes' : '(Please Select)' }, // Refund/Guarantee? - Default placeholder
         { id: '4141', value: application.refundDays?.toString() || '' }, // Refund # Days
         
         // POS System - Removed as it's a label field that shouldn't be updated
@@ -819,7 +842,7 @@ export class IrisCrmService {
         ] : []),
         
         // Application Status and Agreement
-        { id: '4317', value: `Application ${application.status} - Submitted via Secure2Send` }, // Application Notes
+        // Field 4317 (Application Notes) is a LABEL - cannot be updated
       ];
 
       // Filter out empty values to avoid overwriting existing data with blanks
