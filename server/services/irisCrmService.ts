@@ -139,6 +139,11 @@ export class IrisCrmService {
         'USA': 'US',
         'United States': 'US',
       },
+      '4305': { // BO's Issuing Country - US only
+        'US': 'US',
+        'USA': 'US',
+        'United States': 'US',
+      },
       '4298': { // BO's ID Type - IRIS accepts various formats
         'DRIVERS_LICENSE': "Driver's License",
         'DRIVER_LICENSE': "Driver's License",
@@ -163,6 +168,14 @@ export class IrisCrmService {
         'false': 'No',
         'Yes': 'Yes', 
         'No': 'No',
+      },
+      '3779': { // Owner/Officer - Same as FR Owner/Officer
+        'Owner': 'Owner',
+        'OWNER': 'Owner',
+        'Officer': 'Officer',
+        'OFFICER': 'Officer',
+        'N/A': 'N/A',
+        '': 'N/A',
       },
       '3792': { // FR Owner/Officer - Default to N/A
         'Owner': 'Owner',
@@ -772,10 +785,10 @@ export class IrisCrmService {
         { id: '4274', value: application.ownerFullName || '' }, // Owner Full Name
         { id: '3782', value: application.ownerFirstName || '' }, // *First Name
         { id: '3781', value: application.ownerLastName || '' }, // *Last Name
-        { id: '3779', value: application.ownerOfficer || '' }, // Owner/Officer
-        { id: '3780', value: application.ownerTitle || '' }, // *Title
+        { id: '3779', value: this.mapDropdownValue('3779', application.ownerOfficer) }, // Owner/Officer
+        { id: '3780', value: application.ownerTitle || '' }, // *Title (free text field)
         { id: '3778', value: application.ownerOwnershipPercentage?.toString() || '' }, // *Ownership
-        { id: '3777', value: application.ownerMobilePhone || '' }, // Owner Mobile Phone Number
+        { id: '3777', value: this.formatPhone(application.ownerMobilePhone) }, // Owner Mobile Phone Number
         { id: '3871', value: application.ownerEmail || '' }, // Owner Email
         { id: '3872', value: application.ownerSsn || '' }, // Owner SS#
         { id: '3870', value: this.formatDate(application.ownerBirthday) }, // Owner Birthday
@@ -787,7 +800,7 @@ export class IrisCrmService {
         { id: '3774', value: application.ownerCity || '' }, // Owner City
         { id: '3773', value: application.ownerState || '' }, // Owner State
         { id: '3772', value: application.ownerZip || '' }, // Owner Zip
-        { id: '4269', value: application.ownerCountry || '' }, // Owner Country
+        { id: '4269', value: this.mapDropdownValue('4269', application.ownerCountry) }, // Owner Country
         
         // Financial Representative (if exists)
         ...(application.financialRepresentative ? [
@@ -795,10 +808,10 @@ export class IrisCrmService {
           { id: '3796', value: application.financialRepresentative.firstName || '' }, // FR First Name
           { id: '3797', value: application.financialRepresentative.lastName || '' }, // FR Last Name
           { id: '3795', value: application.financialRepresentative.title || '' }, // FR Title
-          { id: '3792', value: application.financialRepresentative.ownerOfficer || '' }, // FR Owner/Officer
+          { id: '3792', value: this.mapDropdownValue('3792', application.financialRepresentative.ownerOfficer) }, // FR Owner/Officer
           { id: '4150', value: application.financialRepresentative.ownershipPercentage?.toString() || '' }, // FR Ownership %
-          { id: '3786', value: application.financialRepresentative.officePhone || '' }, // FR Office Phone Number
-          { id: '3787', value: application.financialRepresentative.mobilePhone || '' }, // FR Mobile Phone Number
+          { id: '3786', value: this.formatPhone(application.financialRepresentative.officePhone) }, // FR Office Phone Number
+          { id: '3787', value: this.formatPhone(application.financialRepresentative.mobilePhone) }, // FR Mobile Phone Number
           { id: '4048', value: application.financialRepresentative.email || '' }, // Financial Rep Email
           { id: '3794', value: application.financialRepresentative.ssn || '' }, // FR Social Security Number
           { id: '3783', value: this.formatDate(application.financialRepresentative.birthday) }, // FR Birthday
@@ -809,7 +822,7 @@ export class IrisCrmService {
           { id: '3790', value: application.financialRepresentative.city || '' }, // FR City
           { id: '3789', value: application.financialRepresentative.state || '' }, // FR State
           { id: '3788', value: application.financialRepresentative.zip || '' }, // FR Zip
-          { id: '4270', value: application.financialRepresentative.country || '' }, // FR Country
+          { id: '4270', value: this.mapDropdownValue('4270', application.financialRepresentative.country) }, // FR Country
         ] : []),
         
         // Business Operations - Auto-filled fields as specified
@@ -835,15 +848,15 @@ export class IrisCrmService {
           { id: '4292', value: application.beneficialOwners[0]?.city || '' }, // BO's City
           { id: '4293', value: application.beneficialOwners[0]?.state || '' }, // BO's State
           { id: '4294', value: application.beneficialOwners[0]?.zip || '' }, // BO's ZIP
-          { id: '4305', value: application.beneficialOwners[0]?.country || '' }, // BO's Issuing Country
-          { id: '4298', value: application.beneficialOwners[0]?.idType || '' }, // BO's ID Type
+          { id: '4305', value: this.mapDropdownValue('4305', application.beneficialOwners[0]?.country) }, // BO's Issuing Country
+          { id: '4298', value: this.mapDropdownValue('4298', application.beneficialOwners[0]?.idType) }, // BO's ID Type
           { id: '4302', value: application.beneficialOwners[0]?.idNumber || '' }, // BO's Number on ID
           { id: '4306', value: this.formatDate(application.beneficialOwners[0]?.idDateIssued) }, // BO ID Date Issued
           { id: '4301', value: this.formatDate(application.beneficialOwners[0]?.idExpDate) }, // BO ID Expiration Date
           { id: '4295', value: this.formatDate(application.beneficialOwners[0]?.dob) }, // BO Date of Birth
-          { id: '4307', value: application.beneficialOwners[0]?.ssnOrTinFromUs ? 'Yes' : 'No' }, // BO SSN or TIN from US?
+          { id: '4307', value: this.mapDropdownValue('4307', application.beneficialOwners[0]?.ssnOrTinFromUs ? 'Yes' : 'No') }, // BO SSN or TIN from US?
           { id: '4296', value: application.beneficialOwners[0]?.ssn || '' }, // BO Social Security Number
-          { id: '4297', value: application.beneficialOwners[0]?.controlPerson ? 'Yes' : 'No' }, // BO Control Person?
+          { id: '4297', value: this.mapDropdownValue('4297', application.beneficialOwners[0]?.controlPerson ? 'Yes' : 'No') }, // BO Control Person?
         ] : []),
         
         // Authorized Contacts (if any)
@@ -852,8 +865,8 @@ export class IrisCrmService {
           { id: '3917', value: application.authorizedContacts[0]?.lastName || '' }, // AC1 Last Name
           { id: '4050', value: application.authorizedContacts[0]?.title || '' }, // AC1 Title
           { id: '3847', value: application.authorizedContacts[0]?.email || '' }, // AC1 Email
-          { id: '3846', value: application.authorizedContacts[0]?.officePhone || '' }, // AC1 Office Phone Number
-          { id: '4151', value: application.authorizedContacts[0]?.mobilePhone || '' }, // AC1 Mobile Phone Number
+          { id: '3846', value: this.formatPhone(application.authorizedContacts[0]?.officePhone) }, // AC1 Office Phone Number
+          { id: '4151', value: this.formatPhone(application.authorizedContacts[0]?.mobilePhone) }, // AC1 Mobile Phone Number
         ] : []),
         
         // Application Status and Agreement
