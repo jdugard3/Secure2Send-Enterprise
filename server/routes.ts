@@ -19,32 +19,7 @@ import { verifyCloudflareAccess, requireAdminAccess, requireEmailDomain, checkTo
 // File upload configuration is now handled in fileValidation middleware
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Auth middleware
-  await setupAuth(app);
-
-  // Apply Cloudflare Access verification in production
-  if (env.NODE_ENV === 'production' && env.CLOUDFLARE_ACCESS_AUD) {
-    console.log('🔒 Cloudflare Zero Trust enabled - applying access verification');
-    
-    // Apply Cloudflare Access verification to all API routes
-    app.use('/api', verifyCloudflareAccess);
-    
-    // Apply token expiration checking
-    app.use('/api', checkTokenExpiration);
-    
-    // Apply admin-specific access controls
-    app.use('/api/admin', requireAdminAccess(['secure2send-admins']));
-    
-    // Apply email domain restrictions (optional - uncomment if needed)
-    // app.use('/api', requireEmailDomain(['yourdomain.com', 'partnerdomain.com']));
-  }
-
-  // Apply MFA requirement middleware after authentication is set up
-  app.use(requireMfaSetup);
-
-  // Auth routes are now handled in auth.ts
-
-  // Health check endpoint for monitoring
+  // Health check endpoint for monitoring (MUST be before auth middleware)
   app.get('/api/health', async (req, res) => {
     try {
       // Test database connectivity
@@ -69,6 +44,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+
+  // Auth middleware
+  await setupAuth(app);
+
+  // Apply Cloudflare Access verification in production
+  // NOTE: Disabled for now - Cloudflare Access JWT verification requires traffic to flow through
+  // Cloudflare's authentication gateway first, which doesn't happen with direct Fly.io access.
+  // The app's existing login + MFA provides robust security.
+  if (false && env.NODE_ENV === 'production' && env.CLOUDFLARE_ACCESS_AUD) {
+    console.log('🔒 Cloudflare Zero Trust enabled - applying access verification');
+    
+    // Apply Cloudflare Access verification to all API routes EXCEPT /api/health
+    app.use('/api', (req, res, next) => {
+      if (req.path === '/health') {
+        return next(); // Skip Cloudflare verification for health checks
+      }
+      return verifyCloudflareAccess(req, res, next);
+    });
+    
+    // Apply token expiration checking
+    app.use('/api', checkTokenExpiration);
+    
+    // Apply admin-specific access controls
+    app.use('/api/admin', requireAdminAccess(['secure2send-admins']));
+    
+    // Apply email domain restrictions (optional - uncomment if needed)
+    // app.use('/api', requireEmailDomain(['yourdomain.com', 'partnerdomain.com']));
+  }
+
+  // Apply MFA requirement middleware after authentication is set up
+  app.use(requireMfaSetup);
+
+  // Auth routes are now handled in auth.ts
 
   // Document routes
   app.post('/api/documents', uploadLimiter, requireAuth, secureUpload.single('file'), async (req: any, res: Response) => {
