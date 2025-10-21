@@ -1,1 +1,0 @@
-# Secure2Send-Enterprise
