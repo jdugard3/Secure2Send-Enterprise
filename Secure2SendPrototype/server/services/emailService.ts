@@ -14,6 +14,8 @@ import { NewDocumentNotificationEmail } from '../emails/NewDocumentNotificationE
 import { SecurityAlertEmail } from '../emails/SecurityAlertEmail';
 import { MfaEnabledEmail } from '../emails/MfaEnabledEmail';
 import { MfaDisabledEmail } from '../emails/MfaDisabledEmail';
+import { MfaOtpEmail } from '../emails/MfaOtpEmail';
+import { MfaMethodChangedEmail } from '../emails/MfaMethodChangedEmail';
 import type { User, Document, Client } from '@shared/schema';
 
 // Initialize email providers based on configuration
@@ -385,6 +387,62 @@ export class EmailService {
       console.log(`✅ MFA disabled email sent to ${user.email}`);
     } catch (error) {
       console.error('❌ Failed to send MFA disabled email:', error);
+    }
+  }
+
+  /**
+   * Send MFA OTP code via email
+   */
+  static async sendMfaOtpEmail(user: User, otpCode: string, expiresInMinutes: number = 5): Promise<void> {
+    try {
+      const emailHtml = await render(MfaOtpEmail({
+        firstName: user.firstName || 'there',
+        otpCode,
+        expiresInMinutes,
+      }));
+
+      await this.sendEmail({
+        to: user.email,
+        subject: `Your Secure2Send verification code: ${otpCode}`,
+        html: emailHtml,
+      });
+
+      console.log(`✅ MFA OTP email sent to ${user.email}`);
+    } catch (error) {
+      console.error('❌ Failed to send MFA OTP email:', error);
+      throw error; // Re-throw so caller knows it failed
+    }
+  }
+
+  /**
+   * Send MFA method changed notification email
+   */
+  static async sendMfaMethodChangedEmail(
+    user: User, 
+    action: 'enabled' | 'disabled', 
+    method: 'email' | 'authenticator'
+  ): Promise<void> {
+    try {
+      const emailHtml = await render(MfaMethodChangedEmail({
+        firstName: user.firstName || 'there',
+        action,
+        method,
+        timestamp: new Date(),
+        appUrl: env.APP_URL!,
+      }));
+
+      const methodName = method === 'email' ? 'Email Verification' : 'Authenticator App';
+      const actionText = action === 'enabled' ? 'Enabled' : 'Disabled';
+
+      await this.sendEmail({
+        to: user.email,
+        subject: `🔒 Security Alert: ${methodName} ${actionText} - Secure2Send`,
+        html: emailHtml,
+      });
+
+      console.log(`✅ MFA method changed email sent to ${user.email} (${method} ${action})`);
+    } catch (error) {
+      console.error('❌ Failed to send MFA method changed email:', error);
     }
   }
 

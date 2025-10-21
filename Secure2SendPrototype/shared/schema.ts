@@ -72,7 +72,14 @@ export const auditLogEnum = pgEnum('audit_action', [
   'MFA_BACKUP_CODE_USED',
   'MFA_SETUP_COMPLETED',
   'MFA_VERIFICATION_FAILED',
-  'MFA_VERIFICATION_SUCCESS'
+  'MFA_VERIFICATION_SUCCESS',
+  'MFA_EMAIL_ENABLED',
+  'MFA_EMAIL_DISABLED',
+  'MFA_EMAIL_OTP_SENT',
+  'MFA_EMAIL_OTP_VERIFIED',
+  'MFA_EMAIL_OTP_FAILED',
+  'MFA_EMAIL_RATE_LIMIT_EXCEEDED',
+  'MFA_METHOD_SWITCHED'
 ]);
 
 // Users table
@@ -85,13 +92,21 @@ export const users = pgTable("users", {
   companyName: varchar("company_name"),
   role: userRoleEnum("role").default('CLIENT'),
   emailVerified: boolean("email_verified").default(false),
-  // MFA fields
+  // MFA fields - TOTP (Authenticator App)
   mfaEnabled: boolean("mfa_enabled").default(false),
   mfaRequired: boolean("mfa_required").default(true), // New users must set up MFA
   mfaSecret: text("mfa_secret"),
   mfaBackupCodes: text("mfa_backup_codes").array(),
   mfaSetupAt: timestamp("mfa_setup_at"),
   mfaLastUsed: timestamp("mfa_last_used"),
+  // MFA fields - Email OTP
+  mfaEmailEnabled: boolean("mfa_email_enabled").default(false),
+  mfaEmailOtp: text("mfa_email_otp"),
+  mfaEmailOtpExpiresAt: timestamp("mfa_email_otp_expires_at"),
+  mfaEmailOtpAttempts: integer("mfa_email_otp_attempts").default(0),
+  mfaEmailLastSentAt: timestamp("mfa_email_last_sent_at"),
+  mfaEmailSendCount: integer("mfa_email_send_count").default(0),
+  mfaEmailRateLimitResetAt: timestamp("mfa_email_rate_limit_reset_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

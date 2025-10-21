@@ -12,6 +12,11 @@ export class MfaService {
   private static readonly APP_NAME = 'Secure2Send Enterprise';
   private static readonly BACKUP_CODES_COUNT = 10;
   private static readonly BACKUP_CODE_LENGTH = 8;
+  private static readonly EMAIL_OTP_LENGTH = 6;
+  private static readonly EMAIL_OTP_EXPIRY_MINUTES = 5;
+  private static readonly EMAIL_OTP_MAX_ATTEMPTS = 5;
+  private static readonly EMAIL_RATE_LIMIT_MAX = 3;
+  private static readonly EMAIL_RATE_LIMIT_WINDOW_MINUTES = 15;
 
   /**
    * Generate a new MFA secret for a user
@@ -312,6 +317,9 @@ export class MfaService {
     setupAt?: Date;
     lastUsed?: Date;
     backupCodesRemaining: number;
+    emailEnabled?: boolean;
+    emailLastSentAt?: Date;
+    emailSendCount?: number;
   }> {
     try {
       const user = await storage.getUser(userId);
@@ -326,10 +334,396 @@ export class MfaService {
         setupAt: user.mfaSetupAt || undefined,
         lastUsed: user.mfaLastUsed || undefined,
         backupCodesRemaining,
+        emailEnabled: user.mfaEmailEnabled || false,
+        emailLastSentAt: user.mfaEmailLastSentAt || undefined,
+        emailSendCount: user.mfaEmailSendCount || 0,
       };
     } catch (error) {
       console.error('Failed to get MFA status:', error);
       return { enabled: false, backupCodesRemaining: 0 };
+    }
+  }
+
+  // ============================================
+  // Email OTP Methods
+  // ============================================
+
+  /**
+   * Generate a random 6-digit OTP code
+   */
+  static generateEmailOtp(): string {
+    const digits = '0123456789';
+    let otp = '';
+    
+    for (let i = 0; i < this.EMAIL_OTP_LENGTH; i++) {
+      const randomIndex = Math.floor(Math.random() * digits.length);
+      otp += digits[randomIndex];
+    }
+    
+    return otp;
+  }
+
+  /**
+   * Hash an email OTP code for secure storage
+   */
+  private static async hashEmailOtp(code: string): Promise<string> {
+    const salt = randomBytes(16).toString('hex');
+    const buf = (await scryptAsync(code, salt, 64)) as Buffer;
+    return `${buf.toString('hex')}.${salt}`;
+  }
+
+  /**
+   * Verify an email OTP code against stored hashed code
+   */
+  private static async verifyEmailOtpHash(code: string, hashedCode: string): Promise<boolean> {
+    try {
+      const [hashed, salt] = hashedCode.split('.');
+      const hashedBuf = Buffer.from(hashed, 'hex');
+      const suppliedBuf = (await scryptAsync(code, salt, 64)) as Buffer;
+      return timingSafeEqual(hashedBuf, suppliedBuf);
+    } catch (error) {
+      console.error('Error verifying email OTP hash:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Check rate limit for email OTP sends
+   */
+  static async checkEmailOtpRateLimit(userId: string): Promise<{
+    allowed: boolean;
+    remainingAttempts: number;
+    resetAt?: Date;
+  }> {
+    try {
+      const rateLimitData = await storage.getEmailRateLimitData(userId);
+      const now = new Date();
+
+      // Check if rate limit window has expired
+      if (rateLimitData.resetAt && now > rateLimitData.resetAt) {
+        // Reset the counter
+        const newResetAt = new Date(now.getTime() + this.EMAIL_RATE_LIMIT_WINDOW_MINUTES * 60 * 1000);
+        await storage.updateEmailRateLimit(userId, 0, newResetAt);
+        return {
+          allowed: true,
+          remainingAttempts: this.EMAIL_RATE_LIMIT_MAX,
+          resetAt: newResetAt,
+        };
+      }
+
+      // Check if under rate limit
+      if (rateLimitData.sendCount >= this.EMAIL_RATE_LIMIT_MAX) {
+        return {
+          allowed: false,
+          remainingAttempts: 0,
+          resetAt: rateLimitData.resetAt,
+        };
+      }
+
+      return {
+        allowed: true,
+        remainingAttempts: this.EMAIL_RATE_LIMIT_MAX - rateLimitData.sendCount,
+        resetAt: rateLimitData.resetAt,
+      };
+    } catch (error) {
+      console.error('Failed to check rate limit:', error);
+      return { allowed: false, remainingAttempts: 0 };
+    }
+  }
+
+  /**
+   * Send email OTP code to user
+   */
+  static async sendEmailOtp(userId: string, email: string): Promise<{
+    success: boolean;
+    error?: string;
+    expiresAt?: Date;
+  }> {
+    try {
+      // Check rate limit
+      const rateLimit = await this.checkEmailOtpRateLimit(userId);
+      if (!rateLimit.allowed) {
+        const resetTime = rateLimit.resetAt 
+          ? new Date(rateLimit.resetAt).toLocaleTimeString() 
+          : 'soon';
+        return {
+          success: false,
+          error: `Rate limit exceeded. You can request another code at ${resetTime}.`,
+        };
+      }
+
+      // Generate OTP
+      const otpCode = this.generateEmailOtp();
+      const hashedOtp = await this.hashEmailOtp(otpCode);
+      const expiresAt = new Date(Date.now() + this.EMAIL_OTP_EXPIRY_MINUTES * 60 * 1000);
+
+      // Save to database
+      await storage.saveEmailOtp(userId, hashedOtp, expiresAt);
+
+      // Update rate limit
+      const rateLimitData = await storage.getEmailRateLimitData(userId);
+      const newSendCount = rateLimitData.sendCount + 1;
+      const resetAt = rateLimitData.resetAt || 
+        new Date(Date.now() + this.EMAIL_RATE_LIMIT_WINDOW_MINUTES * 60 * 1000);
+      await storage.updateEmailRateLimit(userId, newSendCount, resetAt);
+
+      // Get user for email
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return { success: false, error: 'User not found' };
+      }
+
+      // Send email
+      await EmailService.sendMfaOtpEmail(user, otpCode, this.EMAIL_OTP_EXPIRY_MINUTES);
+
+      console.log(`✅ Email OTP sent to ${email} (expires at ${expiresAt.toISOString()})`);
+      return { success: true, expiresAt };
+    } catch (error) {
+      console.error('Failed to send email OTP:', error);
+      return { success: false, error: 'Failed to send verification code. Please try again.' };
+    }
+  }
+
+  /**
+   * Verify email OTP code
+   */
+  static async verifyEmailOtp(userId: string, code: string): Promise<{
+    success: boolean;
+    error?: string;
+  }> {
+    try {
+      // Get OTP data
+      const otpData = await storage.getEmailOtpData(userId);
+
+      // Check if OTP exists
+      if (!otpData.otp) {
+        return { success: false, error: 'No verification code found. Please request a new code.' };
+      }
+
+      // Check attempts
+      if (otpData.attempts >= this.EMAIL_OTP_MAX_ATTEMPTS) {
+        await storage.clearEmailOtp(userId);
+        return { 
+          success: false, 
+          error: 'Too many failed attempts. Please request a new verification code.' 
+        };
+      }
+
+      // Check expiration
+      if (!otpData.expiresAt || new Date() > otpData.expiresAt) {
+        await storage.clearEmailOtp(userId);
+        return { success: false, error: 'Verification code has expired. Please request a new code.' };
+      }
+
+      // Verify code
+      const isValid = await this.verifyEmailOtpHash(code, otpData.otp);
+
+      if (!isValid) {
+        // Increment failed attempts
+        await storage.incrementEmailOtpAttempts(userId);
+        const remainingAttempts = this.EMAIL_OTP_MAX_ATTEMPTS - (otpData.attempts + 1);
+        return { 
+          success: false, 
+          error: `Invalid verification code. ${remainingAttempts} attempts remaining.` 
+        };
+      }
+
+      // Success - clear OTP
+      await storage.clearEmailOtp(userId);
+      console.log(`✅ Email OTP verified for user ${userId}`);
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to verify email OTP:', error);
+      return { success: false, error: 'Verification failed. Please try again.' };
+    }
+  }
+
+  /**
+   * Enable email MFA for a user
+   */
+  static async enableEmailMfa(userId: string, password: string): Promise<{
+    success: boolean;
+    error?: string;
+  }> {
+    try {
+      // Verify password
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return { success: false, error: 'User not found' };
+      }
+
+      // Import password comparison
+      const { scrypt, timingSafeEqual } = await import('crypto');
+      const { promisify } = await import('util');
+      const scryptAsync = promisify(scrypt);
+      
+      const comparePasswords = async (supplied: string, stored: string): Promise<boolean> => {
+        const [hashed, salt] = stored.split(".");
+        const hashedBuf = Buffer.from(hashed, "hex");
+        const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
+        return timingSafeEqual(hashedBuf, suppliedBuf);
+      };
+
+      if (!(await comparePasswords(password, user.password))) {
+        return { success: false, error: 'Invalid password' };
+      }
+
+      // Send verification OTP
+      const otpResult = await this.sendEmailOtp(userId, user.email);
+      if (!otpResult.success) {
+        return { success: false, error: otpResult.error };
+      }
+
+      console.log(`✅ Email MFA setup initiated for user ${userId}`);
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to initiate email MFA:', error);
+      return { success: false, error: 'Failed to enable email MFA. Please try again.' };
+    }
+  }
+
+  /**
+   * Verify and activate email MFA
+   */
+  static async verifyAndActivateEmailMfa(userId: string, code: string): Promise<{
+    success: boolean;
+    error?: string;
+  }> {
+    try {
+      // Verify OTP
+      const verifyResult = await this.verifyEmailOtp(userId, code);
+      if (!verifyResult.success) {
+        return verifyResult;
+      }
+
+      // Enable email MFA
+      await storage.enableEmailMfa(userId);
+
+      // Get user for notification email
+      const user = await storage.getUser(userId);
+      if (user) {
+        EmailService.sendMfaMethodChangedEmail(user, 'enabled', 'email').catch(error => {
+          console.error('Failed to send MFA method changed email:', error);
+        });
+      }
+
+      console.log(`✅ Email MFA enabled for user ${userId}`);
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to activate email MFA:', error);
+      return { success: false, error: 'Failed to enable email MFA. Please try again.' };
+    }
+  }
+
+  /**
+   * Disable email MFA
+   */
+  static async disableEmailMfa(userId: string, password: string): Promise<{
+    success: boolean;
+    error?: string;
+  }> {
+    try {
+      // Verify password
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return { success: false, error: 'User not found' };
+      }
+
+      // Import password comparison
+      const { scrypt, timingSafeEqual } = await import('crypto');
+      const { promisify } = await import('util');
+      const scryptAsync = promisify(scrypt);
+      
+      const comparePasswords = async (supplied: string, stored: string): Promise<boolean> => {
+        const [hashed, salt] = stored.split(".");
+        const hashedBuf = Buffer.from(hashed, "hex");
+        const suppliedBuf = (await scryptAsync(supplied, salt, 64)) as Buffer;
+        return timingSafeEqual(hashedBuf, suppliedBuf);
+      };
+
+      if (!(await comparePasswords(password, user.password))) {
+        return { success: false, error: 'Invalid password' };
+      }
+
+      // Check if at least one MFA method will remain
+      if (!user.mfaEnabled && user.mfaEmailEnabled) {
+        return {
+          success: false,
+          error: 'Cannot disable email MFA. You must have at least one MFA method enabled.',
+        };
+      }
+
+      // Disable email MFA
+      await storage.disableEmailMfa(userId);
+
+      // Send notification email
+      EmailService.sendMfaMethodChangedEmail(user, 'disabled', 'email').catch(error => {
+        console.error('Failed to send MFA method changed email:', error);
+      });
+
+      console.log(`✅ Email MFA disabled for user ${userId}`);
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to disable email MFA:', error);
+      return { success: false, error: 'Failed to disable email MFA. Please try again.' };
+    }
+  }
+
+  /**
+   * Verify MFA for login (handles both TOTP and email OTP)
+   */
+  static async verifyMfaForLoginWithMethod(
+    userId: string, 
+    code: string, 
+    method: 'totp' | 'email'
+  ): Promise<{
+    success: boolean;
+    isBackupCode?: boolean;
+    error?: string;
+  }> {
+    try {
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return { success: false, error: 'User not found' };
+      }
+
+      // Verify based on method
+      if (method === 'totp' && user.mfaEnabled && user.mfaSecret) {
+        // TOTP verification
+        if (this.verifyToken(code, user.mfaSecret)) {
+          await storage.updateUserMfaLastUsed(userId);
+          return { success: true, isBackupCode: false };
+        }
+      } else if (method === 'email' && user.mfaEmailEnabled) {
+        // Email OTP verification
+        const result = await this.verifyEmailOtp(userId, code);
+        if (result.success) {
+          await storage.updateUserMfaLastUsed(userId);
+          return { success: true, isBackupCode: false };
+        }
+        return { success: false, error: result.error };
+      }
+
+      // If primary method fails, try backup codes
+      if (user.mfaBackupCodes && user.mfaBackupCodes.length > 0) {
+        const { isValid, usedCodeIndex } = await this.verifyBackupCode(code, user.mfaBackupCodes);
+        
+        if (isValid) {
+          const updatedBackupCodes = [...user.mfaBackupCodes];
+          updatedBackupCodes[usedCodeIndex] = null as any;
+          
+          await storage.updateUserMfaBackupCodes(userId, updatedBackupCodes.filter(c => c !== null));
+          await storage.updateUserMfaLastUsed(userId);
+          
+          console.log(`✅ Backup code used for user ${userId}`);
+          return { success: true, isBackupCode: true };
+        }
+      }
+
+      return { success: false, error: 'Invalid verification code' };
+    } catch (error) {
+      console.error('Failed to verify MFA for login:', error);
+      return { success: false, error: 'MFA verification failed. Please try again.' };
     }
   }
 }

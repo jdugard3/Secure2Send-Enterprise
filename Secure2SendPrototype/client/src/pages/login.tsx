@@ -13,7 +13,7 @@ import { Link } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { loginSchema, type LoginData } from "@shared/schema";
-import { MfaVerification } from "@/components/MfaVerification";
+import { MfaVerificationDual } from "@/components/MfaVerificationDual";
 
 export default function Login() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -22,6 +22,8 @@ export default function Login() {
   const [mfaChallenge, setMfaChallenge] = useState<{
     userId: string;
     email: string;
+    mfaTotp?: boolean;
+    mfaEmail?: boolean;
   } | null>(null);
   const { toast } = useToast();
 
@@ -44,10 +46,12 @@ export default function Login() {
         setMfaChallenge({
           userId: data.userId,
           email: data.email,
+          mfaTotp: data.mfaTotp,
+          mfaEmail: data.mfaEmail,
         });
         toast({
           title: "MFA Required",
-          description: "Please verify your identity with your authenticator app.",
+          description: "Please verify your identity with multi-factor authentication.",
         });
       } else if (data.mfaSetupRequired) {
         // MFA setup required for new users
@@ -125,9 +129,11 @@ export default function Login() {
             </p>
           </div>
 
-          <MfaVerification
+          <MfaVerificationDual
             userId={mfaChallenge.userId}
             email={mfaChallenge.email}
+            mfaTotp={mfaChallenge.mfaTotp}
+            mfaEmail={mfaChallenge.mfaEmail}
             onVerificationSuccess={handleMfaSuccess}
             onCancel={handleMfaCancel}
           />

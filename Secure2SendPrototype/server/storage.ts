@@ -53,6 +53,22 @@ export interface IStorage {
   updateMerchantApplication(id: string, application: Partial<InsertMerchantApplication>): Promise<MerchantApplication>;
   updateMerchantApplicationStatus(id: string, status: 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED', rejectionReason?: string): Promise<MerchantApplication>;
   deleteMerchantApplication(id: string): Promise<void>;
+  
+  // MFA operations
+  enableUserMfa(userId: string, secret: string, backupCodes: string[]): Promise<void>;
+  disableUserMfa(userId: string): Promise<void>;
+  updateUserMfaLastUsed(userId: string): Promise<void>;
+  updateUserMfaBackupCodes(userId: string, backupCodes: string[]): Promise<void>;
+  
+  // Email MFA operations
+  enableEmailMfa(userId: string): Promise<void>;
+  disableEmailMfa(userId: string): Promise<void>;
+  saveEmailOtp(userId: string, hashedOtp: string, expiresAt: Date): Promise<void>;
+  getEmailOtpData(userId: string): Promise<{ otp?: string; expiresAt?: Date; attempts: number }>;
+  incrementEmailOtpAttempts(userId: string): Promise<void>;
+  clearEmailOtp(userId: string): Promise<void>;
+  updateEmailRateLimit(userId: string, sendCount: number, resetAt: Date): Promise<void>;
+  getEmailRateLimitData(userId: string): Promise<{ sendCount: number; lastSentAt?: Date; resetAt?: Date }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -552,6 +568,138 @@ export class DatabaseStorage implements IStorage {
         updatedAt: new Date(),
       })
       .where(eq(users.id, userId));
+  }
+
+  // Email MFA methods
+  async enableEmailMfa(userId: string): Promise<void> {
+    await db
+      .update(users)
+      .set({
+        mfaEmailEnabled: true,
+        mfaRequired: false, // No longer required once any MFA is enabled
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+  }
+
+  async disableEmailMfa(userId: string): Promise<void> {
+    await db
+      .update(users)
+      .set({
+        mfaEmailEnabled: false,
+        mfaEmailOtp: null,
+        mfaEmailOtpExpiresAt: null,
+        mfaEmailOtpAttempts: 0,
+        mfaEmailSendCount: 0,
+        mfaEmailLastSentAt: null,
+        mfaEmailRateLimitResetAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+  }
+
+  async saveEmailOtp(userId: string, hashedOtp: string, expiresAt: Date): Promise<void> {
+    await db
+      .update(users)
+      .set({
+        mfaEmailOtp: hashedOtp,
+        mfaEmailOtpExpiresAt: expiresAt,
+        mfaEmailOtpAttempts: 0, // Reset attempts on new OTP
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+  }
+
+  async getEmailOtpData(userId: string): Promise<{
+    otp?: string;
+    expiresAt?: Date;
+    attempts: number;
+  }> {
+    const [user] = await db
+      .select({
+        otp: users.mfaEmailOtp,
+        expiresAt: users.mfaEmailOtpExpiresAt,
+        attempts: users.mfaEmailOtpAttempts,
+      })
+      .from(users)
+      .where(eq(users.id, userId));
+
+    if (!user) {
+      return { attempts: 0 };
+    }
+
+    return {
+      otp: user.otp || undefined,
+      expiresAt: user.expiresAt ? new Date(user.expiresAt) : undefined,
+      attempts: user.attempts || 0,
+    };
+  }
+
+  async incrementEmailOtpAttempts(userId: string): Promise<void> {
+    // Get current attempts and increment
+    const [user] = await db
+      .select({ attempts: users.mfaEmailOtpAttempts })
+      .from(users)
+      .where(eq(users.id, userId));
+
+    const newAttempts = (user?.attempts || 0) + 1;
+
+    await db
+      .update(users)
+      .set({
+        mfaEmailOtpAttempts: newAttempts,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+  }
+
+  async clearEmailOtp(userId: string): Promise<void> {
+    await db
+      .update(users)
+      .set({
+        mfaEmailOtp: null,
+        mfaEmailOtpExpiresAt: null,
+        mfaEmailOtpAttempts: 0,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+  }
+
+  async updateEmailRateLimit(userId: string, sendCount: number, resetAt: Date): Promise<void> {
+    await db
+      .update(users)
+      .set({
+        mfaEmailSendCount: sendCount,
+        mfaEmailLastSentAt: new Date(),
+        mfaEmailRateLimitResetAt: resetAt,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+  }
+
+  async getEmailRateLimitData(userId: string): Promise<{
+    sendCount: number;
+    lastSentAt?: Date;
+    resetAt?: Date;
+  }> {
+    const [user] = await db
+      .select({
+        sendCount: users.mfaEmailSendCount,
+        lastSentAt: users.mfaEmailLastSentAt,
+        resetAt: users.mfaEmailRateLimitResetAt,
+      })
+      .from(users)
+      .where(eq(users.id, userId));
+
+    if (!user) {
+      return { sendCount: 0 };
+    }
+
+    return {
+      sendCount: user.sendCount || 0,
+      lastSentAt: user.lastSentAt ? new Date(user.lastSentAt) : undefined,
+      resetAt: user.resetAt ? new Date(user.resetAt) : undefined,
+    };
   }
 }
 

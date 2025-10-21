@@ -61,7 +61,7 @@ export async function setupAuth(app: Express) {
     cookie: {
       secure: env.NODE_ENV === "production", // Secure cookies in production
       httpOnly: true,
-      maxAge: 5 * 60 * 1000, // 5 minutes of inactivity before timeout
+      maxAge: 30 * 60 * 1000, // 30 minutes of inactivity before timeout
       sameSite: env.NODE_ENV === "production" ? "strict" : "lax", // CSRF protection
     },
     rolling: true, // Reset the cookie maxAge on every response (keeps session alive with activity)
@@ -192,21 +192,28 @@ export async function setupAuth(app: Express) {
         userId: user.id,
         email: user.email,
         mfaEnabled: user.mfaEnabled,
+        mfaEmailEnabled: user.mfaEmailEnabled,
         mfaRequired: user.mfaRequired,
         createdAt: user.createdAt
       });
 
       // Check if user has MFA enabled
-      if (user.mfaEnabled) {
+      if (user.mfaEnabled || user.mfaEmailEnabled) {
         // Don't log the user in yet, return MFA challenge
         const { password: _, ...userWithoutPassword } = user;
-        console.log('🔐 Returning MFA challenge for user:', user.email);
-        return res.json({
+        
+        const mfaResponse = {
           mfaRequired: true,
           userId: user.id,
           email: user.email,
-          message: "MFA verification required"
-        });
+          message: "MFA verification required",
+          // Include available MFA methods so frontend knows which tabs to show
+          mfaTotp: user.mfaEnabled || false,
+          mfaEmail: user.mfaEmailEnabled || false
+        };
+        
+        console.log('🔐 Returning MFA challenge for user:', user.email, 'with methods:', mfaResponse);
+        return res.json(mfaResponse);
       }
 
       // Check if user needs to set up MFA (new users)

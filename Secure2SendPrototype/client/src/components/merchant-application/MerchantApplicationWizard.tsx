@@ -243,6 +243,10 @@ export default function MerchantApplicationWizard({
         entityStartDate: formatDateForInput(existingApplication.entityStartDate),
         merchantDate: formatDateForInput(existingApplication.merchantDate),
         corduroDate: formatDateForInput(existingApplication.corduroDate),
+        // Convert owner information dates
+        ownerBirthday: formatDateForInput(existingApplication.ownerBirthday),
+        ownerIdExpDate: formatDateForInput(existingApplication.ownerIdExpDate),
+        ownerIdDateIssued: formatDateForInput(existingApplication.ownerIdDateIssued),
         // Convert dates in beneficial owners
         beneficialOwners: (existingApplication.beneficialOwners || [{}]).map((owner: any) => ({
           ...owner,

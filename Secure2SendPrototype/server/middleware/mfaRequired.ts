@@ -20,6 +20,10 @@ export const requireMfaSetup = (req: any, res: Response, next: NextFunction) => 
     '/api/mfa/setup/verify',
     '/api/mfa/verify',
     
+    // MFA login verification routes (must be accessible during login)
+    '/api/mfa/verify-with-method',
+    '/api/mfa/email/send-login-otp',
+    
     // Health check (for Fly.io monitoring)
     '/api/health',
     
