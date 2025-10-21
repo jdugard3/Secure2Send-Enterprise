@@ -14,7 +14,6 @@ import { env } from "./env";
 import { cloudflareR2 } from "./services/cloudflareR2";
 import { AuditService } from "./services/auditService";
 import { requireMfaSetup } from "./middleware/mfaRequired";
-import { verifyCloudflareAccess, requireAdminAccess, requireEmailDomain, checkTokenExpiration } from "./middleware/cloudflareAccess";
 
 // File upload configuration is now handled in fileValidation middleware
 
@@ -48,30 +47,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
 
-  // Apply Cloudflare Access verification in production
-  // NOTE: Disabled for now - Cloudflare Access JWT verification requires traffic to flow through
-  // Cloudflare's authentication gateway first, which doesn't happen with direct Fly.io access.
-  // The app's existing login + MFA provides robust security.
-  if (false && env.NODE_ENV === 'production' && env.CLOUDFLARE_ACCESS_AUD) {
-    console.log('🔒 Cloudflare Zero Trust enabled - applying access verification');
-    
-    // Apply Cloudflare Access verification to all API routes EXCEPT /api/health
-    app.use('/api', (req, res, next) => {
-      if (req.path === '/health') {
-        return next(); // Skip Cloudflare verification for health checks
-      }
-      return verifyCloudflareAccess(req, res, next);
-    });
-    
-    // Apply token expiration checking
-    app.use('/api', checkTokenExpiration);
-    
-    // Apply admin-specific access controls
-    app.use('/api/admin', requireAdminAccess(['secure2send-admins']));
-    
-    // Apply email domain restrictions (optional - uncomment if needed)
-    // app.use('/api', requireEmailDomain(['yourdomain.com', 'partnerdomain.com']));
-  }
+  // Cloudflare Zero Trust middleware removed - using built-in auth + MFA
 
   // Apply MFA requirement middleware after authentication is set up
   app.use(requireMfaSetup);
