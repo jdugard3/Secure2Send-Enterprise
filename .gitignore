@@ -3,6 +3,7 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
 # Environment variables
 .env
@@ -14,15 +15,17 @@ yarn-error.log*
 # Build outputs
 dist/
 build/
-.next/
+*.tsbuildinfo
 
 # Database
 *.db
 *.sqlite
+*.sqlite3
 
 # Logs
 logs/
 *.log
+server.log
 
 # Runtime data
 pids/
@@ -32,12 +35,28 @@ pids/
 
 # Coverage directory used by tools like istanbul
 coverage/
+*.lcov
+
+# nyc test coverage
+.nyc_output
 
 # Dependency directories
-node_modules/
+jspm_packages/
+
+# TypeScript cache
+*.tsbuildinfo
 
 # Optional npm cache directory
 .npm
+
+# Optional eslint cache
+.eslintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
 
 # Optional REPL history
 .node_repl_history
@@ -48,10 +67,31 @@ node_modules/
 # Yarn Integrity file
 .yarn-integrity
 
-# dotenv environment variables file
-.env
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
 
-# IDE and editor files
+# Next.js build output
+.next
+
+# Nuxt.js build / generate output
+.nuxt
+
+# Gatsby files
+.cache/
+public
+
+# Vite build tool
+.vite/
+
+# Rollup.js default build output
+dist/
+
+# Temporary folders
+tmp/
+temp/
+
+# Editor directories and files
 .vscode/
 .idea/
 *.swp
@@ -67,16 +107,47 @@ node_modules/
 ehthumbs.db
 Thumbs.db
 
-# Replit specific files
-.local/
-.replit
+# Uploads directory (contains user files)
+uploads/
 
-# Uploaded files (user data)
-Secure2SendPrototype/uploads/
-!Secure2SendPrototype/uploads/.gitkeep
+# SSL certificates
+*.pem
+*.key
+*.crt
+*.csr
 
-# Zip files
-*.zip
+# Docker
+.dockerignore
 
-# Bundle files
-*.bundle
+# Backup files
+*.backup
+*.bak
+
+# Session files
+sessions/
+
+# Temporary files
+*.tmp
+
+# IDE specific files
+.vscode/settings.json
+.vscode/launch.json
+.vscode/extensions.json
+
+# MacOS
+.AppleDouble
+.LSOverride
+
+# Windows
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+
+# Cloudflare
+wrangler.toml
+
+# Sensitive configuration files
+tunnel-config.yml
+cloudflare-access-policies.json
