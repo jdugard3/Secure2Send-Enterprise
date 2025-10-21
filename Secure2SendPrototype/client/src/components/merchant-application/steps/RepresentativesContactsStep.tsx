@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Trash2, Users, UserCheck, Phone } from "lucide-react";
+import { Plus, Trash2, Users, UserCheck, Phone, Copy } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import { 
   MerchantApplicationForm, 
   US_STATES, 
@@ -18,6 +19,7 @@ interface RepresentativesContactsStepProps {
 }
 
 export function RepresentativesContactsStep({ form }: RepresentativesContactsStepProps) {
+  const { toast } = useToast();
   const { fields: authorizedContacts, append, remove } = useFieldArray({
     control: form.control,
     name: "authorizedContacts",
@@ -35,15 +37,122 @@ export function RepresentativesContactsStep({ form }: RepresentativesContactsSte
     }
   };
 
+  const copyFromPrimaryOwner = () => {
+    const ownerData = form.getValues();
+    
+    if (!ownerData.ownerFirstName || !ownerData.ownerLastName) {
+      toast({
+        title: "No Owner Data",
+        description: "Please fill in the primary owner information in the Business Information section first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    form.setValue("financialRepresentative.firstName", ownerData.ownerFirstName);
+    form.setValue("financialRepresentative.lastName", ownerData.ownerLastName);
+    form.setValue("financialRepresentative.fullName", ownerData.ownerFullName || `${ownerData.ownerFirstName} ${ownerData.ownerLastName}`);
+    form.setValue("financialRepresentative.title", ownerData.ownerTitle || "");
+    form.setValue("financialRepresentative.ownerOfficer", ownerData.ownerOfficer || "");
+    form.setValue("financialRepresentative.ownershipPercentage", parseFloat(ownerData.ownerOwnershipPercentage || "0"));
+    form.setValue("financialRepresentative.officePhone", ownerData.ownerMobilePhone || "");
+    form.setValue("financialRepresentative.mobilePhone", ownerData.ownerMobilePhone || "");
+    form.setValue("financialRepresentative.email", ownerData.ownerEmail || "");
+    form.setValue("financialRepresentative.ssn", ownerData.ownerSsn || "");
+    form.setValue("financialRepresentative.birthday", ownerData.ownerBirthday || "");
+    form.setValue("financialRepresentative.stateIssuedIdNumber", ownerData.ownerStateIssuedIdNumber || "");
+    form.setValue("financialRepresentative.idExpDate", ownerData.ownerIdExpDate || "");
+    form.setValue("financialRepresentative.issuingState", ownerData.ownerIssuingState || "FL");
+    form.setValue("financialRepresentative.legalStreetAddress", ownerData.ownerLegalAddress || "");
+    form.setValue("financialRepresentative.city", ownerData.ownerCity || "");
+    form.setValue("financialRepresentative.state", ownerData.ownerState || "FL");
+    form.setValue("financialRepresentative.zip", ownerData.ownerZip || "");
+    form.setValue("financialRepresentative.country", ownerData.ownerCountry || "US");
+
+    toast({
+      title: "Owner Information Copied",
+      description: "Primary owner has been copied to Financial Representative.",
+    });
+  };
+
+  const copyFromAdditionalOwner = (additionalOwnerIndex: number) => {
+    const additionalOwners = form.getValues("additionalOwners") || [];
+    const additionalOwner = additionalOwners[additionalOwnerIndex];
+
+    if (!additionalOwner) {
+      toast({
+        title: "No Owner Data",
+        description: "Additional owner data not found.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    form.setValue("financialRepresentative.firstName", additionalOwner.ownerFirstName);
+    form.setValue("financialRepresentative.lastName", additionalOwner.ownerLastName);
+    form.setValue("financialRepresentative.fullName", additionalOwner.ownerFullName || `${additionalOwner.ownerFirstName} ${additionalOwner.ownerLastName}`);
+    form.setValue("financialRepresentative.title", additionalOwner.ownerTitle || "");
+    form.setValue("financialRepresentative.ownerOfficer", additionalOwner.ownerOfficer || "");
+    form.setValue("financialRepresentative.ownershipPercentage", parseFloat(additionalOwner.ownerOwnershipPercentage || "0"));
+    form.setValue("financialRepresentative.officePhone", additionalOwner.ownerMobilePhone || "");
+    form.setValue("financialRepresentative.mobilePhone", additionalOwner.ownerMobilePhone || "");
+    form.setValue("financialRepresentative.email", additionalOwner.ownerEmail || "");
+    form.setValue("financialRepresentative.ssn", additionalOwner.ownerSsn || "");
+    form.setValue("financialRepresentative.birthday", additionalOwner.ownerBirthday || "");
+    form.setValue("financialRepresentative.stateIssuedIdNumber", additionalOwner.ownerStateIssuedIdNumber || "");
+    form.setValue("financialRepresentative.idExpDate", additionalOwner.ownerIdExpDate || "");
+    form.setValue("financialRepresentative.issuingState", additionalOwner.ownerIssuingState || "FL");
+    form.setValue("financialRepresentative.legalStreetAddress", additionalOwner.ownerLegalAddress || "");
+    form.setValue("financialRepresentative.city", additionalOwner.ownerCity || "");
+    form.setValue("financialRepresentative.state", additionalOwner.ownerState || "FL");
+    form.setValue("financialRepresentative.zip", additionalOwner.ownerZip || "");
+    form.setValue("financialRepresentative.country", additionalOwner.ownerCountry || "US");
+
+    toast({
+      title: "Owner Information Copied",
+      description: `Additional owner #${additionalOwnerIndex + 1} has been copied to Financial Representative.`,
+    });
+  };
+
   return (
     <Form {...form}>
       <div className="space-y-8">
         {/* Financial Representative */}
         <Card>
           <CardHeader>
-            <div className="flex items-center gap-2">
-              <UserCheck className="h-5 w-5 text-primary" />
-              <CardTitle>Financial Representative</CardTitle>
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-2">
+                <UserCheck className="h-5 w-5 text-primary" />
+                <CardTitle>Financial Representative</CardTitle>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={copyFromPrimaryOwner}
+                  className="bg-blue-500 hover:bg-blue-600 text-white"
+                >
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copy Primary Owner
+                </Button>
+                {(() => {
+                  const additionalOwners = form.watch("additionalOwners") || [];
+                  return additionalOwners.map((_, index) => (
+                    <Button
+                      key={index}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => copyFromAdditionalOwner(index)}
+                      className="bg-purple-500 hover:bg-purple-600 text-white"
+                    >
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copy Owner #{index + 1}
+                    </Button>
+                  ));
+                })()}
+              </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -112,9 +221,18 @@ export function RepresentativesContactsStep({ form }: RepresentativesContactsSte
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Owner/Officer *</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter owner/officer status" {...field} />
-                    </FormControl>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select role" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Owner">Owner</SelectItem>
+                        <SelectItem value="Officer">Officer</SelectItem>
+                        <SelectItem value="N/A">N/A</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}

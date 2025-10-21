@@ -5,9 +5,10 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Trash2, Users, AlertCircle } from "lucide-react";
+import { Plus, Trash2, Users, AlertCircle, Copy } from "lucide-react";
 import { MerchantApplicationForm, US_STATES, ID_TYPES, defaultBeneficialOwner } from "@/lib/merchantApplicationSchemas";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useToast } from "@/hooks/use-toast";
 
 interface BeneficialOwnershipStepProps {
   form: UseFormReturn<MerchantApplicationForm>;
@@ -21,6 +22,7 @@ const ID_TYPE_LABELS = {
 } as const;
 
 export function BeneficialOwnershipStep({ form }: BeneficialOwnershipStepProps) {
+  const { toast } = useToast();
   const { fields: beneficialOwners, append, remove } = useFieldArray({
     control: form.control,
     name: "beneficialOwners",
@@ -34,6 +36,89 @@ export function BeneficialOwnershipStep({ form }: BeneficialOwnershipStepProps) 
     if (beneficialOwners.length > 1) {
       remove(index);
     }
+  };
+
+  const copyFromPrimaryOwner = () => {
+    const ownerData = form.getValues();
+    
+    if (!ownerData.ownerFirstName || !ownerData.ownerLastName) {
+      toast({
+        title: "No Owner Data",
+        description: "Please fill in the primary owner information in the Business Information section first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const newBeneficialOwner = {
+      name: ownerData.ownerFullName || `${ownerData.ownerFirstName} ${ownerData.ownerLastName}`,
+      title: ownerData.ownerTitle || "",
+      ownershipPercentage: parseFloat(ownerData.ownerOwnershipPercentage || "25"),
+      residentialAddress: ownerData.ownerLegalAddress || "",
+      city: ownerData.ownerCity || "",
+      state: ownerData.ownerState || "FL",
+      zip: ownerData.ownerZip || "",
+      country: ownerData.ownerCountry || "US",
+      phoneNumber: ownerData.ownerMobilePhone || "",
+      email: ownerData.ownerEmail || "",
+      idType: "DRIVERS_LICENSE" as const,
+      idNumber: ownerData.ownerStateIssuedIdNumber || "",
+      idState: ownerData.ownerIssuingState || "FL",
+      idExpDate: ownerData.ownerIdExpDate || "",
+      idDateIssued: ownerData.ownerIdDateIssued || "",
+      dob: ownerData.ownerBirthday || "",
+      ssn: ownerData.ownerSsn || "",
+      ssnOrTinFromUs: true,
+      controlPerson: false,
+    };
+
+    append(newBeneficialOwner);
+    toast({
+      title: "Owner Information Copied",
+      description: "Primary owner has been added as a beneficial owner.",
+    });
+  };
+
+  const copyFromAdditionalOwner = (additionalOwnerIndex: number) => {
+    const additionalOwners = form.getValues("additionalOwners") || [];
+    const additionalOwner = additionalOwners[additionalOwnerIndex];
+
+    if (!additionalOwner) {
+      toast({
+        title: "No Owner Data",
+        description: "Additional owner data not found.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const newBeneficialOwner = {
+      name: additionalOwner.ownerFullName || `${additionalOwner.ownerFirstName} ${additionalOwner.ownerLastName}`,
+      title: additionalOwner.ownerTitle || "",
+      ownershipPercentage: parseFloat(additionalOwner.ownerOwnershipPercentage || "25"),
+      residentialAddress: additionalOwner.ownerLegalAddress || "",
+      city: additionalOwner.ownerCity || "",
+      state: additionalOwner.ownerState || "FL",
+      zip: additionalOwner.ownerZip || "",
+      country: additionalOwner.ownerCountry || "US",
+      phoneNumber: additionalOwner.ownerMobilePhone || "",
+      email: additionalOwner.ownerEmail || "",
+      idType: "DRIVERS_LICENSE" as const,
+      idNumber: additionalOwner.ownerStateIssuedIdNumber || "",
+      idState: additionalOwner.ownerIssuingState || "FL",
+      idExpDate: additionalOwner.ownerIdExpDate || "",
+      idDateIssued: additionalOwner.ownerIdDateIssued || "",
+      dob: additionalOwner.ownerBirthday || "",
+      ssn: additionalOwner.ownerSsn || "",
+      ssnOrTinFromUs: true,
+      controlPerson: false,
+    };
+
+    append(newBeneficialOwner);
+    toast({
+      title: "Owner Information Copied",
+      description: `Additional owner #${additionalOwnerIndex + 1} has been added as a beneficial owner.`,
+    });
   };
 
   return (
@@ -69,20 +154,48 @@ export function BeneficialOwnershipStep({ form }: BeneficialOwnershipStepProps) 
         {/* Beneficial Owners */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-3">
               <div className="flex items-center gap-2">
                 <Users className="h-5 w-5 text-primary" />
                 <CardTitle>Beneficial Owners (25%+ Ownership)</CardTitle>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={addBeneficialOwner}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Owner
-              </Button>
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={copyFromPrimaryOwner}
+                  className="bg-blue-500 hover:bg-blue-600 text-white"
+                >
+                  <Copy className="h-4 w-4 mr-2" />
+                  Copy Primary Owner
+                </Button>
+                {(() => {
+                  const additionalOwners = form.watch("additionalOwners") || [];
+                  return additionalOwners.map((_, index) => (
+                    <Button
+                      key={index}
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => copyFromAdditionalOwner(index)}
+                      className="bg-purple-500 hover:bg-purple-600 text-white"
+                    >
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copy Owner #{index + 1}
+                    </Button>
+                  ));
+                })()}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addBeneficialOwner}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add New Owner
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-6">

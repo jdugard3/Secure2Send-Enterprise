@@ -10,11 +10,8 @@ export const US_STATES = [
 ] as const;
 
 export const PROCESSING_CATEGORIES = [
-  'MOBILE',
-  'CARD_NOT_PRESENT_E_COMMERCE', 
   'CARD_PRESENT_RETAIL',
-  'MAIL_ORDER_TELEPHONE_MOTO',
-  'OTHER'
+  'CARD_NOT_PRESENT_E_COMMERCE'
 ] as const;
 
 export const OWNERSHIP_TYPES = [
@@ -103,6 +100,29 @@ export const principalOfficerSchema = z.object({
   state: z.enum(US_STATES, { errorMap: () => ({ message: "Please select a valid state" }) }),
   zip: z.string().regex(/^\d{5}(-\d{4})?$/, "ZIP code must be 5 or 9 digits"),
   phoneNumber: z.string().min(10, "Phone number is required"),
+});
+
+// Additional Owner Schema (for multiple owners beyond the primary)
+export const additionalOwnerSchema = z.object({
+  ownerFullName: z.string().min(1, "Full name is required"),
+  ownerFirstName: z.string().min(1, "First name is required"),
+  ownerLastName: z.string().min(1, "Last name is required"),
+  ownerOfficer: z.string().min(1, "Owner/Officer is required"),
+  ownerTitle: z.string().min(1, "Title is required"),
+  ownerOwnershipPercentage: z.string().min(1, "Ownership % is required"),
+  ownerMobilePhone: z.string().min(10, "Mobile phone is required"),
+  ownerEmail: z.string().email("Valid email is required"),
+  ownerSsn: z.string().regex(/^\d{3}-\d{2}-\d{4}$/, "SSN must be in format XXX-XX-XXXX"),
+  ownerBirthday: z.string().min(1, "Birthday is required"),
+  ownerStateIssuedIdNumber: z.string().min(1, "State issued ID number is required"),
+  ownerIdExpDate: z.string().min(1, "ID expiration date is required"),
+  ownerIssuingState: z.enum(US_STATES),
+  ownerIdDateIssued: z.string().min(1, "ID date issued is required"),
+  ownerLegalAddress: z.string().min(1, "Legal address is required"),
+  ownerCity: z.string().min(1, "City is required"),
+  ownerState: z.enum(US_STATES),
+  ownerZip: z.string().regex(/^\d{5}(-\d{4})?$/, "ZIP code must be 5 or 9 digits"),
+  ownerCountry: z.string().default("US"),
 });
 
 // Beneficial Owner Schema (Enhanced for IRIS CRM)
@@ -268,6 +288,9 @@ export const businessInformationSchema = z.object({
   
   // Principal Officers (keeping existing structure)
   principalOfficers: z.array(principalOfficerSchema).min(1, "At least one principal officer is required"),
+  
+  // Additional Owners (for multiple owners beyond the primary)
+  additionalOwners: z.array(additionalOwnerSchema).optional().default([]),
 });
 
 // Fee Schedule Schema (Step 2)
@@ -357,6 +380,28 @@ export const defaultPrincipalOfficer: Partial<PrincipalOfficer> = {
   state: undefined,
   zip: "",
   phoneNumber: "",
+};
+
+export const defaultAdditionalOwner = {
+  ownerFullName: "",
+  ownerFirstName: "",
+  ownerLastName: "",
+  ownerOfficer: "",
+  ownerTitle: "",
+  ownerOwnershipPercentage: "",
+  ownerMobilePhone: "",
+  ownerEmail: "",
+  ownerSsn: "",
+  ownerBirthday: "",
+  ownerStateIssuedIdNumber: "",
+  ownerIdExpDate: "",
+  ownerIssuingState: "FL" as const,
+  ownerIdDateIssued: "",
+  ownerLegalAddress: "",
+  ownerCity: "",
+  ownerState: "FL" as const,
+  ownerZip: "",
+  ownerCountry: "US",
 };
 
 export const defaultBeneficialOwner: BeneficialOwner = {
