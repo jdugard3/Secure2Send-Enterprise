@@ -34,7 +34,7 @@ export const AccountCreatedEmail = ({
           {/* Header */}
           <Section style={header}>
             <Text style={logo}>🔒 Secure2Send</Text>
-            <Text style={tagline}>Cannabis Compliance Made Simple</Text>
+            <Text style={tagline}>Professional Compliance Made Simple</Text>
           </Section>
 
           {/* Main Content */}
@@ -46,7 +46,7 @@ export const AccountCreatedEmail = ({
             </Text>
             
             <Text style={paragraph}>
-              Your Secure2Send account has been created by our admin team. You can now access the platform to manage your cannabis compliance documents.
+              Your Secure2Send account has been created by our admin team. You can now access the platform to manage your compliance documents.
             </Text>
 
             {companyName && (

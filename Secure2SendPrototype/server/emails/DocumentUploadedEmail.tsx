@@ -32,7 +32,7 @@ export const DocumentUploadedEmail = ({
           {/* Header */}
           <Section style={header}>
             <Text style={logo}>🔒 Secure2Send</Text>
-            <Text style={tagline}>Cannabis Compliance Made Simple</Text>
+            <Text style={tagline}>Professional Compliance Made Simple</Text>
           </Section>
 
           {/* Main Content */}

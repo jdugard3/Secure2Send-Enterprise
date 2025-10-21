@@ -428,10 +428,15 @@ After completing this setup:
 This Zero Trust setup helps with:
 - **SOC 2 Type II**: Access controls and monitoring
 - **HIPAA**: Secure access to sensitive documents
-- **Cannabis Compliance**: Audit trails and access controls
+- **Business Compliance**: Audit trails and access controls
 - **PCI DSS**: Network segmentation and access controls
 
 Remember to document all configurations and maintain an audit trail of changes for compliance purposes.
+
+
+
+
+
 
 
 

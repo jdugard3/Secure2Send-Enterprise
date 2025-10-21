@@ -30,7 +30,7 @@ export const AllDocumentsApprovedEmail = ({
           {/* Header */}
           <Section style={header}>
             <Text style={logo}>🔒 Secure2Send</Text>
-            <Text style={tagline}>Cannabis Compliance Made Simple</Text>
+            <Text style={tagline}>Professional Compliance Made Simple</Text>
           </Section>
 
           {/* Main Content */}
@@ -52,7 +52,7 @@ export const AllDocumentsApprovedEmail = ({
               <Text style={successIcon}>✅</Text>
               <Text style={successTitle}>Compliance Complete!</Text>
               <Text style={successText}>
-                Your cannabis compliance documentation package is now complete and approved.
+                Your compliance documentation package is now complete and approved.
               </Text>
               <Text style={completedDate}>
                 Completed on {new Date().toLocaleDateString()}
@@ -77,7 +77,7 @@ export const AllDocumentsApprovedEmail = ({
             </Section>
 
             <Text style={paragraph}>
-              Thank you for choosing Secure2Send for your cannabis compliance needs. We're proud to have helped you achieve full compliance.
+              Thank you for choosing Secure2Send for your compliance needs. We're proud to have helped you achieve full compliance.
             </Text>
 
             <Section style={nextStepsBox}>

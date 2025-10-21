@@ -145,7 +145,7 @@ The webhook sends this JSON structure:
   "document": {
     "filename": "generated-filename.pdf",
     "originalName": "user-uploaded-name.pdf",
-    "documentType": "CANNABIS_LICENSE",
+    "documentType": "BUSINESS_LICENSE",
     "fileSize": 1234567,
     "mimeType": "application/pdf",
     "fileContent": "base64-encoded-file-content"
@@ -154,7 +154,7 @@ The webhook sends this JSON structure:
     "firstName": "John",
     "lastName": "Doe",
     "email": "john@example.com",
-    "companyName": "Example Cannabis Co."
+    "companyName": "Example Co."
   }
 }
 ```

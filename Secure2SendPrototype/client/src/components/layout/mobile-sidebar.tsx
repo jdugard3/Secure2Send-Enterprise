@@ -171,7 +171,7 @@ export function MobileSidebar() {
           {/* Logo */}
           <div className="p-6 border-b border-gray-200">
             <h1 className="text-xl font-bold text-primary">Secure2Send</h1>
-            <p className="text-sm text-gray-600">Cannabis Compliance</p>
+            <p className="text-sm text-gray-600">Professional Compliance</p>
           </div>
           
           {/* Navigation */}

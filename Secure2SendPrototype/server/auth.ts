@@ -61,9 +61,10 @@ export async function setupAuth(app: Express) {
     cookie: {
       secure: env.NODE_ENV === "production", // Secure cookies in production
       httpOnly: true,
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 5 * 60 * 1000, // 5 minutes of inactivity before timeout
       sameSite: env.NODE_ENV === "production" ? "strict" : "lax", // CSRF protection
     },
+    rolling: true, // Reset the cookie maxAge on every response (keeps session alive with activity)
   };
 
   app.set("trust proxy", 1);

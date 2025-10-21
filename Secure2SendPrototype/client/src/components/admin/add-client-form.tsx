@@ -173,7 +173,7 @@ export default function AddClientForm({ open, onOpenChange }: AddClientFormProps
               type="text"
               value={formData.companyName}
               onChange={(e) => handleInputChange("companyName", e.target.value)}
-              placeholder="Acme Cannabis Co."
+              placeholder="Acme Co."
               disabled={createClientMutation.isPending}
               required
             />
@@ -186,7 +186,7 @@ export default function AddClientForm({ open, onOpenChange }: AddClientFormProps
               type="email"
               value={formData.email}
               onChange={(e) => handleInputChange("email", e.target.value)}
-              placeholder="john@acmecannabis.com"
+              placeholder="john@acme.com"
               disabled={createClientMutation.isPending}
               required
             />

@@ -33,7 +33,6 @@ export const documentTypeEnum = pgEnum('document_type', [
   'BENEFICIAL_OWNERSHIP',
   'DRIVERS_LICENSE',
   'PASSPORT',
-  'CANNABIS_LICENSE',
   'SEED_TO_SALE_INFO',
   'POS_INFO',
   'BANKING_INFO',

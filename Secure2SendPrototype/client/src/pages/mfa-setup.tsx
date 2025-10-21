@@ -73,7 +73,7 @@ export default function MfaSetupPage() {
               <h1 className="text-3xl font-bold text-gray-900">Secure2Send</h1>
             </div>
             <p className="text-gray-600">
-              Cannabis Compliance Document Management
+              Professional Document Management
             </p>
           </div>
 
@@ -96,7 +96,7 @@ export default function MfaSetupPage() {
             <h1 className="text-3xl font-bold text-gray-900">Secure2Send</h1>
           </div>
           <p className="text-gray-600">
-            Cannabis Compliance Document Management
+            Professional Document Management
           </p>
         </div>
 

@@ -31,7 +31,7 @@ export const WelcomeEmail = ({
           {/* Header */}
           <Section style={header}>
             <Text style={logo}>🔒 Secure2Send</Text>
-            <Text style={tagline}>Cannabis Compliance Made Simple</Text>
+            <Text style={tagline}>Professional Compliance Made Simple</Text>
           </Section>
 
           {/* Main Content */}
@@ -43,7 +43,7 @@ export const WelcomeEmail = ({
             </Text>
             
             <Text style={paragraph}>
-              Welcome to Secure2Send! Your account has been successfully created and you're ready to begin your cannabis compliance document journey.
+              Welcome to Secure2Send! Your account has been successfully created and you're ready to begin your compliance document journey.
             </Text>
 
             {companyName && (

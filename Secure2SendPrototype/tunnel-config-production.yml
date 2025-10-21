@@ -1,0 +1,67 @@
+# Cloudflare Tunnel Configuration for Secure2Send Enterprise - Production
+# This is a production-ready configuration template
+# Replace all placeholder values with your actual configuration
+
+tunnel: YOUR_TUNNEL_ID_HERE
+credentials-file: /etc/cloudflared/YOUR_TUNNEL_ID_HERE.json
+
+# Ingress rules for Secure2Send Enterprise
+ingress:
+  # Main Secure2Send application
+  - hostname: secure2send.yourdomain.com
+    service: http://secure2send:8080
+    originRequest:
+      noTLSVerify: true
+      httpHostHeader: secure2send.yourdomain.com
+      connectTimeout: 30s
+      tlsTimeout: 30s
+      tcpKeepAlive: 30s
+      keepAliveConnections: 10
+      keepAliveTimeout: 90s
+  
+  # Admin panel - restricted access with additional security
+  - hostname: admin.secure2send.yourdomain.com
+    service: http://secure2send:5000
+    originRequest:
+      noTLSVerify: true
+      httpHostHeader: admin.secure2send.yourdomain.com
+      connectTimeout: 30s
+      tlsTimeout: 30s
+      tcpKeepAlive: 30s
+  
+  # API endpoints for integrations (IRIS CRM, etc.)
+  - hostname: api.secure2send.yourdomain.com
+    service: http://secure2send:5000
+    originRequest:
+      noTLSVerify: true
+      httpHostHeader: api.secure2send.yourdomain.com
+      connectTimeout: 30s
+      tlsTimeout: 30s
+      tcpKeepAlive: 30s
+  
+  # File upload/download service (for secure document handling)
+  - hostname: files.secure2send.yourdomain.com
+    service: http://secure2send:5000
+    originRequest:
+      noTLSVerify: true
+      httpHostHeader: files.secure2send.yourdomain.com
+      connectTimeout: 60s  # Longer timeout for file uploads
+      tlsTimeout: 30s
+      tcpKeepAlive: 30s
+  
+  # Catch-all rule (required - must be last)
+  - service: http_status:404
+
+# Tunnel configuration options
+loglevel: info
+transport-loglevel: warn
+
+# Optional: Metrics and health checks
+metrics: localhost:8080
+
+# Optional: Auto-update cloudflared
+no-autoupdate: false
+
+# Optional: Retry configuration
+retries: 5
+grace-period: 30s

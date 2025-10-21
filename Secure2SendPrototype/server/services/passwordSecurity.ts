@@ -10,7 +10,7 @@ const scryptAsync = promisify(scrypt);
 const COMMON_WEAK_PASSWORDS = [
   'password', '123456', '123456789', 'qwerty', 'abc123', 'password123',
   'admin', 'letmein', 'welcome', 'monkey', '1234567890', 'password1',
-  'cannabis', 'secure2send', 'admin123', 'user123', 'test123'
+  'secure2send', 'admin123', 'user123', 'test123'
 ];
 
 // Password breach check (simplified - in production use HaveIBeenPwned API)

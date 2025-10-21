@@ -108,10 +108,10 @@ export default function Signup() {
             <h1 className="text-3xl font-bold text-gray-900">Secure2Send</h1>
           </div>
           <p className="text-xl text-gray-600 mb-2">
-            Cannabis Compliance Document Management
+            Professional Document Management
           </p>
           <Badge variant="secondary" className="bg-green-100 text-green-800">
-            Trusted by Cannabis Businesses Nationwide
+            Trusted by Businesses Nationwide
           </Badge>
         </div>
 
@@ -178,7 +178,7 @@ export default function Signup() {
             <CardHeader className="space-y-1">
               <CardTitle className="text-2xl text-center">Get Started Today</CardTitle>
               <CardDescription className="text-center">
-                Join cannabis businesses already using Secure2Send
+                Join businesses already using Secure2Send
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -193,7 +193,7 @@ export default function Signup() {
                         <FormItem>
                           <FormLabel>First Name</FormLabel>
                           <FormControl>
-                            <Input placeholder="John" {...field} />
+                            <Input placeholder="John" {...field} value={field.value ?? ""} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -207,7 +207,7 @@ export default function Signup() {
                         <FormItem>
                           <FormLabel>Last Name</FormLabel>
                           <FormControl>
-                            <Input placeholder="Doe" {...field} />
+                            <Input placeholder="Doe" {...field} value={field.value ?? ""} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -240,7 +240,7 @@ export default function Signup() {
                       <FormItem>
                         <FormLabel>Company Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="Your Cannabis Business" {...field} />
+                          <Input placeholder="Your Business" {...field} value={field.value ?? ""} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

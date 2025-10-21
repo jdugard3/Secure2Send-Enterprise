@@ -33,7 +33,6 @@ import {
 } from "@/lib/merchantApplicationSchemas";
 import { PDFGenerator } from "@/lib/pdfGenerator";
 import { BusinessInformationStep } from "./steps/BusinessInformationStep";
-import { FeeScheduleStep } from "./steps/FeeScheduleStep";
 import { CertificationStep } from "./steps/CertificationStep";
 import { BeneficialOwnershipStep } from "./steps/BeneficialOwnershipStep";
 import { RepresentativesContactsStep } from "./steps/RepresentativesContactsStep";
@@ -52,24 +51,18 @@ const STEPS = [
   },
   {
     id: 2,
-    title: "Fee Schedule & Equipment",
-    description: "Processing fees and equipment requirements",
-    icon: DollarSign,
-  },
-  {
-    id: 3,
     title: "Certification & Agreement",
     description: "Corporate resolution and signatures",
     icon: Shield,
   },
   {
-    id: 4,
+    id: 3,
     title: "Beneficial Ownership",
     description: "Details of beneficial owners (25%+ ownership)",
     icon: Users,
   },
   {
-    id: 5,
+    id: 4,
     title: "Representatives & Contacts",
     description: "Financial representative and authorized contacts",
     icon: Users,
@@ -554,20 +547,15 @@ export default function MerchantApplicationWizard({
           // Business Operations
           'businessType', 'posSystem', 'processingCategories'
         ];
-      case 2: // Fee Schedule Step
-        return [
-          // Fee schedule is mostly optional, but these are core requirements
-          'feeScheduleData'
-        ];
-      case 3: // Certification Step
+      case 2: // Certification Step
         return [
           'corporateResolution', 'merchantName', 'merchantTitle', 'merchantDate', 'agreementAccepted'
         ];
-      case 4: // Beneficial Ownership Step
+      case 3: // Beneficial Ownership Step
         return [
           'beneficialOwners'
         ];
-      case 5: // Representatives & Contacts Step
+      case 4: // Representatives & Contacts Step
         return [
           'financialRepresentative', 'authorizedContacts'
         ];
@@ -729,12 +717,10 @@ export default function MerchantApplicationWizard({
       case 1:
         return <BusinessInformationStep form={form} />;
       case 2:
-        return <FeeScheduleStep form={form} />;
-      case 3:
         return <CertificationStep form={form} />;
-      case 4:
+      case 3:
         return <BeneficialOwnershipStep form={form} />;
-      case 5:
+      case 4:
         return <RepresentativesContactsStep form={form} />;
       default:
         return null;

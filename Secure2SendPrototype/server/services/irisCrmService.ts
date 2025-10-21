@@ -45,6 +45,16 @@ export class IrisCrmService {
   private static readonly ZAPIER_DOCUMENT_WEBHOOK_URL = 'https://hooks.zapier.com/hooks/catch/15790762/umqr4bb/';
   private static readonly ZAPIER_APPLICATION_WEBHOOK_URL = 'https://hooks.zapier.com/hooks/catch/15790762/umqr4bb/';
 
+  // IRIS CRM Pipeline Stage Mappings
+  // Based on actual IRIS CRM configuration
+  private static readonly PIPELINE_STAGES = {
+    OPS_PRE_ACTIVE: { status: 158, group: 51 },              // When account is initially created
+    SALES_PRE_SALE: { status: 187, group: 48 },              // When application is saved as draft
+    SALES_READY_FOR_REVIEW: { status: 193, group: 1 },       // When application is submitted
+    UNDERWRITING_READY_FOR_REVIEW: { status: 171, group: 1 }, // When application is approved
+    SALES_DECLINED: { status: 149, group: 28 },              // When application is denied/rejected
+  } as const;
+
   /**
    * Format date to IRIS CRM expected format (mm/dd/yyyy)
    * Uses UTC methods to avoid timezone conversion issues
@@ -69,6 +79,7 @@ export class IrisCrmService {
 
   /**
    * Format phone number to IRIS CRM expected format (111-111-1111)
+   * Rejects invalid area codes like 555, 000, 999
    */
   private static formatPhone(phoneString: string): string {
     if (!phoneString) return '';
@@ -78,6 +89,18 @@ export class IrisCrmService {
     
     // Must be exactly 10 digits
     if (digits.length !== 10) return '';
+    
+    // Get area code
+    const areaCode = digits.slice(0, 3);
+    
+    // Reject invalid area codes commonly used for testing
+    // 555 is reserved for fiction/testing
+    // 000, 999 are invalid
+    const invalidAreaCodes = ['000', '555', '999'];
+    if (invalidAreaCodes.includes(areaCode)) {
+      console.warn(`⚠️ Skipping invalid phone number with area code ${areaCode}: ${phoneString}`);
+      return '';
+    }
     
     // Format as 111-111-1111
     return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
@@ -93,38 +116,48 @@ export class IrisCrmService {
     }
     
     const dropdownMappings: Record<string, Record<string, string>> = {
-      '3861': { // Entity Type - Use exact IRIS values
+      '3861': { // Entity Type - Based on actual IRIS values
         'SOLE_PROPRIETORSHIP': 'Sole Proprietorship',
+        'SOLE PROPRIETORSHIP': 'Sole Proprietorship',
         'LLC': 'LLC', 
+        'NON_PROFIT': 'Non-Profit',
+        'NON-PROFIT': 'Non-Profit',
         'CORPORATION_PRIVATELY_HELD': 'Corporation',
         'CORPORATION': 'Corporation',
         'PARTNERSHIP_LLP': 'Partnership',
         'PARTNERSHIP': 'Partnership',
         'S_CORP': 'S-Corporation',
+        'S-CORP': 'S-Corporation',
       },
-      '4269': { // Owner Country - Must be exact IRIS values
+      '4269': { // Owner Country - US only
         'US': 'US',
         'USA': 'US', 
         'United States': 'US',
       },
-      '4270': { // FR Country - Must be exact IRIS values
+      '4270': { // FR Country - US only
         'US': 'US',
         'USA': 'US',
         'United States': 'US',
       },
-      '4298': { // BO's ID Type - Use exact IRIS values
+      '4305': { // BO's Issuing Country - US only
+        'US': 'US',
+        'USA': 'US',
+        'United States': 'US',
+      },
+      '4298': { // BO's ID Type - IRIS accepts various formats
         'DRIVERS_LICENSE': "Driver's License",
         'DRIVER_LICENSE': "Driver's License",
+        "DRIVER'S LICENSE": "Driver's License",
         'PASSPORT': 'Passport',
         'STATE_ID': 'State ID',
       },
       '4273': { // Multiple Locations - Boolean to Yes/No
-        'true': 'Yes',
+        'true': 'No',  // Default to No if not specified
         'false': 'No',
         'Yes': 'Yes',
         'No': 'No',
       },
-      '4297': { // BO Control Person - Boolean to Yes/No
+      '4297': { // BO Control Person - Boolean to Yes/No (default Yes based on diagnostic)
         'true': 'Yes',
         'false': 'No', 
         'Yes': 'Yes',
@@ -136,39 +169,67 @@ export class IrisCrmService {
         'Yes': 'Yes', 
         'No': 'No',
       },
-      '3792': { // FR Owner/Officer
+      '3779': { // Owner/Officer - Same as FR Owner/Officer
         'Owner': 'Owner',
         'OWNER': 'Owner',
         'Officer': 'Officer',
         'OFFICER': 'Officer',
+        'N/A': 'N/A',
+        '': 'N/A',
       },
-      '4278': { // Business Type
+      '3792': { // FR Owner/Officer - Default to N/A
+        'Owner': 'Owner',
+        'OWNER': 'Owner',
+        'Officer': 'Officer',
+        'OFFICER': 'Officer',
+        'N/A': 'N/A',
+        '': 'N/A',
+      },
+      '4278': { // Business Type - Keep Retail as primary
         'Retail': 'Retail',
         'RETAIL': 'Retail',
         'E-commerce': 'E-commerce',
         'Restaurant': 'Restaurant',
       },
-      '4174': { // Previously Processed
-        'true': 'Yes',
-        'false': 'No',
+      '4174': { // Previously Processed - Default to "(Please select)"
+        'true': '(Please select)',
+        'false': '(Please select)',
         'Yes': 'Yes',
         'No': 'No',
+        '': '(Please select)',
       },
-      '4316': { // Automatic Billing
-        'true': 'Yes',
-        'false': 'No', 
+      '4316': { // Automatic Billing - Default to "(Please select)"
+        'true': '(Please select)',
+        'false': '(Please select)', 
         'Yes': 'Yes',
         'No': 'No',
+        '': '(Please select)',
       },
-      '4181': { // Refund/Guarantee
-        'true': 'Yes',
-        'false': 'No',
+      '4181': { // Refund/Guarantee - Note different capitalization from 4174/4316
+        'true': '(Please Select)',
+        'false': '(Please Select)',
         'Yes': 'Yes',
         'No': 'No',
+        '': '(Please Select)',
       }
     };
     
-    return dropdownMappings[fieldId]?.[value] || value;
+    // Return mapped value if it exists, otherwise return empty string
+    // Empty strings will be filtered out before sending to IRIS
+    // This prevents sending invalid values that IRIS will reject
+    const mappedValue = dropdownMappings[fieldId]?.[value];
+    if (mappedValue !== undefined) {
+      return mappedValue;
+    }
+    
+    // For fields without mappings, return the value as-is (for text fields)
+    // For fields with mappings but unmapped values, return empty to skip them
+    if (dropdownMappings[fieldId]) {
+      console.warn(`⚠️ Unmapped value for field ${fieldId}: "${value}" - skipping field`);
+      return '';
+    }
+    
+    return value;
   }
 
   /**
@@ -253,6 +314,51 @@ export class IrisCrmService {
       console.error('❌ Failed to create IRIS CRM lead:', error);
       // Don't throw - we want to continue with normal flow
       return null;
+    }
+  }
+
+  /**
+   * Update lead status and group (move to different pipeline stage)
+   */
+  static async updateLeadStatus(
+    leadId: string,
+    stage: keyof typeof IrisCrmService.PIPELINE_STAGES
+  ): Promise<void> {
+    try {
+      if (!env.IRIS_CRM_API_KEY || !env.IRIS_CRM_SUBDOMAIN) {
+        console.warn('⚠️ IRIS CRM API key or subdomain not configured, skipping lead status update');
+        return;
+      }
+
+      const { status, group } = this.PIPELINE_STAGES[stage];
+
+      console.log(`🔄 Updating IRIS CRM lead ${leadId} to pipeline stage: ${stage}`);
+      console.log(`   Status: ${status}, Group: ${group}`);
+
+      const updateData = {
+        status,
+        group,
+      };
+
+      const response = await fetch(`${this.getApiBaseUrl()}/leads/${leadId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-KEY': env.IRIS_CRM_API_KEY,
+          'accept': 'application/json',
+        },
+        body: JSON.stringify(updateData),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`IRIS CRM status update API error: ${response.status} - ${errorText}`);
+      }
+
+      console.log(`✅ IRIS CRM lead ${leadId} successfully moved to ${stage}`);
+    } catch (error) {
+      console.error(`❌ Failed to update IRIS CRM lead status to ${stage}:`, error);
+      // Don't throw - we want to continue with normal flow
     }
   }
 
@@ -679,10 +785,10 @@ export class IrisCrmService {
         { id: '4274', value: application.ownerFullName || '' }, // Owner Full Name
         { id: '3782', value: application.ownerFirstName || '' }, // *First Name
         { id: '3781', value: application.ownerLastName || '' }, // *Last Name
-        { id: '3779', value: application.ownerOfficer || '' }, // Owner/Officer
-        { id: '3780', value: application.ownerTitle || '' }, // *Title
+        { id: '3779', value: this.mapDropdownValue('3779', application.ownerOfficer) }, // Owner/Officer
+        { id: '3780', value: application.ownerTitle || '' }, // *Title (free text field)
         { id: '3778', value: application.ownerOwnershipPercentage?.toString() || '' }, // *Ownership
-        { id: '3777', value: application.ownerMobilePhone || '' }, // Owner Mobile Phone Number
+        { id: '3777', value: this.formatPhone(application.ownerMobilePhone) }, // Owner Mobile Phone Number
         { id: '3871', value: application.ownerEmail || '' }, // Owner Email
         { id: '3872', value: application.ownerSsn || '' }, // Owner SS#
         { id: '3870', value: this.formatDate(application.ownerBirthday) }, // Owner Birthday
@@ -694,7 +800,7 @@ export class IrisCrmService {
         { id: '3774', value: application.ownerCity || '' }, // Owner City
         { id: '3773', value: application.ownerState || '' }, // Owner State
         { id: '3772', value: application.ownerZip || '' }, // Owner Zip
-        { id: '4269', value: application.ownerCountry || '' }, // Owner Country
+        { id: '4269', value: this.mapDropdownValue('4269', application.ownerCountry) }, // Owner Country
         
         // Financial Representative (if exists)
         ...(application.financialRepresentative ? [
@@ -702,10 +808,10 @@ export class IrisCrmService {
           { id: '3796', value: application.financialRepresentative.firstName || '' }, // FR First Name
           { id: '3797', value: application.financialRepresentative.lastName || '' }, // FR Last Name
           { id: '3795', value: application.financialRepresentative.title || '' }, // FR Title
-          { id: '3792', value: application.financialRepresentative.ownerOfficer || '' }, // FR Owner/Officer
+          { id: '3792', value: this.mapDropdownValue('3792', application.financialRepresentative.ownerOfficer) }, // FR Owner/Officer
           { id: '4150', value: application.financialRepresentative.ownershipPercentage?.toString() || '' }, // FR Ownership %
-          { id: '3786', value: application.financialRepresentative.officePhone || '' }, // FR Office Phone Number
-          { id: '3787', value: application.financialRepresentative.mobilePhone || '' }, // FR Mobile Phone Number
+          { id: '3786', value: this.formatPhone(application.financialRepresentative.officePhone) }, // FR Office Phone Number
+          { id: '3787', value: this.formatPhone(application.financialRepresentative.mobilePhone) }, // FR Mobile Phone Number
           { id: '4048', value: application.financialRepresentative.email || '' }, // Financial Rep Email
           { id: '3794', value: application.financialRepresentative.ssn || '' }, // FR Social Security Number
           { id: '3783', value: this.formatDate(application.financialRepresentative.birthday) }, // FR Birthday
@@ -716,19 +822,19 @@ export class IrisCrmService {
           { id: '3790', value: application.financialRepresentative.city || '' }, // FR City
           { id: '3789', value: application.financialRepresentative.state || '' }, // FR State
           { id: '3788', value: application.financialRepresentative.zip || '' }, // FR Zip
-          { id: '4270', value: application.financialRepresentative.country || '' }, // FR Country
+          { id: '4270', value: this.mapDropdownValue('4270', application.financialRepresentative.country) }, // FR Country
         ] : []),
         
         // Business Operations - Auto-filled fields as specified
         { id: '4278', value: 'Retail' }, // Business Type - Autofill "Retail"
-        { id: '3860', value: 'No' }, // Processed Cards in Past? - Autofill "No"
-        { id: '4174', value: 'No' }, // Previously Processed? - Autofill "No"
+        // Field 3860 (Processed Cards in Past) is a LABEL - cannot be updated
+        { id: '4174', value: '(Please select)' }, // Previously Processed? - Default placeholder
         { id: '3859', value: 'N/A' }, // If Yes, Under What Name? - Autofill "N/A"
-        { id: '4316', value: 'No' }, // Automatic Billing? - Autofill "No"
-        { id: '4107', value: 'No' }, // Cardholder Data 3rd Party - Autofill "No"
+        { id: '4316', value: '(Please select)' }, // Automatic Billing? - Default placeholder
+        // Field 4107 (Cardholder Data 3rd Party) is a LABEL - cannot be updated
         
         // Refund/Guarantee Information
-        { id: '4181', value: application.refundGuarantee ? 'Yes' : 'No' }, // Refund/Guarantee?
+        { id: '4181', value: application.refundGuarantee ? 'Yes' : '(Please Select)' }, // Refund/Guarantee? - Default placeholder
         { id: '4141', value: application.refundDays?.toString() || '' }, // Refund # Days
         
         // POS System - Removed as it's a label field that shouldn't be updated
@@ -742,15 +848,15 @@ export class IrisCrmService {
           { id: '4292', value: application.beneficialOwners[0]?.city || '' }, // BO's City
           { id: '4293', value: application.beneficialOwners[0]?.state || '' }, // BO's State
           { id: '4294', value: application.beneficialOwners[0]?.zip || '' }, // BO's ZIP
-          { id: '4305', value: application.beneficialOwners[0]?.country || '' }, // BO's Issuing Country
-          { id: '4298', value: application.beneficialOwners[0]?.idType || '' }, // BO's ID Type
+          { id: '4305', value: this.mapDropdownValue('4305', application.beneficialOwners[0]?.country) }, // BO's Issuing Country
+          { id: '4298', value: this.mapDropdownValue('4298', application.beneficialOwners[0]?.idType) }, // BO's ID Type
           { id: '4302', value: application.beneficialOwners[0]?.idNumber || '' }, // BO's Number on ID
           { id: '4306', value: this.formatDate(application.beneficialOwners[0]?.idDateIssued) }, // BO ID Date Issued
           { id: '4301', value: this.formatDate(application.beneficialOwners[0]?.idExpDate) }, // BO ID Expiration Date
           { id: '4295', value: this.formatDate(application.beneficialOwners[0]?.dob) }, // BO Date of Birth
-          { id: '4307', value: application.beneficialOwners[0]?.ssnOrTinFromUs ? 'Yes' : 'No' }, // BO SSN or TIN from US?
+          { id: '4307', value: this.mapDropdownValue('4307', application.beneficialOwners[0]?.ssnOrTinFromUs ? 'Yes' : 'No') }, // BO SSN or TIN from US?
           { id: '4296', value: application.beneficialOwners[0]?.ssn || '' }, // BO Social Security Number
-          { id: '4297', value: application.beneficialOwners[0]?.controlPerson ? 'Yes' : 'No' }, // BO Control Person?
+          { id: '4297', value: this.mapDropdownValue('4297', application.beneficialOwners[0]?.controlPerson ? 'Yes' : 'No') }, // BO Control Person?
         ] : []),
         
         // Authorized Contacts (if any)
@@ -759,12 +865,12 @@ export class IrisCrmService {
           { id: '3917', value: application.authorizedContacts[0]?.lastName || '' }, // AC1 Last Name
           { id: '4050', value: application.authorizedContacts[0]?.title || '' }, // AC1 Title
           { id: '3847', value: application.authorizedContacts[0]?.email || '' }, // AC1 Email
-          { id: '3846', value: application.authorizedContacts[0]?.officePhone || '' }, // AC1 Office Phone Number
-          { id: '4151', value: application.authorizedContacts[0]?.mobilePhone || '' }, // AC1 Mobile Phone Number
+          { id: '3846', value: this.formatPhone(application.authorizedContacts[0]?.officePhone) }, // AC1 Office Phone Number
+          { id: '4151', value: this.formatPhone(application.authorizedContacts[0]?.mobilePhone) }, // AC1 Mobile Phone Number
         ] : []),
         
         // Application Status and Agreement
-        { id: '4317', value: `Application ${application.status} - Submitted via Secure2Send` }, // Application Notes
+        // Field 4317 (Application Notes) is a LABEL - cannot be updated
       ];
 
       // Filter out empty values to avoid overwriting existing data with blanks

@@ -28,16 +28,6 @@ export default function ProgressCards() {
     gcTime: 1000 * 60 * 10, // Keep in cache for 10 minutes
   });
 
-  // Debug logging for troubleshooting
-  console.log('ProgressCards Debug:', {
-    userId: user?.id,
-    userRole: user?.role,
-    documentsCount: documents.length,
-    isLoading,
-    isError,
-    error: error?.message
-  });
-
   // Only show progress for CLIENT users
   if (user?.role !== 'CLIENT') {
     return null;
@@ -77,12 +67,26 @@ export default function ProgressCards() {
   }
 
   // Calculate actual required documents count
-  const totalRequired = Object.values(DOCUMENT_TYPES).filter(doc => doc.required).length;
-  const uploadedCount = documents.length;
+  const requiredDocTypes = Object.entries(DOCUMENT_TYPES)
+    .filter(([_, info]) => info.required)
+    .map(([key]) => key);
+  
+  const totalRequired = requiredDocTypes.length;
+  
+  // Count unique document sections (not individual documents)
+  const completedSections = new Set();
+  documents.forEach(doc => {
+    // Only count if this document type is in our current required list
+    if (requiredDocTypes.includes(doc.documentType)) {
+      completedSections.add(doc.documentType);
+    }
+  });
+  const uploadedCount = completedSections.size;
+  
   const approvedCount = documents.filter((doc) => doc.status === 'APPROVED').length;
   const pendingCount = documents.filter((doc) => doc.status === 'PENDING').length;
   const rejectedCount = documents.filter((doc) => doc.status === 'REJECTED').length;
-  const progressPercentage = Math.round((uploadedCount / totalRequired) * 100);
+  const progressPercentage = totalRequired > 0 ? Math.round((uploadedCount / totalRequired) * 100) : 0;
 
   // Get actual missing required documents
   const existingDocTypes = new Set(documents.map(doc => doc.documentType));

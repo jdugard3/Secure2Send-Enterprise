@@ -14,19 +14,12 @@ import { env } from "./env";
 import { cloudflareR2 } from "./services/cloudflareR2";
 import { AuditService } from "./services/auditService";
 import { requireMfaSetup } from "./middleware/mfaRequired";
+import { verifyCloudflareAccess, requireAdminAccess, requireEmailDomain, checkTokenExpiration } from "./middleware/cloudflareAccess";
 
 // File upload configuration is now handled in fileValidation middleware
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Auth middleware
-  await setupAuth(app);
-
-  // Apply MFA requirement middleware after authentication is set up
-  app.use(requireMfaSetup);
-
-  // Auth routes are now handled in auth.ts
-
-  // Health check endpoint for monitoring
+  // Health check endpoint for monitoring (MUST be before auth middleware)
   app.get('/api/health', async (req, res) => {
     try {
       // Test database connectivity
@@ -51,6 +44,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+
+  // Auth middleware
+  await setupAuth(app);
+
+  // Apply Cloudflare Access verification in production
+  // NOTE: Disabled for now - Cloudflare Access JWT verification requires traffic to flow through
+  // Cloudflare's authentication gateway first, which doesn't happen with direct Fly.io access.
+  // The app's existing login + MFA provides robust security.
+  if (false && env.NODE_ENV === 'production' && env.CLOUDFLARE_ACCESS_AUD) {
+    console.log('🔒 Cloudflare Zero Trust enabled - applying access verification');
+    
+    // Apply Cloudflare Access verification to all API routes EXCEPT /api/health
+    app.use('/api', (req, res, next) => {
+      if (req.path === '/health') {
+        return next(); // Skip Cloudflare verification for health checks
+      }
+      return verifyCloudflareAccess(req, res, next);
+    });
+    
+    // Apply token expiration checking
+    app.use('/api', checkTokenExpiration);
+    
+    // Apply admin-specific access controls
+    app.use('/api/admin', requireAdminAccess(['secure2send-admins']));
+    
+    // Apply email domain restrictions (optional - uncomment if needed)
+    // app.use('/api', requireEmailDomain(['yourdomain.com', 'partnerdomain.com']));
+  }
+
+  // Apply MFA requirement middleware after authentication is set up
+  app.use(requireMfaSetup);
+
+  // Auth routes are now handled in auth.ts
 
   // Document routes
   app.post('/api/documents', uploadLimiter, requireAuth, secureUpload.single('file'), async (req: any, res: Response) => {
@@ -894,6 +920,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         metadata: { applicationId: application.id, status: 'DRAFT' }
       });
 
+      // Move IRIS lead to Sales - Pre-Sale when application is created (async, don't block response)
+      import('./services/irisCrmService').then(async ({ IrisCrmService }) => {
+        let irisLeadId = client.irisLeadId;
+        
+        // Create IRIS lead ID if it doesn't exist
+        if (!irisLeadId) {
+          console.log('🔄 No IRIS lead ID found, creating new lead for client:', client.id);
+          try {
+            irisLeadId = await IrisCrmService.createLead(user);
+            if (irisLeadId) {
+              await storage.updateClientIrisLeadId(client.id, irisLeadId);
+              console.log('✅ Created and assigned IRIS lead ID:', irisLeadId);
+            } else {
+              console.warn('⚠️ Failed to create IRIS lead ID, skipping IRIS sync');
+              return;
+            }
+          } catch (error) {
+            console.error('❌ Failed to create IRIS lead ID:', error);
+            return;
+          }
+        }
+        
+        // Move lead to Sales - Pre-Sale (application started)
+        IrisCrmService.updateLeadStatus(irisLeadId, 'SALES_PRE_SALE').catch(error => {
+          console.error('Failed to update IRIS CRM lead status to SALES_PRE_SALE:', error);
+        });
+      }).catch(error => {
+        console.error('Failed to import IRIS CRM service:', error);
+      });
+
       res.json(application);
     } catch (error) {
       console.error("Error creating merchant application:", error);
@@ -1045,6 +1101,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               }
             }
             
+            // Note: Pipeline stage updates happen in the status change endpoint or on creation
+            // Don't update pipeline here as it could conflict with explicit status changes
+            
             // Sync via Zapier webhook (comprehensive payload)
             IrisCrmService.syncMerchantApplicationToIris(applicationOwner, application, irisLeadId).catch(error => {
               console.error('Failed to sync merchant application to IRIS CRM via Zapier:', error);
@@ -1148,6 +1207,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   console.error('❌ Failed to create IRIS lead ID:', error);
                   return;
                 }
+              }
+              
+              // Update IRIS pipeline stage based on application status
+              const pipelineStageMap: Record<string, keyof typeof IrisCrmService['PIPELINE_STAGES']> = {
+                'DRAFT': 'SALES_PRE_SALE',
+                'SUBMITTED': 'SALES_READY_FOR_REVIEW',
+                'UNDER_REVIEW': 'SALES_READY_FOR_REVIEW', // Keep in Sales - Ready for Review during admin review
+                'APPROVED': 'UNDERWRITING_READY_FOR_REVIEW',
+                'REJECTED': 'SALES_DECLINED',
+              };
+
+              const pipelineStage = pipelineStageMap[status];
+              if (pipelineStage) {
+                IrisCrmService.updateLeadStatus(irisLeadId, pipelineStage).catch(error => {
+                  console.error(`Failed to update IRIS CRM lead status to ${pipelineStage}:`, error);
+                });
               }
               
               // Sync via Zapier webhook (comprehensive payload)
@@ -1435,7 +1510,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const html = render(WelcomeEmail({
           firstName: 'John',
-          companyName: 'Cannabis Co.',
+          companyName: 'Example Co.',
           appUrl: env.APP_URL!,
         }));
         
@@ -1473,8 +1548,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const html = render(DocumentUploadedEmail({
           firstName: 'Mike',
-          documentType: 'CANNABIS_LICENSE',
-          documentName: 'cannabis-license.pdf',
+          documentType: 'BUSINESS_LICENSE',
+          documentName: 'business-license.pdf',
           appUrl: env.APP_URL!,
         }));
         
@@ -1531,7 +1606,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const html = render(AllDocumentsApprovedEmail({
           firstName: 'Chris',
-          companyName: 'Mountain Peak Cannabis',
+          companyName: 'Mountain Peak Co.',
           appUrl: env.APP_URL!,
         }));
         
@@ -1551,7 +1626,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           firstName: 'Taylor',
           lastName: 'Johnson',
           email: 'taylor@example.com',
-          companyName: 'Sunshine Cannabis Co.',
+          companyName: 'Sunshine Co.',
           registrationDate: new Date().toLocaleDateString(),
           appUrl: env.APP_URL!,
         }));

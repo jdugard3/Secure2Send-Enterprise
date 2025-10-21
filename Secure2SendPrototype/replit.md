@@ -1,6 +1,6 @@
 # Overview
 
-This is a full-stack web application for cannabis business compliance document management called "Secure2Send". The application provides a streamlined platform for cannabis businesses to submit compliance documents and for administrators to review and approve them. It features separate client and admin dashboards with comprehensive document management capabilities including upload, review, approval/rejection workflows, and progress tracking.
+This is a full-stack web application for business compliance document management called "Secure2Send". The application provides a streamlined platform for businesses to submit compliance documents and for administrators to review and approve them. It features separate client and admin dashboards with comprehensive document management capabilities including upload, review, approval/rejection workflows, and progress tracking.
 
 ## Current Status (January 2025)
 ✅ **COMPLETE AND FUNCTIONAL** - Custom authentication system implemented
@@ -8,7 +8,7 @@ This is a full-stack web application for cannabis business compliance document m
 - **Custom authentication with email/password login system**
 - Client and Admin dashboards fully functional
 - Document upload system with drag & drop interface operational
-- 17 cannabis compliance document types supported
+- 17 compliance document types supported
 - Admin review and approval system working
 - Progress tracking for clients implemented
 - Database schema deployed and running

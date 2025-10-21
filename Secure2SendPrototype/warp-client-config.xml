@@ -67,7 +67,7 @@
       <category>botnet</category>
     </security_categories>
     
-    <!-- Cannabis industry specific blocking -->
+    <!-- Industry specific blocking -->
     <blocked_categories>
       <category>social_networking</category>    <!-- During work hours -->
       <category>gambling</category>
@@ -141,7 +141,7 @@
       
       <!-- Disk Encryption -->
       <check type="disk_encryption">
-        <required>true</required>                <!-- Critical for cannabis docs -->
+        <required>true</required>                <!-- Critical for document security -->
         <encrypted>true</encrypted>
       </check>
       
@@ -248,6 +248,11 @@
   </emergency>
 
 </cloudflare-warp-config>
+
+
+
+
+
 
 
 

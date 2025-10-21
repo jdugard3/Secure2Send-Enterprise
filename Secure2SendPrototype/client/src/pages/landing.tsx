@@ -40,11 +40,11 @@ export default function Landing() {
       <section className="py-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto text-center">
           <h1 className="text-4xl md:text-6xl font-bold text-gray-900 mb-6">
-            Cannabis Compliance
+            Business Compliance
             <span className="block text-primary">Made Simple</span>
           </h1>
           <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
-            Streamline your cannabis business compliance document submission and approval process with our secure, professional platform.
+            Streamline your business compliance document submission and approval process with our secure, professional platform.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button 
@@ -125,7 +125,7 @@ export default function Landing() {
             Ready to Streamline Your Compliance?
           </h2>
           <p className="text-xl text-gray-600 mb-8">
-            Join hundreds of cannabis businesses who trust Secure2Send with their compliance needs.
+            Join hundreds of businesses who trust Secure2Send with their compliance needs.
           </p>
           <Button 
             size="lg"
@@ -145,7 +145,7 @@ export default function Landing() {
             <span className="text-lg font-semibold text-gray-900">Secure2Send</span>
           </div>
           <p className="text-gray-600">
-            © 2024 Secure2Send. Professional cannabis compliance document management.
+            © 2024 Secure2Send. Professional compliance document management.
           </p>
         </div>
       </footer>

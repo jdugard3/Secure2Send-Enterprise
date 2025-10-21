@@ -13,7 +13,7 @@ You are a **world-class senior software developer** with 10+ years of experience
 
 ## 📋 Current Application Overview
 
-**Secure2Send** is a production-ready cannabis compliance document management system with the following **EXISTING** architecture that must be preserved and enhanced, not replaced:
+**Secure2Send** is a production-ready compliance document management system with the following **EXISTING** architecture that must be preserved and enhanced, not replaced:
 
 ### 🏗️ Current Tech Stack (DO NOT CHANGE)
 
@@ -78,7 +78,7 @@ secure2send/
 - ✅ Admin impersonation capabilities
 
 **Document Management:**
-- ✅ 17 cannabis-specific document types
+- ✅ 17 compliance document types
 - ✅ Drag & drop upload with React Dropzone
 - ✅ File validation (PDF, JPG, PNG, size limits)
 - ✅ Status workflow: Pending → Approved/Rejected
@@ -226,7 +226,7 @@ Based on the analysis, these improvements are **recommended and approved**:
 
 The application is **production-ready** with:
 - ✅ Professional development standards
-- ✅ Comprehensive cannabis compliance features
+- ✅ Comprehensive compliance features
 - ✅ Modern, scalable architecture
 - ✅ Clean, maintainable codebase
 - ✅ Strong type safety throughout

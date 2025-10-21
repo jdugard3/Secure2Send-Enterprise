@@ -2,7 +2,7 @@
 
 ## 🎯 Overview
 
-This document outlines the enterprise-grade security and compliance features that have been implemented to transform Secure2Send into a SOC 2 compliant platform for cannabis industry document management.
+This document outlines the enterprise-grade security and compliance features that have been implemented to transform Secure2Send into a SOC 2 compliant platform for business document management.
 
 ## 🔒 Security Features Implemented
 
