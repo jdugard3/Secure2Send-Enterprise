@@ -19,6 +19,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and } from "drizzle-orm";
+import { LogSanitizer, safeLog } from "./utils/logSanitizer";
 
 export interface IStorage {
   // User operations
@@ -331,12 +332,12 @@ export class DatabaseStorage implements IStorage {
 
   async updateMerchantApplication(id: string, application: Partial<InsertMerchantApplication>): Promise<MerchantApplication> {
     try {
-      console.log("updateMerchantApplication - id:", id);
-      console.log("updateMerchantApplication - application data:", JSON.stringify(application, null, 2));
+      safeLog.log("updateMerchantApplication - id:", { id });
+      safeLog.log("updateMerchantApplication - application data:", application);
       
       // Sanitize the data to remove undefined values and ensure proper JSON serialization
       const sanitizedData = this.sanitizeApplicationData(application);
-      console.log("updateMerchantApplication - sanitized data:", JSON.stringify(sanitizedData, null, 2));
+      safeLog.log("updateMerchantApplication - sanitized data:", sanitizedData);
       
       // Always set these timestamps manually (don't let them come from frontend)
       const updateData = {
@@ -345,7 +346,7 @@ export class DatabaseStorage implements IStorage {
         lastSavedAt: new Date(),
       };
       
-      console.log("updateMerchantApplication - final update data:", JSON.stringify(updateData, null, 2));
+      safeLog.log("updateMerchantApplication - final update data:", updateData);
       
       const [updated] = await db
         .update(merchantApplications)
@@ -353,10 +354,10 @@ export class DatabaseStorage implements IStorage {
         .where(eq(merchantApplications.id, id))
         .returning();
         
-      console.log("updateMerchantApplication - updated result:", JSON.stringify(updated, null, 2));
+      safeLog.log("updateMerchantApplication - updated result:", updated);
       return updated;
     } catch (error) {
-      console.error("updateMerchantApplication - Database error:", error);
+      safeLog.error("updateMerchantApplication - Database error:", error);
       throw error;
     }
   }

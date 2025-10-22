@@ -14,6 +14,7 @@ import { env } from "./env";
 import { cloudflareR2 } from "./services/cloudflareR2";
 import { AuditService } from "./services/auditService";
 import { requireMfaSetup } from "./middleware/mfaRequired";
+import { LogSanitizer, safeLog } from "./utils/logSanitizer";
 
 // File upload configuration is now handled in fileValidation middleware
 
@@ -1004,7 +1005,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const user = req.user;
       
-      console.log("PUT /api/merchant-applications/:id - Request body:", JSON.stringify(req.body, null, 2));
+      safeLog.log("PUT /api/merchant-applications/:id - Request body:", req.body);
       
       // CRITICAL: Remove all problematic null/undefined date fields before processing
       const sanitizedBody = { ...req.body };
@@ -1021,7 +1022,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       });
       
-      console.log("PUT /api/merchant-applications/:id - Sanitized body:", JSON.stringify(sanitizedBody, null, 2));
+      safeLog.log("PUT /api/merchant-applications/:id - Sanitized body:", sanitizedBody);
       
       const existingApplication = await storage.getMerchantApplicationById(id);
       if (!existingApplication) {
