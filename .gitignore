@@ -90,6 +90,7 @@ dist/
 # Temporary folders
 tmp/
 temp/
+test-output/
 
 # Editor directories and files
 .vscode/

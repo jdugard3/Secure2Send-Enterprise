@@ -133,6 +133,7 @@ export const documents = pgTable("documents", {
   status: documentStatusEnum("status").default('PENDING'),
   rejectionReason: text("rejection_reason"),
   clientId: varchar("client_id").notNull().references(() => clients.id),
+  merchantApplicationId: varchar("merchant_application_id").references(() => merchantApplications.id),
   uploadedAt: timestamp("uploaded_at").defaultNow(),
   reviewedAt: timestamp("reviewed_at"),
   // Cloudflare R2 fields
@@ -146,6 +147,7 @@ export const merchantApplications = pgTable("merchant_applications", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   clientId: varchar("client_id").notNull().references(() => clients.id),
   status: merchantApplicationStatusEnum("status").default('DRAFT'),
+  irisLeadId: varchar("iris_lead_id"), // IRIS CRM lead ID for this specific merchant application
   
   // Business Information
   legalBusinessName: varchar("legal_business_name"),
@@ -283,6 +285,13 @@ export const merchantApplications = pgTable("merchant_applications", {
   
   // Auto-save tracking
   lastSavedAt: timestamp("last_saved_at").defaultNow(),
+  
+  // E-Signature tracking
+  eSignatureStatus: text("e_signature_status").default('NOT_SENT'), // 'NOT_SENT' | 'PENDING' | 'SIGNED' | 'DECLINED' | 'EXPIRED'
+  eSignatureApplicationId: text("e_signature_application_id"), // IRIS e-signature application ID
+  eSignatureSentAt: timestamp("e_signature_sent_at"),
+  eSignatureCompletedAt: timestamp("e_signature_completed_at"),
+  signedDocumentId: integer("signed_document_id"), // Reference to signed document
 });
 
 // Sensitive data table for encrypted PII
@@ -337,9 +346,13 @@ export const documentsRelations = relations(documents, ({ one }) => ({
     fields: [documents.clientId],
     references: [clients.id],
   }),
+  merchantApplication: one(merchantApplications, {
+    fields: [documents.merchantApplicationId],
+    references: [merchantApplications.id],
+  }),
 }));
 
-export const merchantApplicationsRelations = relations(merchantApplications, ({ one }) => ({
+export const merchantApplicationsRelations = relations(merchantApplications, ({ one, many }) => ({
   client: one(clients, {
     fields: [merchantApplications.clientId],
     references: [clients.id],
@@ -348,6 +361,7 @@ export const merchantApplicationsRelations = relations(merchantApplications, ({ 
     fields: [merchantApplications.reviewedBy],
     references: [users.id],
   }),
+  documents: many(documents),
 }));
 
 export const sensitiveDataRelations = relations(sensitiveData, ({ one }) => ({

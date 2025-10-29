@@ -8,6 +8,20 @@
       "when": 1759195253161,
       "tag": "0000_pink_wolf_cub",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1759195253162,
+      "tag": "010_add_merchant_app_iris_and_doc_linking",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1730000000000,
+      "tag": "011_add_esignature_tracking",
+      "breakpoints": true
     }
   ]
 }

@@ -136,26 +136,13 @@ export async function setupAuth(app: Express) {
       });
 
       // Also create a client record for this user
-      const client = await storage.createClient({
+      await storage.createClient({
         userId: user.id,
         status: "PENDING",
       });
 
-      // Create IRIS CRM lead (async, don't block registration)
-      import('./services/irisCrmService').then(({ IrisCrmService }) => {
-        IrisCrmService.createLead(user).then(leadId => {
-          if (leadId) {
-            // Update client with IRIS lead ID
-            storage.updateClientIrisLeadId(client.id, leadId).catch(error => {
-              console.error('Failed to update client with IRIS lead ID:', error);
-            });
-          }
-        }).catch(error => {
-          console.error('Failed to create IRIS CRM lead:', error);
-        });
-      }).catch(error => {
-        console.error('Failed to import IRIS CRM service:', error);
-      });
+      // Note: IRIS CRM lead will be created when user creates their first merchant application
+      // This ensures each merchant application has its own lead in IRIS
 
       // Send welcome email to user (async, don't block registration)
       EmailService.sendWelcomeEmail(user).catch(error => {

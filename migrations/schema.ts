@@ -69,6 +69,7 @@ export const documents = pgTable("documents", {
 	status: documentStatus().default('PENDING'),
 	rejectionReason: text("rejection_reason"),
 	clientId: varchar("client_id").notNull(),
+	merchantApplicationId: varchar("merchant_application_id"),
 	uploadedAt: timestamp("uploaded_at", { mode: 'string' }).defaultNow(),
 	reviewedAt: timestamp("reviewed_at", { mode: 'string' }),
 	r2Key: text("r2_key"),
@@ -79,6 +80,11 @@ export const documents = pgTable("documents", {
 			columns: [table.clientId],
 			foreignColumns: [clients.id],
 			name: "documents_client_id_clients_id_fk"
+		}),
+	foreignKey({
+			columns: [table.merchantApplicationId],
+			foreignColumns: [merchantApplications.id],
+			name: "documents_merchant_application_id_fkey"
 		}),
 ]);
 
@@ -124,6 +130,7 @@ export const merchantApplications = pgTable("merchant_applications", {
 	id: varchar().default(gen_random_uuid()).primaryKey().notNull(),
 	clientId: varchar("client_id").notNull(),
 	status: merchantApplicationStatus().default('DRAFT'),
+	irisLeadId: varchar("iris_lead_id"),
 	legalBusinessName: varchar("legal_business_name"),
 	dbaBusinessName: varchar("dba_business_name"),
 	billingAddress: text("billing_address"),
@@ -218,6 +225,11 @@ export const merchantApplications = pgTable("merchant_applications", {
 	previouslyProcessed: boolean("previously_processed").default(false),
 	automaticBilling: boolean("automatic_billing").default(false),
 	cardholderData3RdParty: boolean("cardholder_data_3rd_party").default(false),
+	eSignatureStatus: text("e_signature_status").default('NOT_SENT'),
+	eSignatureApplicationId: text("e_signature_application_id"),
+	eSignatureSentAt: timestamp("e_signature_sent_at", { mode: 'string' }),
+	eSignatureCompletedAt: timestamp("e_signature_completed_at", { mode: 'string' }),
+	signedDocumentId: integer("signed_document_id"),
 }, (table) => [
 	foreignKey({
 			columns: [table.clientId],

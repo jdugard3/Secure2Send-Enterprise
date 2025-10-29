@@ -8,7 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
 import { DOCUMENT_TYPES } from "@/lib/constants";
 import DocumentReviewModal from "./document-review-modal";
-import { FileText, Download, Eye, RotateCcw, Trash2 } from "lucide-react";
+import { FileText, Download, Eye, RotateCcw, Trash2, Building2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import type { Document } from "@shared/schema";
 
@@ -31,6 +31,22 @@ export default function DocumentList() {
     },
     enabled: !!user?.id,
   });
+
+  // Fetch merchant applications to display names
+  const { data: merchantApplications = [] } = useQuery<any[]>({
+    queryKey: ["/api/merchant-applications", user?.id],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/merchant-applications");
+      return response.json();
+    },
+    enabled: !!user?.id,
+  });
+
+  // Create a map of merchant application IDs to names for quick lookup
+  const merchantAppMap = merchantApplications.reduce((acc: Record<string, string>, app: any) => {
+    acc[app.id] = app.dbaBusinessName || app.legalBusinessName || 'Unnamed Application';
+    return acc;
+  }, {});
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -157,6 +173,20 @@ export default function DocumentList() {
                       <p className="text-sm text-gray-500">
                         {getDocumentTypeName(document.documentType)}
                       </p>
+                      {document.merchantApplicationId ? (
+                        <div className="flex items-center gap-1 mt-1">
+                          <Building2 className="h-3 w-3 text-gray-400" />
+                          <span className="text-xs text-gray-500">
+                            {merchantAppMap[document.merchantApplicationId] || 'Unknown Application'}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 mt-1">
+                          <span className="text-xs text-orange-600 font-medium">
+                            Not linked to application
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center space-x-4">

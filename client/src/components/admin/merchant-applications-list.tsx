@@ -56,6 +56,10 @@ interface MerchantApplication {
   submittedAt?: string;
   reviewedAt?: string;
   rejectionReason?: string;
+  eSignatureStatus?: 'NOT_SENT' | 'PENDING' | 'SIGNED' | 'DECLINED' | 'EXPIRED';
+  eSignatureApplicationId?: string;
+  eSignatureSentAt?: string;
+  eSignatureCompletedAt?: string;
   client: {
     id: string;
     user: {
@@ -75,11 +79,19 @@ const STATUS_COLORS = {
   REJECTED: 'bg-red-100 text-red-800',
 } as const;
 
+const ESIGNATURE_STATUS_COLORS = {
+  NOT_SENT: 'bg-gray-100 text-gray-800',
+  PENDING: 'bg-blue-100 text-blue-800 animate-pulse',
+  SIGNED: 'bg-green-100 text-green-800',
+  DECLINED: 'bg-red-100 text-red-800',
+  EXPIRED: 'bg-orange-100 text-orange-800',
+} as const;
+
 export default function MerchantApplicationsList() {
   const [selectedApplication, setSelectedApplication] = useState<MerchantApplication | null>(null);
   const [reviewAction, setReviewAction] = useState<'APPROVED' | 'REJECTED' | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
-  const { toast } = useToast();
+  const { toast} = useToast();
   const queryClient = useQueryClient();
 
   const { data: applications = [], isLoading } = useQuery({
@@ -137,6 +149,28 @@ export default function MerchantApplicationsList() {
     onError: (error: Error) => {
       toast({
         title: "Delete Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // E-Signature mutation
+  const sendForSignatureMutation = useMutation({
+    mutationFn: async (applicationId: string) => {
+      const response = await apiRequest('POST', `/api/merchant-applications/${applicationId}/send-for-signature`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "E-Signature Request Sent",
+        description: "The merchant will receive an email to sign the application.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/merchant-applications'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to Send",
         description: error.message,
         variant: "destructive",
       });
@@ -321,7 +355,57 @@ export default function MerchantApplicationsList() {
                                   {selectedApplication.status?.replace('_', ' ') || 'DRAFT'}
                                 </Badge>
                               </div>
+                              <div>
+                                <Label className="text-sm font-medium">E-Signature Status</Label>
+                                <Badge 
+                                  variant="secondary" 
+                                  className={ESIGNATURE_STATUS_COLORS[selectedApplication.eSignatureStatus || 'NOT_SENT']}
+                                >
+                                  {selectedApplication.eSignatureStatus?.replace('_', ' ') || 'NOT SENT'}
+                                </Badge>
+                              </div>
                             </div>
+
+                            {/* Send for E-Signature Button (for approved applications) */}
+                            {selectedApplication.status === 'APPROVED' && 
+                             (!selectedApplication.eSignatureStatus || selectedApplication.eSignatureStatus === 'NOT_SENT') && (
+                              <div className="border-t pt-4">
+                                <Button
+                                  onClick={() => sendForSignatureMutation.mutate(selectedApplication.id)}
+                                  disabled={sendForSignatureMutation.isPending}
+                                  className="w-full"
+                                >
+                                  <CheckCircle className="h-4 w-4 mr-2" />
+                                  {sendForSignatureMutation.isPending ? 'Sending...' : 'Send for E-Signature'}
+                                </Button>
+                                <p className="text-xs text-muted-foreground mt-2">
+                                  Send this approved application to the merchant for electronic signature.
+                                </p>
+                              </div>
+                            )}
+
+                            {/* E-Signature Status Info */}
+                            {selectedApplication.eSignatureStatus === 'PENDING' && (
+                              <div className="bg-blue-50 p-4 rounded-md border border-blue-200">
+                                <p className="text-sm font-medium text-blue-900">
+                                  Awaiting Signature
+                                </p>
+                                <p className="text-xs text-blue-700 mt-1">
+                                  Sent {selectedApplication.eSignatureSentAt && formatDistanceToNow(new Date(selectedApplication.eSignatureSentAt), { addSuffix: true })}
+                                </p>
+                              </div>
+                            )}
+
+                            {selectedApplication.eSignatureStatus === 'SIGNED' && (
+                              <div className="bg-green-50 p-4 rounded-md border border-green-200">
+                                <p className="text-sm font-medium text-green-900">
+                                  ✓ Document Signed
+                                </p>
+                                <p className="text-xs text-green-700 mt-1">
+                                  Signed {selectedApplication.eSignatureCompletedAt && formatDistanceToNow(new Date(selectedApplication.eSignatureCompletedAt), { addSuffix: true })}
+                                </p>
+                              </div>
+                            )}
 
                             {/* Rejection Reason (if rejected) */}
                             {selectedApplication.status === 'REJECTED' && selectedApplication.rejectionReason && (
