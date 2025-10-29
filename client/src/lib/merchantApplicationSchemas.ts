@@ -1,5 +1,56 @@
 import { z } from "zod";
 
+/**
+ * Validate phone number against NANP (North American Numbering Plan)
+ * Format: XXX-XXX-XXXX or XXXXXXXXXX (10 digits)
+ */
+export function validatePhoneNumber(phone: string): boolean {
+  if (!phone) return false;
+  
+  // Remove all non-digits
+  const digits = phone.replace(/\D/g, '');
+  
+  // Must be exactly 10 digits
+  if (digits.length !== 10) return false;
+  
+  // Get area code and exchange
+  const areaCode = digits.slice(0, 3);
+  const exchange = digits.slice(3, 6);
+  
+  // NANP Validation Rules:
+  // 1. Area code cannot start with 0 or 1
+  if (areaCode[0] === '0' || areaCode[0] === '1') return false;
+  
+  // 2. Area code cannot be N11 (211, 311, 411, etc.)
+  if (areaCode[1] === '1' && areaCode[2] === '1') return false;
+  
+  // 3. Exchange cannot start with 0 or 1
+  if (exchange[0] === '0' || exchange[0] === '1') return false;
+  
+  // 4. Exchange cannot be N11
+  if (exchange[1] === '1' && exchange[2] === '1') return false;
+  
+  // 5. Reject common test/dummy area codes
+  const invalidAreaCodes = ['000', '555', '999', '666', '888'];
+  if (invalidAreaCodes.includes(areaCode)) return false;
+  
+  // 6. Reject obviously fake patterns
+  if (digits === '0000000000' || digits === '1111111111' || 
+      digits === '2222222222' || digits === '1234567890') return false;
+  
+  return true;
+}
+
+/**
+ * Custom Zod validator for phone numbers
+ */
+export const phoneNumberSchema = z
+  .string()
+  .min(10, "Phone number must be at least 10 digits")
+  .refine(validatePhoneNumber, {
+    message: "Invalid phone number. Must be a valid US/Canada number (e.g., 919-770-9714)",
+  });
+
 // US States list for validation
 export const US_STATES = [
   'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
@@ -53,8 +104,8 @@ export const financialRepresentativeSchema = z.object({
   title: z.string().min(1, "FR title is required"),
   ownerOfficer: z.string().min(1, "Owner/Officer status is required"),
   ownershipPercentage: z.number().min(0).max(100),
-  officePhone: z.string().min(10, "Office phone is required"),
-  mobilePhone: z.string().min(10, "Mobile phone is required"),
+  officePhone: phoneNumberSchema,
+  mobilePhone: phoneNumberSchema,
   email: z.string().email("Valid email is required"),
   ssn: z.string().regex(/^\d{3}-\d{2}-\d{4}$/, "SSN must be in format XXX-XX-XXXX"),
   birthday: z.string().min(1, "Birthday is required"),
@@ -74,8 +125,8 @@ export const authorizedContactSchema = z.object({
   lastName: z.string().min(1, "Last name is required"),
   title: z.string().min(1, "Title is required"),
   email: z.string().email("Valid email is required"),
-  officePhone: z.string().min(10, "Office phone is required"),
-  mobilePhone: z.string().min(10, "Mobile phone is required"),
+  officePhone: phoneNumberSchema,
+  mobilePhone: phoneNumberSchema,
 });
 
 // Transaction and Volume Schema
@@ -99,7 +150,7 @@ export const principalOfficerSchema = z.object({
   city: z.string().min(1, "City is required"),
   state: z.enum(US_STATES, { errorMap: () => ({ message: "Please select a valid state" }) }),
   zip: z.string().regex(/^\d{5}(-\d{4})?$/, "ZIP code must be 5 or 9 digits"),
-  phoneNumber: z.string().min(10, "Phone number is required"),
+  phoneNumber: phoneNumberSchema,
 });
 
 // Additional Owner Schema (for multiple owners beyond the primary)
@@ -110,7 +161,7 @@ export const additionalOwnerSchema = z.object({
   ownerOfficer: z.string().min(1, "Owner/Officer is required"),
   ownerTitle: z.string().min(1, "Title is required"),
   ownerOwnershipPercentage: z.string().min(1, "Ownership % is required"),
-  ownerMobilePhone: z.string().min(10, "Mobile phone is required"),
+  ownerMobilePhone: phoneNumberSchema,
   ownerEmail: z.string().email("Valid email is required"),
   ownerSsn: z.string().regex(/^\d{3}-\d{2}-\d{4}$/, "SSN must be in format XXX-XX-XXXX"),
   ownerBirthday: z.string().min(1, "Birthday is required"),
@@ -140,7 +191,7 @@ export const beneficialOwnerSchema = z.object({
   country: z.string().default("US"),
   
   // Contact Information
-  phoneNumber: z.string().min(10, "Phone number is required"),
+  phoneNumber: phoneNumberSchema,
   email: z.string().email("Valid email is required"),
   
   // Identification
@@ -217,7 +268,7 @@ export const businessInformationSchema = z.object({
   city: z.string().min(1, "City is required"),
   state: z.enum(US_STATES, { errorMap: () => ({ message: "Please select a valid state" }) }),
   zip: z.string().regex(/^\d{5}(-\d{4})?$/, "ZIP code must be 5 or 9 digits"),
-  businessPhone: z.string().min(10, "Business phone is required"),
+  businessPhone: phoneNumberSchema,
   contactEmail: z.string().email("Valid contact email is required"),
   productOrServiceSold: z.string().min(1, "Product or service sold is required"),
   dbaWebsite: z.string().min(1, "DBA website is required"),
@@ -227,7 +278,7 @@ export const businessInformationSchema = z.object({
   legalBusinessName: z.string().min(1, "Legal business name is required"),
   billingAddress: z.string().min(1, "Legal address is required"),
   legalContactName: z.string().min(1, "Legal contact name is required"),
-  legalPhone: z.string().min(10, "Legal phone is required"),
+  legalPhone: phoneNumberSchema,
   legalEmail: z.string().email("Valid legal email is required"),
   ownershipType: z.enum(OWNERSHIP_TYPES, { errorMap: () => ({ message: "Please select an ownership type" }) }),
   federalTaxIdNumber: z.string().min(1, "Federal Tax ID is required"),
@@ -245,7 +296,7 @@ export const businessInformationSchema = z.object({
   abaRoutingNumber: z.string().regex(/^\d{9}$/, "ABA routing number must be 9 digits"),
   ddaNumber: z.string().min(1, "Account number is required"),
   bankOfficerName: z.string().min(1, "Bank officer name is required"),
-  bankOfficerPhone: z.string().min(10, "Bank officer phone is required"),
+  bankOfficerPhone: phoneNumberSchema,
   bankOfficerEmail: z.string().email("Valid bank officer email is required"),
   
   // Enhanced Owner Information (IRIS CRM fields - optional for now)
@@ -255,7 +306,7 @@ export const businessInformationSchema = z.object({
   ownerOfficer: z.string().optional(),
   ownerTitle: z.string().optional(),
   ownerOwnershipPercentage: z.string().optional(),
-  ownerMobilePhone: z.string().optional(),
+  ownerMobilePhone: phoneNumberSchema.optional(),
   ownerEmail: z.string().optional(),
   ownerSsn: z.string().optional(),
   ownerBirthday: z.string().optional(),
@@ -280,9 +331,9 @@ export const businessInformationSchema = z.object({
   
   // Legacy fields (keeping for backward compatibility) - all optional
   businessFaxNumber: z.string().optional(),
-  customerServicePhone: z.string().optional(),
+  customerServicePhone: phoneNumberSchema.optional(),
   contactName: z.string().optional(),
-  contactPhoneNumber: z.string().optional(),
+  contactPhoneNumber: phoneNumberSchema.optional(),
   websiteAddress: z.string().optional(),
   accountName: z.string().optional(), // Replaced by nameOnBankAccount
   

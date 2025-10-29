@@ -42,7 +42,7 @@ export interface ZapierDocumentPayload {
 }
 
 export class IrisCrmService {
-  private static readonly ZAPIER_DOCUMENT_WEBHOOK_URL = 'https://hooks.zapier.com/hooks/catch/15790762/umqr4bb/';
+  private static readonly ZAPIER_DOCUMENT_WEBHOOK_URL = 'https://hooks.zapier.com/hooks/catch/24656561/umq3mle/';
   private static readonly ZAPIER_APPLICATION_WEBHOOK_URL = 'https://hooks.zapier.com/hooks/catch/15790762/umqr4bb/';
 
   // IRIS CRM Pipeline Stage Mappings
@@ -79,7 +79,7 @@ export class IrisCrmService {
 
   /**
    * Format phone number to IRIS CRM expected format (111-111-1111)
-   * Rejects invalid area codes like 555, 000, 999
+   * Validates against NANP (North American Numbering Plan) rules
    */
   private static formatPhone(phoneString: string): string {
     if (!phoneString) return '';
@@ -88,17 +88,59 @@ export class IrisCrmService {
     const digits = phoneString.replace(/\D/g, '');
     
     // Must be exactly 10 digits
-    if (digits.length !== 10) return '';
+    if (digits.length !== 10) {
+      console.warn(`⚠️ Invalid phone number length (${digits.length} digits): ${phoneString}`);
+      return '';
+    }
     
-    // Get area code
+    // Get area code and exchange
     const areaCode = digits.slice(0, 3);
+    const exchange = digits.slice(3, 6);
     
-    // Reject invalid area codes commonly used for testing
-    // 555 is reserved for fiction/testing
-    // 000, 999 are invalid
-    const invalidAreaCodes = ['000', '555', '999'];
+    // NANP Validation Rules:
+    // 1. Area code cannot start with 0 or 1
+    // 2. Area code cannot be N11 (211, 311, 411, etc.)
+    // 3. Exchange cannot start with 0 or 1
+    // 4. Exchange cannot be N11
+    
+    const areaCodeFirst = areaCode[0];
+    const exchangeFirst = exchange[0];
+    
+    // Check area code first digit (cannot be 0 or 1)
+    if (areaCodeFirst === '0' || areaCodeFirst === '1') {
+      console.warn(`⚠️ Invalid area code (starts with ${areaCodeFirst}): ${phoneString}`);
+      return '';
+    }
+    
+    // Check if area code is N11 (like 211, 311, 411, 511, 611, 711, 811, 911)
+    if (areaCode[1] === '1' && areaCode[2] === '1') {
+      console.warn(`⚠️ Invalid area code (N11 format): ${phoneString}`);
+      return '';
+    }
+    
+    // Check exchange first digit (cannot be 0 or 1)
+    if (exchangeFirst === '0' || exchangeFirst === '1') {
+      console.warn(`⚠️ Invalid exchange (starts with ${exchangeFirst}): ${phoneString}`);
+      return '';
+    }
+    
+    // Check if exchange is N11
+    if (exchange[1] === '1' && exchange[2] === '1') {
+      console.warn(`⚠️ Invalid exchange (N11 format): ${phoneString}`);
+      return '';
+    }
+    
+    // Additional check: Reject common test/dummy numbers
+    const invalidAreaCodes = ['000', '555', '999', '666', '888'];
     if (invalidAreaCodes.includes(areaCode)) {
-      console.warn(`⚠️ Skipping invalid phone number with area code ${areaCode}: ${phoneString}`);
+      console.warn(`⚠️ Invalid/reserved area code (${areaCode}): ${phoneString}`);
+      return '';
+    }
+    
+    // Check for obviously fake patterns (all same digit, sequential, etc.)
+    if (digits === '0000000000' || digits === '1111111111' || 
+        digits === '2222222222' || digits === '1234567890') {
+      console.warn(`⚠️ Invalid phone number pattern: ${phoneString}`);
       return '';
     }
     
@@ -948,6 +990,194 @@ export class IrisCrmService {
     } catch (error) {
       console.error('❌ Failed to update IRIS CRM lead:', error);
       // Don't throw - we want to continue with normal flow
+    }
+  }
+
+  /**
+   * Generate an e-signature document in IRIS CRM
+   * @param leadId IRIS CRM lead ID
+   * @param applicationId E-signature application ID (can be merchant app ID)
+   * @param pdfBuffer PDF file buffer to upload
+   */
+  static async generateESignatureDocument(
+    leadId: string,
+    applicationId: string,
+    pdfBuffer: Buffer
+  ): Promise<string> {
+    try {
+      if (!env.IRIS_CRM_API_KEY || !env.IRIS_CRM_SUBDOMAIN) {
+        throw new Error('IRIS CRM API key or subdomain not configured');
+      }
+
+      console.log(`🔄 Generating e-signature document for lead ${leadId}, application ${applicationId}`);
+
+      // Create form data with the PDF
+      const FormData = (await import('form-data')).default;
+      const form = new FormData();
+      
+      // Append the PDF file
+      form.append('file', pdfBuffer, {
+        filename: `merchant-application-${applicationId}.pdf`,
+        contentType: 'application/pdf',
+      });
+
+      const response = await fetch(
+        `${this.getApiBaseUrl()}/leads/${leadId}/signatures/${applicationId}/generate`,
+        {
+          method: 'POST',
+          headers: {
+            'X-API-KEY': env.IRIS_CRM_API_KEY,
+            'accept': 'application/json',
+            ...form.getHeaders(),
+          },
+          body: form as any,
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`IRIS e-signature generate API error: ${response.status} - ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ E-signature document generated successfully:', result);
+      
+      return applicationId;
+    } catch (error) {
+      console.error('❌ Failed to generate e-signature document:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send an e-signature document for signing
+   * @param leadId IRIS CRM lead ID
+   * @param applicationId E-signature application ID
+   * @param recipientEmail Email of the signer
+   * @param recipientName Name of the signer
+   */
+  static async sendESignatureDocument(
+    leadId: string,
+    applicationId: string,
+    recipientEmail: string,
+    recipientName: string
+  ): Promise<void> {
+    try {
+      if (!env.IRIS_CRM_API_KEY || !env.IRIS_CRM_SUBDOMAIN) {
+        throw new Error('IRIS CRM API key or subdomain not configured');
+      }
+
+      console.log(`🔄 Sending e-signature document to ${recipientEmail}`);
+
+      const payload = {
+        recipient_email: recipientEmail,
+        recipient_name: recipientName,
+      };
+
+      const response = await fetch(
+        `${this.getApiBaseUrl()}/leads/${leadId}/signatures/${applicationId}/send`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-API-KEY': env.IRIS_CRM_API_KEY,
+            'accept': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`IRIS e-signature send API error: ${response.status} - ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ E-signature document sent successfully:', result);
+    } catch (error) {
+      console.error('❌ Failed to send e-signature document:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get the status of an e-signature document
+   * @param applicationId E-signature application ID
+   */
+  static async getESignatureStatus(applicationId: string): Promise<{
+    status: 'PENDING' | 'SIGNED' | 'DECLINED' | 'EXPIRED';
+    signedAt?: string;
+  }> {
+    try {
+      if (!env.IRIS_CRM_API_KEY || !env.IRIS_CRM_SUBDOMAIN) {
+        throw new Error('IRIS CRM API key or subdomain not configured');
+      }
+
+      console.log(`🔄 Checking e-signature status for application ${applicationId}`);
+
+      const response = await fetch(
+        `${this.getApiBaseUrl()}/leads/signatures/${applicationId}/status`,
+        {
+          method: 'GET',
+          headers: {
+            'X-API-KEY': env.IRIS_CRM_API_KEY,
+            'accept': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`IRIS e-signature status API error: ${response.status} - ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ E-signature status retrieved:', result);
+      
+      return result;
+    } catch (error) {
+      console.error('❌ Failed to get e-signature status:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Download a signed document from IRIS CRM
+   * @param applicationId E-signature application ID
+   */
+  static async downloadSignedDocument(applicationId: string): Promise<Buffer> {
+    try {
+      if (!env.IRIS_CRM_API_KEY || !env.IRIS_CRM_SUBDOMAIN) {
+        throw new Error('IRIS CRM API key or subdomain not configured');
+      }
+
+      console.log(`🔄 Downloading signed document for application ${applicationId}`);
+
+      const response = await fetch(
+        `${this.getApiBaseUrl()}/leads/signatures/${applicationId}/download`,
+        {
+          method: 'GET',
+          headers: {
+            'X-API-KEY': env.IRIS_CRM_API_KEY,
+            'accept': 'application/pdf',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`IRIS e-signature download API error: ${response.status} - ${errorText}`);
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      
+      console.log(`✅ Signed document downloaded successfully: ${buffer.length} bytes`);
+      
+      return buffer;
+    } catch (error) {
+      console.error('❌ Failed to download signed document:', error);
+      throw error;
     }
   }
 }
