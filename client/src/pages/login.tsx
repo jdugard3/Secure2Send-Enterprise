@@ -69,7 +69,14 @@ export default function Login() {
           title: "Login Successful",
           description: "Welcome back to Secure2Send!",
         });
-        navigate("/");
+        // Check if there's a redirect path stored from session timeout
+        const redirectPath = sessionStorage.getItem('redirectAfterLogin');
+        if (redirectPath) {
+          sessionStorage.removeItem('redirectAfterLogin');
+          navigate(redirectPath);
+        } else {
+          navigate("/");
+        }
       }
     },
     onError: (error: Error) => {
@@ -83,9 +90,28 @@ export default function Login() {
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      navigate("/");
+      // Check if there's a redirect path stored from session timeout
+      const redirectPath = sessionStorage.getItem('redirectAfterLogin');
+      if (redirectPath) {
+        sessionStorage.removeItem('redirectAfterLogin');
+        navigate(redirectPath);
+      } else {
+        navigate("/");
+      }
     }
   }, [isAuthenticated, isLoading, navigate]);
+
+  // Show session timeout message if user was redirected here
+  useEffect(() => {
+    const redirectPath = sessionStorage.getItem('redirectAfterLogin');
+    if (redirectPath && !isAuthenticated) {
+      toast({
+        title: "Session Expired",
+        description: "Your session has timed out. Please log in again to continue.",
+        variant: "default",
+      });
+    }
+  }, [toast, isAuthenticated]);
 
   const onSubmit = (data: LoginData) => {
     loginMutation.mutate(data);
@@ -97,7 +123,14 @@ export default function Login() {
       title: "Login Successful",
       description: "Welcome back to Secure2Send!",
     });
-    navigate("/");
+    // Check if there's a redirect path stored from session timeout
+    const redirectPath = sessionStorage.getItem('redirectAfterLogin');
+    if (redirectPath) {
+      sessionStorage.removeItem('redirectAfterLogin');
+      navigate(redirectPath);
+    } else {
+      navigate("/");
+    }
   };
 
   const handleMfaCancel = () => {

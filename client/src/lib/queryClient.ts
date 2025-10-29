@@ -21,6 +21,19 @@ async function throwIfResNotOk(res: Response) {
       console.error("Error reading response:", e);
     }
 
+    // Handle session timeout / unauthorized
+    if (res.status === 401) {
+      console.log('🔒 Session expired - Redirecting to login page');
+      // Only redirect if not already on login/signup page
+      if (!window.location.pathname.startsWith('/login') && 
+          !window.location.pathname.startsWith('/signup')) {
+        // Store the current path to redirect back after login
+        sessionStorage.setItem('redirectAfterLogin', window.location.pathname);
+        window.location.href = '/login';
+      }
+      return; // Don't throw error, just redirect
+    }
+
     // Handle MFA setup requirement
     if (res.status === 403 && errorData?.mfaSetupRequired) {
       console.log('🔐 MFA Setup Required - Redirecting to setup page');
@@ -72,7 +85,17 @@ export const getQueryFn: <T>(options: {
       credentials: "include",
     });
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+    // Handle 401 by redirecting to login (session timeout)
+    if (res.status === 401) {
+      console.log('🔒 Session expired - Redirecting to login page');
+      // Only redirect if not already on login/signup page
+      if (!window.location.pathname.startsWith('/login') && 
+          !window.location.pathname.startsWith('/signup')) {
+        // Store the current path to redirect back after login
+        sessionStorage.setItem('redirectAfterLogin', window.location.pathname);
+        window.location.href = '/login';
+      }
+      // Return null to prevent errors while redirecting
       return null;
     }
 
