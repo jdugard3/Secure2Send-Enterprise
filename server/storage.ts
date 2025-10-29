@@ -53,6 +53,8 @@ export interface IStorage {
   getAllMerchantApplicationsForReview(): Promise<MerchantApplicationWithClient[]>;
   updateMerchantApplication(id: string, application: Partial<InsertMerchantApplication>): Promise<MerchantApplication>;
   updateMerchantApplicationStatus(id: string, status: 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED', rejectionReason?: string): Promise<MerchantApplication>;
+  updateMerchantApplicationIrisLeadId(id: string, irisLeadId: string): Promise<MerchantApplication>;
+  validateMerchantApplicationOwnership(merchantApplicationId: string, userId: string): Promise<boolean>;
   deleteMerchantApplication(id: string): Promise<void>;
   
   // MFA operations
@@ -285,12 +287,17 @@ export class DatabaseStorage implements IStorage {
 
   // Merchant Application operations
   async createMerchantApplication(application: InsertMerchantApplication): Promise<MerchantApplication> {
-    // Sanitize the data before insertion
+    // Sanitize the data before insertion, but ensure clientId is preserved
     const sanitizedData = this.sanitizeApplicationData(application);
+    
+    // Ensure clientId is always present (it's required)
+    if (!sanitizedData.clientId && application.clientId) {
+      sanitizedData.clientId = application.clientId;
+    }
     
     const [merchantApplication] = await db
       .insert(merchantApplications)
-      .values(sanitizedData)
+      .values(sanitizedData as any) // Type assertion needed due to Partial type from sanitization
       .returning();
     return merchantApplication;
   }
@@ -520,6 +527,61 @@ export class DatabaseStorage implements IStorage {
 
   async deleteMerchantApplication(id: string): Promise<void> {
     await db.delete(merchantApplications).where(eq(merchantApplications.id, id));
+  }
+
+  async updateMerchantApplicationIrisLeadId(id: string, irisLeadId: string): Promise<MerchantApplication> {
+    const [application] = await db
+      .update(merchantApplications)
+      .set({ irisLeadId, updatedAt: new Date() })
+      .where(eq(merchantApplications.id, id))
+      .returning();
+    return application;
+  }
+
+  async updateMerchantApplicationESignature(
+    id: string,
+    data: {
+      eSignatureStatus?: 'NOT_SENT' | 'PENDING' | 'SIGNED' | 'DECLINED' | 'EXPIRED';
+      eSignatureApplicationId?: string;
+      eSignatureSentAt?: Date;
+      eSignatureCompletedAt?: Date;
+      signedDocumentId?: number;
+    }
+  ): Promise<MerchantApplication> {
+    const [application] = await db
+      .update(merchantApplications)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(eq(merchantApplications.id, id))
+      .returning();
+    return application;
+  }
+
+  async getMerchantApplicationByESignatureId(eSignatureApplicationId: string): Promise<MerchantApplication | undefined> {
+    const [application] = await db
+      .select()
+      .from(merchantApplications)
+      .where(eq(merchantApplications.eSignatureApplicationId, eSignatureApplicationId));
+    return application;
+  }
+
+  async validateMerchantApplicationOwnership(merchantApplicationId: string, userId: string): Promise<boolean> {
+    // Get the merchant application
+    const application = await this.getMerchantApplicationById(merchantApplicationId);
+    if (!application) {
+      return false;
+    }
+
+    // Get the client for this application
+    const client = await this.getClientById(application.clientId);
+    if (!client) {
+      return false;
+    }
+
+    // Check if the client belongs to the user
+    return client.userId === userId;
   }
 
   // MFA-related methods

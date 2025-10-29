@@ -13,6 +13,7 @@ import { EmailService } from "./services/emailService";
 import { env } from "./env";
 import { cloudflareR2 } from "./services/cloudflareR2";
 import { AuditService } from "./services/auditService";
+import { IrisCrmService } from "./services/irisCrmService";
 import { requireMfaSetup } from "./middleware/mfaRequired";
 import { LogSanitizer, safeLog } from "./utils/logSanitizer";
 
@@ -77,10 +78,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const file = req.file;
-      const { documentType } = req.body;
+      const { documentType, merchantApplicationId } = req.body;
 
       if (!file) {
         return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      // Require merchantApplicationId for new uploads
+      if (!merchantApplicationId) {
+        // Clean up uploaded file
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+        }
+        return res.status(400).json({ 
+          message: "Merchant application ID is required. Please select a merchant application before uploading documents." 
+        });
+      }
+
+      // Validate that the merchant application belongs to this user
+      const isOwner = await storage.validateMerchantApplicationOwnership(merchantApplicationId, userId);
+      if (!isOwner) {
+        // Clean up uploaded file
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+        }
+        return res.status(403).json({ 
+          message: "You don't have permission to upload documents for this merchant application" 
+        });
+      }
+
+      // Get the merchant application to access its IRIS lead ID
+      let merchantApplication = await storage.getMerchantApplicationById(merchantApplicationId);
+      if (!merchantApplication) {
+        // Clean up uploaded file
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+        }
+        return res.status(404).json({ message: "Merchant application not found" });
+      }
+
+      // Auto-create IRIS lead if merchant application doesn't have one yet (backfill for old apps)
+      if (!merchantApplication.irisLeadId) {
+        console.log('🔄 Merchant application missing IRIS lead, creating one now...');
+        try {
+          const { IrisCrmService } = await import('./services/irisCrmService');
+          const newLeadId = await IrisCrmService.createLead(user);
+          if (newLeadId) {
+            await storage.updateMerchantApplicationIrisLeadId(merchantApplication.id, newLeadId);
+            const refreshedApp = await storage.getMerchantApplicationById(merchantApplicationId); // Refresh
+            if (refreshedApp) {
+              merchantApplication = refreshedApp;
+              console.log('✅ Created IRIS lead for existing merchant application:', newLeadId);
+              
+              // Move lead to appropriate stage based on application status
+              if (merchantApplication.status === 'SUBMITTED') {
+                IrisCrmService.updateLeadStatus(newLeadId, 'SALES_READY_FOR_REVIEW').catch(error => {
+                  console.error('Failed to update IRIS CRM lead status:', error);
+                });
+              } else if (merchantApplication.status === 'DRAFT') {
+                IrisCrmService.updateLeadStatus(newLeadId, 'SALES_PRE_SALE').catch(error => {
+                  console.error('Failed to update IRIS CRM lead status:', error);
+                });
+              }
+            }
+          }
+        } catch (error) {
+          console.error('❌ Failed to create IRIS lead for merchant application:', error);
+        }
       }
 
       // Enhanced file validation
@@ -116,6 +180,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filePath: file.path,
         documentType,
         clientId: client.id,
+        merchantApplicationId: merchantApplicationId,
         status: 'PENDING' as const,
         r2Key,
         r2Url,
@@ -139,7 +204,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Sync document to IRIS CRM via Zapier webhook (async, don't block response)
       // Read file content before potential cleanup
       let fileContentForIris: Buffer | null = null;
-      if (client.irisLeadId && fs.existsSync(file.path)) {
+      if (merchantApplication.irisLeadId && fs.existsSync(file.path)) {
         try {
           fileContentForIris = fs.readFileSync(file.path);
         } catch (error) {
@@ -157,21 +222,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Now sync to IRIS CRM - prefer R2 URL, fallback to buffer
-      if (client.irisLeadId) {
+      if (merchantApplication.irisLeadId) {
         import('./services/irisCrmService').then(async ({ IrisCrmService }) => {
           if (r2Key && cloudflareR2) {
             try {
               // Generate signed URL that Zapier can access (24 hour expiry)
               const signedUrl = await cloudflareR2.getDownloadUrl(r2Key, 86400);
               console.log('🔗 Using Cloudflare R2 signed URL for IRIS sync (24h expiry)');
-              IrisCrmService.syncDocumentToIrisWithUrl(user, document, client.irisLeadId!, signedUrl).catch(error => {
+              IrisCrmService.syncDocumentToIrisWithUrl(user, document, merchantApplication.irisLeadId!, signedUrl).catch(error => {
                 console.error('Failed to sync document to IRIS CRM with signed URL:', error);
               });
             } catch (error) {
               console.error('Failed to generate signed URL, falling back to base64:', error);
               // Fallback to base64 if signed URL generation fails
               if (fileContentForIris) {
-                IrisCrmService.syncDocumentToIrisWithBuffer(user, document, client.irisLeadId!, fileContentForIris).catch(error => {
+                IrisCrmService.syncDocumentToIrisWithBuffer(user, document, merchantApplication.irisLeadId!, fileContentForIris).catch(error => {
                   console.error('Failed to sync document to IRIS CRM with buffer:', error);
                 });
               }
@@ -179,7 +244,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           } else if (fileContentForIris) {
             // Fallback to base64 content when R2 isn't available
             console.log('💾 Using base64 content for IRIS sync (R2 not available)');
-            IrisCrmService.syncDocumentToIrisWithBuffer(user, document, client.irisLeadId!, fileContentForIris).catch(error => {
+            IrisCrmService.syncDocumentToIrisWithBuffer(user, document, merchantApplication.irisLeadId!, fileContentForIris).catch(error => {
               console.error('Failed to sync document to IRIS CRM with buffer:', error);
             });
           } else {
@@ -189,7 +254,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.error('Failed to import IRIS CRM service:', error);
         });
       } else {
-        console.warn('⚠️ No IRIS lead ID found for client, skipping document sync');
+        console.warn('⚠️ No IRIS lead ID found for merchant application, skipping document sync');
       }
 
       res.json(document);
@@ -750,21 +815,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "PENDING",
       });
 
-      // Create IRIS CRM lead (async, don't block response)
-      import('./services/irisCrmService').then(({ IrisCrmService }) => {
-        IrisCrmService.createLead(newUser).then(leadId => {
-          if (leadId) {
-            // Update client with IRIS lead ID
-            storage.updateClientIrisLeadId(client.id, leadId).catch(error => {
-              console.error('Failed to update client with IRIS lead ID:', error);
-            });
-          }
-        }).catch(error => {
-          console.error('Failed to create IRIS CRM lead:', error);
-        });
-      }).catch(error => {
-        console.error('Failed to import IRIS CRM service:', error);
-      });
+      // Note: IRIS CRM lead will be created when user creates their first merchant application
+      // This ensures each merchant application has its own lead in IRIS
 
       // Send account created email to user (async, don't block response)
       EmailService.sendAccountCreatedEmail(newUser, password).catch(error => {
@@ -897,32 +949,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         metadata: { applicationId: application.id, status: 'DRAFT' }
       });
 
-      // Move IRIS lead to Sales - Pre-Sale when application is created (async, don't block response)
+      // Create IRIS lead for this specific merchant application (async, don't block response)
       import('./services/irisCrmService').then(async ({ IrisCrmService }) => {
-        let irisLeadId = client.irisLeadId;
-        
-        // Create IRIS lead ID if it doesn't exist
-        if (!irisLeadId) {
-          console.log('🔄 No IRIS lead ID found, creating new lead for client:', client.id);
-          try {
-            irisLeadId = await IrisCrmService.createLead(user);
-            if (irisLeadId) {
-              await storage.updateClientIrisLeadId(client.id, irisLeadId);
-              console.log('✅ Created and assigned IRIS lead ID:', irisLeadId);
-            } else {
-              console.warn('⚠️ Failed to create IRIS lead ID, skipping IRIS sync');
-              return;
-            }
-          } catch (error) {
-            console.error('❌ Failed to create IRIS lead ID:', error);
-            return;
+        console.log('🔄 Creating new IRIS lead for merchant application:', application.id);
+        try {
+          const irisLeadId = await IrisCrmService.createLead(user);
+          if (irisLeadId) {
+            // Store IRIS lead ID on the merchant application
+            await storage.updateMerchantApplicationIrisLeadId(application.id, irisLeadId);
+            console.log('✅ Created and assigned IRIS lead ID to merchant application:', irisLeadId);
+            
+            // Move lead to Sales - Pre-Sale (application started)
+            IrisCrmService.updateLeadStatus(irisLeadId, 'SALES_PRE_SALE').catch(error => {
+              console.error('Failed to update IRIS CRM lead status to SALES_PRE_SALE:', error);
+            });
+
+            // Sync application data to IRIS via Zapier webhook
+            IrisCrmService.syncMerchantApplicationToIris(user, application, irisLeadId).catch(error => {
+              console.error('Failed to sync merchant application to IRIS CRM via Zapier:', error);
+            });
+            
+            // Also update lead fields directly (field ID mapping)
+            IrisCrmService.updateLeadWithMerchantApplication(irisLeadId, application).catch(error => {
+              console.error('Failed to update IRIS CRM lead fields:', error);
+            });
+          } else {
+            console.warn('⚠️ Failed to create IRIS lead ID for merchant application');
           }
+        } catch (error) {
+          console.error('❌ Failed to create IRIS lead ID for merchant application:', error);
         }
-        
-        // Move lead to Sales - Pre-Sale (application started)
-        IrisCrmService.updateLeadStatus(irisLeadId, 'SALES_PRE_SALE').catch(error => {
-          console.error('Failed to update IRIS CRM lead status to SALES_PRE_SALE:', error);
-        });
       }).catch(error => {
         console.error('Failed to import IRIS CRM service:', error);
       });
@@ -1255,6 +1311,262 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting merchant application:", error);
       res.status(500).json({ message: "Failed to delete merchant application" });
+    }
+  });
+
+  // E-Signature routes
+  app.post('/api/merchant-applications/:id/send-for-signature', requireAuth, async (req: any, res: Response) => {
+    try {
+      const { id } = req.params;
+      const user = req.user;
+
+      // Only admins can send for signature
+      if (user.role !== 'ADMIN') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const application = await storage.getMerchantApplicationById(id);
+      if (!application) {
+        return res.status(404).json({ message: "Merchant application not found" });
+      }
+
+      // Verify application is approved
+      if (application.status !== 'APPROVED') {
+        return res.status(400).json({ message: "Only approved applications can be sent for signature" });
+      }
+
+      // Prevent duplicate signature requests
+      if (application.eSignatureStatus === 'PENDING') {
+        return res.status(400).json({ message: "E-signature request already pending" });
+      }
+
+      if (application.eSignatureStatus === 'SIGNED') {
+        return res.status(400).json({ message: "Application already signed" });
+      }
+
+      // Verify application has IRIS lead ID
+      if (!application.irisLeadId) {
+        return res.status(400).json({ message: "Application must be synced to IRIS CRM first" });
+      }
+
+      // Get client information for email
+      const client = await storage.getClientById(application.clientId);
+      if (!client) {
+        return res.status(404).json({ message: "Client not found" });
+      }
+
+      const clientUser = await storage.getUser(client.userId);
+      if (!clientUser) {
+        return res.status(404).json({ message: "Client user not found" });
+      }
+
+      console.log(`📝 Preparing to send e-signature for application ${id}`);
+
+      // Fill PDF with application data
+      const { PdfFillService } = await import('./services/pdfFillService');
+      const filledPdfBuffer = await PdfFillService.fillMerchantApplicationPDF(application);
+
+      // Upload to IRIS e-signature system
+      await IrisCrmService.generateESignatureDocument(
+        application.irisLeadId,
+        application.id,
+        filledPdfBuffer
+      );
+
+      // Send for signature
+      const recipientName = `${clientUser.firstName || ''} ${clientUser.lastName || ''}`.trim() || clientUser.email;
+      await IrisCrmService.sendESignatureDocument(
+        application.irisLeadId,
+        application.id,
+        clientUser.email,
+        recipientName
+      );
+
+      // Update application status
+      await storage.updateMerchantApplicationESignature(id, {
+        eSignatureStatus: 'PENDING',
+        eSignatureApplicationId: application.id,
+        eSignatureSentAt: new Date(),
+      });
+
+      // Audit log
+      await AuditService.logAction(user, 'MERCHANT_APPLICATION_UPDATE', req, {
+        resourceType: 'merchant_application',
+        resourceId: id,
+        metadata: {
+          action: 'send_for_signature',
+          recipientEmail: clientUser.email,
+        }
+      });
+
+      res.json({
+        message: "E-signature request sent successfully",
+        eSignatureApplicationId: application.id,
+        recipientEmail: clientUser.email,
+      });
+    } catch (error) {
+      console.error("Error sending e-signature request:", error);
+      res.status(500).json({ 
+        message: "Failed to send e-signature request",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  app.get('/api/merchant-applications/:id/signature-status', requireAuth, async (req: any, res: Response) => {
+    try {
+      const { id } = req.params;
+      const user = req.user;
+
+      const application = await storage.getMerchantApplicationById(id);
+      if (!application) {
+        return res.status(404).json({ message: "Merchant application not found" });
+      }
+
+      // Check access permissions
+      if (user.role === 'CLIENT') {
+        const client = await storage.getClientByUserId(user.id);
+        if (!client || application.clientId !== client.id) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      // If no e-signature request has been sent, return current status
+      if (!application.eSignatureApplicationId) {
+        return res.json({
+          status: application.eSignatureStatus || 'NOT_SENT',
+          sentAt: null,
+          completedAt: null,
+        });
+      }
+
+      // Check status with IRIS if pending
+      if (application.eSignatureStatus === 'PENDING') {
+        try {
+          const irisStatus = await IrisCrmService.getESignatureStatus(application.eSignatureApplicationId);
+          
+          // Update local status if changed
+          if (irisStatus.status !== application.eSignatureStatus) {
+            await storage.updateMerchantApplicationESignature(id, {
+              eSignatureStatus: irisStatus.status,
+              eSignatureCompletedAt: irisStatus.status === 'SIGNED' ? new Date() : undefined,
+            });
+          }
+
+          return res.json({
+            status: irisStatus.status,
+            sentAt: application.eSignatureSentAt,
+            completedAt: irisStatus.status === 'SIGNED' ? (irisStatus.signedAt || new Date().toISOString()) : null,
+          });
+        } catch (error) {
+          console.error('Error checking IRIS e-signature status:', error);
+          // Fall through to return local status
+        }
+      }
+
+      // Return local status
+      res.json({
+        status: application.eSignatureStatus || 'NOT_SENT',
+        sentAt: application.eSignatureSentAt,
+        completedAt: application.eSignatureCompletedAt,
+      });
+    } catch (error) {
+      console.error("Error checking signature status:", error);
+      res.status(500).json({ message: "Failed to check signature status" });
+    }
+  });
+
+  app.post('/api/merchant-applications/:id/download-signed-document', requireAuth, async (req: any, res: Response) => {
+    try {
+      const { id } = req.params;
+      const user = req.user;
+
+      // Only admins can download signed documents
+      if (user.role !== 'ADMIN') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const application = await storage.getMerchantApplicationById(id);
+      if (!application) {
+        return res.status(404).json({ message: "Merchant application not found" });
+      }
+
+      if (!application.eSignatureApplicationId) {
+        return res.status(400).json({ message: "No e-signature request found" });
+      }
+
+      if (application.eSignatureStatus !== 'SIGNED') {
+        return res.status(400).json({ message: "Document not signed yet" });
+      }
+
+      // Check if we already have the signed document
+      if (application.signedDocumentId) {
+        const document = await storage.getDocumentById(application.signedDocumentId.toString());
+        if (document) {
+          return res.json({
+            message: "Signed document already downloaded",
+            documentId: document.id,
+          });
+        }
+      }
+
+      console.log(`📥 Downloading signed document for application ${id}`);
+
+      // Download from IRIS
+      const signedPdfBuffer = await IrisCrmService.downloadSignedDocument(application.eSignatureApplicationId);
+
+      // Save as a document
+      const timestamp = Date.now();
+      const filename = `signed-application-${id}-${timestamp}.pdf`;
+      const tempPath = path.join(__dirname, '../uploads', filename);
+      
+      // Ensure uploads directory exists
+      const uploadsDir = path.join(__dirname, '../uploads');
+      if (!fs.existsSync(uploadsDir)) {
+        fs.mkdirSync(uploadsDir, { recursive: true });
+      }
+      
+      fs.writeFileSync(tempPath, signedPdfBuffer);
+
+      // Create document record
+      const document = await storage.createDocument({
+        filename,
+        originalName: `Signed Merchant Application - ${application.legalBusinessName || application.dbaBusinessName || id}.pdf`,
+        fileSize: signedPdfBuffer.length,
+        mimeType: 'application/pdf',
+        filePath: tempPath,
+        documentType: 'ARTICLES_OF_INCORPORATION', // Or create a new type for signed applications
+        clientId: application.clientId,
+        merchantApplicationId: id,
+        status: 'APPROVED',
+      });
+
+      // Link document to application
+      await storage.updateMerchantApplicationESignature(id, {
+        signedDocumentId: parseInt(document.id),
+      });
+
+      // Audit log
+      await AuditService.logAction(user, 'DOCUMENT_DOWNLOAD', req, {
+        resourceType: 'document',
+        resourceId: document.id,
+        metadata: {
+          action: 'download_signed_application',
+          merchantApplicationId: id,
+        }
+      });
+
+      res.json({
+        message: "Signed document downloaded successfully",
+        documentId: document.id,
+        filename: document.originalName,
+      });
+    } catch (error) {
+      console.error("Error downloading signed document:", error);
+      res.status(500).json({ 
+        message: "Failed to download signed document",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   });
 
