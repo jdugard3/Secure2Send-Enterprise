@@ -994,22 +994,26 @@ export class IrisCrmService {
   }
 
   /**
-   * Generate an e-signature document in IRIS CRM
+   * Upload a PDF document to IRIS CRM (Step 1 of e-signature workflow)
+   * Reference: https://www.iriscrm.com/api/#/paths/~1leads~1{leadId}~1documents/post
    * @param leadId IRIS CRM lead ID
-   * @param applicationId E-signature application ID (can be merchant app ID)
    * @param pdfBuffer PDF file buffer to upload
+   * @param filename Filename for the document
+   * @returns Document ID from IRIS
    */
-  static async generateESignatureDocument(
+  static async uploadDocument(
     leadId: string,
-    applicationId: string,
-    pdfBuffer: Buffer
-  ): Promise<string> {
+    pdfBuffer: Buffer,
+    filename: string
+  ): Promise<number> {
     try {
       if (!env.IRIS_CRM_API_KEY || !env.IRIS_CRM_SUBDOMAIN) {
         throw new Error('IRIS CRM API key or subdomain not configured');
       }
 
-      console.log(`🔄 Generating e-signature document for lead ${leadId}, application ${applicationId}`);
+      const apiUrl = `${this.getApiBaseUrl()}/leads/${leadId}/documents`;
+      console.log(`🔄 Uploading document to IRIS CRM for lead ${leadId}`);
+      console.log(`📍 IRIS Document Upload API URL: ${apiUrl}`);
 
       // Create form data with the PDF
       const FormData = (await import('form-data')).default;
@@ -1017,34 +1021,96 @@ export class IrisCrmService {
       
       // Append the PDF file
       form.append('file', pdfBuffer, {
-        filename: `merchant-application-${applicationId}.pdf`,
+        filename: filename,
         contentType: 'application/pdf',
       });
 
-      const response = await fetch(
-        `${this.getApiBaseUrl()}/leads/${leadId}/signatures/${applicationId}/generate`,
-        {
-          method: 'POST',
-          headers: {
-            'X-API-KEY': env.IRIS_CRM_API_KEY,
-            'accept': 'application/json',
-            ...form.getHeaders(),
-          },
-          body: form as any,
-        }
-      );
+      console.log(`📤 Uploading PDF (${pdfBuffer.length} bytes) to IRIS...`);
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'X-API-KEY': env.IRIS_CRM_API_KEY,
+          'accept': 'application/json',
+          ...form.getHeaders(),
+        },
+        body: form as any,
+      });
+
+      console.log(`📥 IRIS API Response Status: ${response.status} ${response.statusText}`);
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error(`❌ IRIS Document Upload Error:`, errorText);
+        console.error(`❌ Endpoint: ${apiUrl}`);
+        throw new Error(`IRIS document upload API error: ${response.status} - ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log('✅ Document uploaded to IRIS successfully:', result);
+      
+      // Return the document ID from IRIS response
+      return result.id || result.documentId || result.document_id;
+    } catch (error) {
+      console.error('❌ Failed to upload document to IRIS:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate an e-signature application in IRIS CRM (Step 2 of e-signature workflow)
+   * @param leadId IRIS CRM lead ID (integer)
+   * @param fieldId IRIS field ID for e-signature application (integer)
+   * @param expirePrevious Whether to expire previously generated applications
+   * @returns Generated application ID
+   */
+  static async generateESignatureApplication(
+    leadId: string,
+    fieldId: number,
+    expirePrevious: boolean = false
+  ): Promise<string> {
+    try {
+      if (!env.IRIS_CRM_API_KEY || !env.IRIS_CRM_SUBDOMAIN) {
+        throw new Error('IRIS CRM API key or subdomain not configured');
+      }
+
+      const apiUrl = `${this.getApiBaseUrl()}/leads/${leadId}/signatures/${fieldId}/generate`;
+      console.log(`🔄 Generating e-signature application for lead ${leadId}, field ${fieldId}`);
+      console.log(`📍 IRIS E-Signature Generate API URL: ${apiUrl}`);
+
+      const payload = {
+        expire: expirePrevious
+      };
+
+      console.log(`📤 Sending generate request with payload:`, payload);
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-API-KEY': env.IRIS_CRM_API_KEY,
+          'accept': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      console.log(`📥 IRIS API Response Status: ${response.status} ${response.statusText}`);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`❌ IRIS E-Signature Generate Error:`, errorText);
+        console.error(`❌ Endpoint: ${apiUrl}`);
+        console.error(`❌ Lead ID: ${leadId}, Field ID: ${fieldId}`);
         throw new Error(`IRIS e-signature generate API error: ${response.status} - ${errorText}`);
       }
 
       const result = await response.json();
-      console.log('✅ E-signature document generated successfully:', result);
+      console.log('✅ E-signature application generated successfully:', result);
       
-      return applicationId;
+      // Return the application ID from response
+      return result.applicationId || result.id || fieldId.toString();
     } catch (error) {
-      console.error('❌ Failed to generate e-signature document:', error);
+      console.error('❌ Failed to generate e-signature application:', error);
       throw error;
     }
   }

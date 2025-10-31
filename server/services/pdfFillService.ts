@@ -13,7 +13,7 @@ const __dirname = path.dirname(__filename);
 export class PdfFillService {
   private static readonly PDF_TEMPLATE_PATH = path.join(
     __dirname,
-    '../../uploads/CorduroMSA_CRB (2025.10.23) (4).pdf'
+    '../../uploads/CorduroMSA_CRB (2025.10.23) (5).pdf'
   );
 
   /**
@@ -69,11 +69,21 @@ export class PdfFillService {
       this.setTextField(form, 'Bank Officer Phone', application.bankOfficerPhone);
       this.setTextField(form, 'Bank Officer Email', application.bankOfficerEmail);
       
-      // New fields from updated PDF
+      // New fields from updated PDF (Page 6 - Bank & Provider Info)
       this.setTextField(form, 'MerchantName', application.dbaBusinessName || application.legalBusinessName);
       this.setTextField(form, 'CorporateLegalName', application.legalBusinessName);
       this.setTextField(form, 'LocationAddress', application.locationAddress);
       this.setTextField(form, 'CorporateMailingAddress', application.billingAddress);
+      this.setTextField(form, 'Bank Address', application.billingAddress); // Or bank's physical address if available
+      this.setTextField(form, 'Primary Contact', application.contactName || application.legalContactName);
+      this.setTextField(form, 'Primary Contact Email', application.contactEmail || application.legalEmail);
+      this.setTextField(form, 'Primary Contact Phone', application.businessPhone);
+      this.setTextField(form, 'POS Provider', application.posSystem);
+      this.setTextField(form, 'S2S provider', ''); // Seed-to-Sale provider - add to schema if needed
+      this.setTextField(form, 'Compliance Provider', ''); // Compliance provider - add to schema if needed
+      
+      // Page 11 - Merchant Initials
+      this.setTextField(form, 'Merchant Initials', this.getInitials(application.merchantName || ''));
 
       // Principal Officers (up to 5 supported)
       this.fillPrincipalOfficers(form, principalOfficers);
@@ -117,22 +127,42 @@ export class PdfFillService {
    */
   private static fillPrincipalOfficers(form: any, officers: any[]) {
     const suffixes = ['', '_2', '_3', '_4'];
+    const citySuffixes = ['_3', '_4', '_5', '_6']; // City and State have underscores
     const administratorSuffix = '_5';
 
     for (let i = 0; i < Math.min(officers.length, 4); i++) {
       const officer = officers[i];
       const suffix = suffixes[i];
+      const citySuffix = citySuffixes[i];
 
+      // Basic info fields (Page 5)
       this.setTextField(form, `Principal ${i + 1} Name`, officer.name);
       this.setTextField(form, `SSN${suffix}`, officer.ssn);
       this.setTextField(form, ` Ownership${suffix}`, officer.equityPercentage ? `${officer.equityPercentage}%` : '');
       this.setTextField(form, `Residential Address${suffix}`, officer.residentialAddress);
-      this.setTextField(form, `City${i + 3}`, officer.city);
-      this.setTextField(form, `State${i + 3}`, officer.state);
+      this.setTextField(form, `City${citySuffix}`, officer.city);
+      this.setTextField(form, `State${citySuffix}`, officer.state);
       this.setTextField(form, `TitleZip${suffix}`, officer.zip);
       this.setTextField(form, `Email${suffix}`, officer.email);
       this.setTextField(form, `Date of Birth${suffix}`, officer.dob ? this.formatDate(officer.dob) : '');
       this.setTextField(form, `Cell Phone${suffix}`, officer.phoneNumber);
+      this.setTextField(form, `Home Phone${suffix}`, officer.homePhone || officer.phoneNumber);
+      this.setTextField(form, `State Issued ID${suffix}`, officer.idState || '');
+      this.setTextField(form, `ID Number${suffix}`, officer.idNumber || '');
+      this.setTextField(form, `Exp Date${suffix}`, officer.idExpDate ? this.formatDate(officer.idExpDate) : '');
+      
+      // Detailed fields (another section) - Principal #1, Principal #2, etc.
+      this.setTextField(form, `Principal #${i + 1} Name`, officer.name);
+      this.setTextField(form, `Principal #${i + 1} SSN`, officer.ssn);
+      this.setTextField(form, `Principal #${i + 1} DOB`, officer.dob ? this.formatDate(officer.dob) : '');
+      this.setTextField(form, `Principal #${i + 1} Title`, officer.title || '');
+      this.setTextField(form, `Principal #${i + 1} Residential Address`, officer.residentialAddress);
+      this.setTextField(form, `Principal #${i + 1} City/State/Zip`, `${officer.city || ''}, ${officer.state || ''} ${officer.zip || ''}`.trim());
+      this.setTextField(form, `Principal #${i + 1} Home Phone`, officer.homePhone || officer.phoneNumber);
+      this.setTextField(form, `Principal #${i + 1} Cell Phone`, officer.phoneNumber);
+      this.setTextField(form, `Principal #${i + 1} Email`, officer.email);
+      this.setTextField(form, `Principal #${i + 1} State Issued ID${i === 0 ? ' Number' : ''}`, officer.idNumber || '');
+      this.setTextField(form, `Principal #${i + 1} Exp Date`, officer.idExpDate ? this.formatDate(officer.idExpDate) : '');
     }
 
     // Administrator field (5th officer)
@@ -231,6 +261,23 @@ export class PdfFillService {
       }
     }
     return null;
+  }
+
+  /**
+   * Get initials from a full name
+   */
+  private static getInitials(fullName: string): string {
+    if (!fullName) return '';
+    
+    const parts = fullName.trim().split(/\s+/);
+    if (parts.length === 1) {
+      return parts[0].substring(0, 2).toUpperCase();
+    }
+    
+    return parts
+      .filter(part => part.length > 0)
+      .map(part => part[0].toUpperCase())
+      .join('');
   }
 
   /**

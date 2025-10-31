@@ -1258,6 +1258,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 });
               }
               
+              // Auto-generate and upload filled PDF to IRIS when approved
+              if (status === 'APPROVED') {
+                console.log(`📝 Auto-generating filled PDF for approved application ${id}`);
+                import('./services/pdfFillService').then(async ({ PdfFillService }) => {
+                  try {
+                    const filledPdfBuffer = await PdfFillService.fillMerchantApplicationPDF(application);
+                    console.log(`✅ PDF generated successfully (${filledPdfBuffer.length} bytes)`);
+                    
+                    // Upload to IRIS CRM documents
+                    const documentId = await IrisCrmService.uploadDocument(
+                      irisLeadId,
+                      filledPdfBuffer,
+                      `merchant-application-${application.legalBusinessName || application.dbaBusinessName || id}.pdf`
+                    );
+                    console.log(`✅ Filled PDF uploaded to IRIS CRM, document ID: ${documentId}`);
+                  } catch (error) {
+                    console.error('❌ Failed to generate and upload PDF to IRIS:', error);
+                  }
+                }).catch(error => {
+                  console.error('❌ Failed to import PDF fill service:', error);
+                });
+              }
+              
               // Sync via Zapier webhook (comprehensive payload)
               IrisCrmService.syncMerchantApplicationToIris(applicationOwner, application, irisLeadId).catch(error => {
                 console.error('Failed to sync merchant application to IRIS CRM via Zapier:', error);
@@ -1314,7 +1337,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // E-Signature routes
+  // ========================================================================
+  // E-SIGNATURE ROUTES - DISABLED FOR NOW (to be re-enabled later)
+  // These routes are preserved for future use when e-signature is implemented
+  // ========================================================================
+  /*
   app.post('/api/merchant-applications/:id/send-for-signature', requireAuth, async (req: any, res: Response) => {
     try {
       const { id } = req.params;
@@ -1361,31 +1388,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log(`📝 Preparing to send e-signature for application ${id}`);
+      console.log(`🔍 Lead ID: ${application.irisLeadId}`);
 
-      // Fill PDF with application data
+      // Step 1: Fill PDF with application data
       const { PdfFillService } = await import('./services/pdfFillService');
       const filledPdfBuffer = await PdfFillService.fillMerchantApplicationPDF(application);
+      console.log(`✅ PDF filled successfully (${filledPdfBuffer.length} bytes)`);
 
-      // Upload to IRIS e-signature system
-      await IrisCrmService.generateESignatureDocument(
+      // Step 2: Upload PDF document to IRIS CRM
+      const documentId = await IrisCrmService.uploadDocument(
         application.irisLeadId,
-        application.id,
-        filledPdfBuffer
+        filledPdfBuffer,
+        `merchant-application-${id}.pdf`
       );
+      console.log(`✅ Document uploaded to IRIS, document ID: ${documentId}`);
 
-      // Send for signature
+      // Step 3: Generate e-signature application
+      // TODO: Need to determine the correct IRIS field ID for merchant applications
+      // This should be a field in IRIS CRM that represents the merchant agreement/application
+      const IRIS_MERCHANT_APPLICATION_FIELD_ID = 9999; // PLACEHOLDER - NEEDS TO BE CONFIGURED
+      
+      console.log(`⚠️  WARNING: Using placeholder field ID ${IRIS_MERCHANT_APPLICATION_FIELD_ID}`);
+      console.log(`⚠️  This needs to be updated with the actual IRIS field ID for merchant applications`);
+      
+      const eSignatureApplicationId = await IrisCrmService.generateESignatureApplication(
+        application.irisLeadId,
+        IRIS_MERCHANT_APPLICATION_FIELD_ID,
+        false // Don't expire previous applications
+      );
+      console.log(`✅ E-signature application generated: ${eSignatureApplicationId}`);
+
+      // Step 4: Send for signature
       const recipientName = `${clientUser.firstName || ''} ${clientUser.lastName || ''}`.trim() || clientUser.email;
       await IrisCrmService.sendESignatureDocument(
         application.irisLeadId,
-        application.id,
+        eSignatureApplicationId,
         clientUser.email,
         recipientName
       );
+      console.log(`✅ E-signature sent to: ${clientUser.email}`);
 
-      // Update application status
+      // Step 5: Update application status in database
       await storage.updateMerchantApplicationESignature(id, {
         eSignatureStatus: 'PENDING',
-        eSignatureApplicationId: application.id,
+        eSignatureApplicationId: eSignatureApplicationId,
         eSignatureSentAt: new Date(),
       });
 
@@ -1569,6 +1615,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
+  */
+  // ========================================================================
+  // END OF DISABLED E-SIGNATURE ROUTES
+  // ========================================================================
 
   // MFA (Multi-Factor Authentication) routes
   app.get('/api/mfa/status', requireAuth, async (req: any, res) => {

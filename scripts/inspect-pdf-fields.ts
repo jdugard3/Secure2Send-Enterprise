@@ -13,7 +13,7 @@ const __dirname = path.dirname(__filename);
  */
 async function inspectPdfFields() {
   try {
-    const pdfPath = path.join(__dirname, '../uploads/CorduroMSA_CRB (2025.10.23) (4).pdf');
+    const pdfPath = path.join(__dirname, '../uploads/CorduroMSA_CRB (2025.10.23) (5).pdf');
     
     console.log('📄 Loading PDF from:', pdfPath);
     

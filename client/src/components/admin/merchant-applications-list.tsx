@@ -56,10 +56,6 @@ interface MerchantApplication {
   submittedAt?: string;
   reviewedAt?: string;
   rejectionReason?: string;
-  eSignatureStatus?: 'NOT_SENT' | 'PENDING' | 'SIGNED' | 'DECLINED' | 'EXPIRED';
-  eSignatureApplicationId?: string;
-  eSignatureSentAt?: string;
-  eSignatureCompletedAt?: string;
   client: {
     id: string;
     user: {
@@ -79,13 +75,137 @@ const STATUS_COLORS = {
   REJECTED: 'bg-red-100 text-red-800',
 } as const;
 
-const ESIGNATURE_STATUS_COLORS = {
-  NOT_SENT: 'bg-gray-100 text-gray-800',
-  PENDING: 'bg-blue-100 text-blue-800 animate-pulse',
-  SIGNED: 'bg-green-100 text-green-800',
-  DECLINED: 'bg-red-100 text-red-800',
-  EXPIRED: 'bg-orange-100 text-orange-800',
-} as const;
+// Component to display full application details
+function ApplicationDetailsView({ application }: { application: any }) {
+  const DetailSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
+    <div className="border-b pb-4">
+      <h3 className="font-semibold text-lg mb-3">{title}</h3>
+      {children}
+    </div>
+  );
+
+  const DetailField = ({ label, value }: { label: string; value: any }) => (
+    <div>
+      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <p className="text-sm">{value || 'Not provided'}</p>
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      {/* Business Information */}
+      <DetailSection title="Business Information">
+        <div className="grid grid-cols-2 gap-4">
+          <DetailField label="Legal Business Name" value={application.legalBusinessName} />
+          <DetailField label="DBA Business Name" value={application.dbaBusinessName} />
+          <DetailField label="Business Phone" value={application.businessPhone} />
+          <DetailField label="Federal Tax ID" value={application.federalTaxIdNumber} />
+          <DetailField label="Location Address" value={application.locationAddress} />
+          <DetailField label="Billing Address" value={application.billingAddress} />
+          <DetailField label="City" value={application.city} />
+          <DetailField label="State" value={application.state} />
+          <DetailField label="ZIP" value={application.zip} />
+          <DetailField label="Website" value={application.dbaWebsite || application.websiteAddress} />
+          <DetailField label="Ownership Type" value={application.ownershipType} />
+          <DetailField label="Incorporation State" value={application.incorporationState} />
+          <DetailField label="Entity Start Date" value={application.entityStartDate} />
+        </div>
+      </DetailSection>
+
+      {/* Contact Information */}
+      <DetailSection title="Contact Information">
+        <div className="grid grid-cols-2 gap-4">
+          <DetailField label="Contact Name" value={application.legalContactName || application.contactName} />
+          <DetailField label="Contact Email" value={application.legalEmail || application.contactEmail} />
+          <DetailField label="Contact Phone" value={application.legalPhone || application.businessPhone} />
+        </div>
+      </DetailSection>
+
+      {/* Principal Officers */}
+      {application.principalOfficers && application.principalOfficers.length > 0 && (
+        <DetailSection title="Principal Officers">
+          {application.principalOfficers.map((officer: any, index: number) => (
+            <div key={index} className="mb-4 p-3 bg-gray-50 rounded-md">
+              <h4 className="font-medium mb-2">Officer #{index + 1}</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <DetailField label="Name" value={officer.name} />
+                <DetailField label="Title" value={officer.title} />
+                <DetailField label="Email" value={officer.email} />
+                <DetailField label="Phone" value={officer.phoneNumber} />
+                <DetailField label="Date of Birth" value={officer.dob} />
+                <DetailField label="SSN" value={officer.ssn ? '***-**-' + officer.ssn.slice(-4) : 'Not provided'} />
+                <DetailField label="Ownership %" value={officer.equityPercentage ? `${officer.equityPercentage}%` : ''} />
+                <DetailField label="Residential Address" value={officer.residentialAddress} />
+                <DetailField label="City" value={officer.city} />
+                <DetailField label="State" value={officer.state} />
+                <DetailField label="ZIP" value={officer.zip} />
+              </div>
+            </div>
+          ))}
+        </DetailSection>
+      )}
+
+      {/* Beneficial Owners */}
+      {application.beneficialOwners && application.beneficialOwners.length > 0 && (
+        <DetailSection title="Beneficial Owners">
+          {application.beneficialOwners.map((owner: any, index: number) => (
+            <div key={index} className="mb-4 p-3 bg-gray-50 rounded-md">
+              <h4 className="font-medium mb-2">Owner #{index + 1}</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <DetailField label="Name" value={owner.name} />
+                <DetailField label="Title" value={owner.title} />
+                <DetailField label="Email" value={owner.email} />
+                <DetailField label="Phone" value={owner.phoneNumber} />
+                <DetailField label="Ownership %" value={owner.ownershipPercentage ? `${owner.ownershipPercentage}%` : ''} />
+                <DetailField label="Control Person" value={owner.controlPerson ? 'Yes' : 'No'} />
+              </div>
+            </div>
+          ))}
+        </DetailSection>
+      )}
+
+      {/* Banking Information */}
+      <DetailSection title="Banking Information">
+        <div className="grid grid-cols-2 gap-4">
+          <DetailField label="Bank Name" value={application.bankName} />
+          <DetailField label="ABA Routing Number" value={application.abaRoutingNumber} />
+          <DetailField label="Account Name" value={application.nameOnBankAccount || application.accountName} />
+          <DetailField label="DDA Number" value={application.ddaNumber} />
+          <DetailField label="Bank Officer Name" value={application.bankOfficerName} />
+          <DetailField label="Bank Officer Phone" value={application.bankOfficerPhone} />
+          <DetailField label="Bank Officer Email" value={application.bankOfficerEmail} />
+        </div>
+      </DetailSection>
+
+      {/* Volume Information */}
+      <DetailSection title="Transaction Volume">
+        <div className="grid grid-cols-2 gap-4">
+          <DetailField label="Average Ticket" value={application.averageTicket ? `$${application.averageTicket}` : ''} />
+          <DetailField label="High Ticket" value={application.highTicket ? `$${application.highTicket}` : ''} />
+          <DetailField label="Monthly Sales Volume" value={application.monthlySalesVolume ? `$${application.monthlySalesVolume}` : ''} />
+          <DetailField label="Annual Volume" value={application.annualVolume ? `$${application.annualVolume}` : ''} />
+          <DetailField label="Monthly Transactions" value={application.monthlyTransactions} />
+          <DetailField label="Annual Transactions" value={application.annualTransactions} />
+        </div>
+      </DetailSection>
+
+      {/* Processing Information */}
+      <DetailSection title="Processing Information">
+        <div className="grid grid-cols-2 gap-4">
+          <DetailField label="POS System" value={application.posSystem} />
+          <DetailField label="Business Type" value={application.businessType} />
+          <DetailField label="Processing Categories" value={
+            application.processingCategories ? 
+              Array.isArray(application.processingCategories) ? 
+                application.processingCategories.join(', ') : 
+                application.processingCategories 
+              : 'Not provided'
+          } />
+        </div>
+      </DetailSection>
+    </div>
+  );
+}
 
 export default function MerchantApplicationsList() {
   const [selectedApplication, setSelectedApplication] = useState<MerchantApplication | null>(null);
@@ -149,28 +269,6 @@ export default function MerchantApplicationsList() {
     onError: (error: Error) => {
       toast({
         title: "Delete Failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  // E-Signature mutation
-  const sendForSignatureMutation = useMutation({
-    mutationFn: async (applicationId: string) => {
-      const response = await apiRequest('POST', `/api/merchant-applications/${applicationId}/send-for-signature`);
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "E-Signature Request Sent",
-        description: "The merchant will receive an email to sign the application.",
-      });
-      queryClient.invalidateQueries({ queryKey: ['/api/merchant-applications'] });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Failed to Send",
         description: error.message,
         variant: "destructive",
       });
@@ -326,8 +424,40 @@ export default function MerchantApplicationsList() {
                         
                         {selectedApplication && (
                           <div className="space-y-6">
-                            {/* Application Details */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Application Status Header */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4 border-b">
+                              <div>
+                                <Label className="text-sm font-medium">Current Status</Label>
+                                <Badge 
+                                  variant="secondary" 
+                                  className={`${STATUS_COLORS[selectedApplication.status] || STATUS_COLORS.DRAFT} mt-1`}
+                                >
+                                  {selectedApplication.status?.replace('_', ' ') || 'DRAFT'}
+                                </Badge>
+                              </div>
+                            </div>
+
+                            {/* View Full Application Button */}
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button variant="outline" className="w-full">
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Full Application Details
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                                <DialogHeader>
+                                  <DialogTitle>Complete Merchant Application</DialogTitle>
+                                  <DialogDescription>
+                                    Full details of the submitted merchant application
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <ApplicationDetailsView application={selectedApplication} />
+                              </DialogContent>
+                            </Dialog>
+
+                            {/* Quick Summary */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-md">
                               <div>
                                 <Label className="text-sm font-medium">Business Name</Label>
                                 <p className="text-sm">
@@ -347,65 +477,14 @@ export default function MerchantApplicationsList() {
                                 </p>
                               </div>
                               <div>
-                                <Label className="text-sm font-medium">Current Status</Label>
-                                <Badge 
-                                  variant="secondary" 
-                                  className={STATUS_COLORS[selectedApplication.status] || STATUS_COLORS.DRAFT}
-                                >
-                                  {selectedApplication.status?.replace('_', ' ') || 'DRAFT'}
-                                </Badge>
-                              </div>
-                              <div>
-                                <Label className="text-sm font-medium">E-Signature Status</Label>
-                                <Badge 
-                                  variant="secondary" 
-                                  className={ESIGNATURE_STATUS_COLORS[selectedApplication.eSignatureStatus || 'NOT_SENT']}
-                                >
-                                  {selectedApplication.eSignatureStatus?.replace('_', ' ') || 'NOT SENT'}
-                                </Badge>
+                                <Label className="text-sm font-medium">Submitted</Label>
+                                <p className="text-sm">
+                                  {selectedApplication.submittedAt 
+                                    ? formatDistanceToNow(new Date(selectedApplication.submittedAt), { addSuffix: true })
+                                    : 'Not submitted'}
+                                </p>
                               </div>
                             </div>
-
-                            {/* Send for E-Signature Button (for approved applications) */}
-                            {selectedApplication.status === 'APPROVED' && 
-                             (!selectedApplication.eSignatureStatus || selectedApplication.eSignatureStatus === 'NOT_SENT') && (
-                              <div className="border-t pt-4">
-                                <Button
-                                  onClick={() => sendForSignatureMutation.mutate(selectedApplication.id)}
-                                  disabled={sendForSignatureMutation.isPending}
-                                  className="w-full"
-                                >
-                                  <CheckCircle className="h-4 w-4 mr-2" />
-                                  {sendForSignatureMutation.isPending ? 'Sending...' : 'Send for E-Signature'}
-                                </Button>
-                                <p className="text-xs text-muted-foreground mt-2">
-                                  Send this approved application to the merchant for electronic signature.
-                                </p>
-                              </div>
-                            )}
-
-                            {/* E-Signature Status Info */}
-                            {selectedApplication.eSignatureStatus === 'PENDING' && (
-                              <div className="bg-blue-50 p-4 rounded-md border border-blue-200">
-                                <p className="text-sm font-medium text-blue-900">
-                                  Awaiting Signature
-                                </p>
-                                <p className="text-xs text-blue-700 mt-1">
-                                  Sent {selectedApplication.eSignatureSentAt && formatDistanceToNow(new Date(selectedApplication.eSignatureSentAt), { addSuffix: true })}
-                                </p>
-                              </div>
-                            )}
-
-                            {selectedApplication.eSignatureStatus === 'SIGNED' && (
-                              <div className="bg-green-50 p-4 rounded-md border border-green-200">
-                                <p className="text-sm font-medium text-green-900">
-                                  ✓ Document Signed
-                                </p>
-                                <p className="text-xs text-green-700 mt-1">
-                                  Signed {selectedApplication.eSignatureCompletedAt && formatDistanceToNow(new Date(selectedApplication.eSignatureCompletedAt), { addSuffix: true })}
-                                </p>
-                              </div>
-                            )}
 
                             {/* Rejection Reason (if rejected) */}
                             {selectedApplication.status === 'REJECTED' && selectedApplication.rejectionReason && (
