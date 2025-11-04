@@ -17,10 +17,10 @@ const envSchema = z.object({
   SESSION_SECRET: z.string().min(32, "SESSION_SECRET must be at least 32 characters for security"),
   
   // Email Configuration
-  EMAIL_PROVIDER: z.enum(["resend", "mailgun", "console"]).optional().default("console"),
-  RESEND_API_KEY: z.string().optional(),
+  EMAIL_PROVIDER: z.enum(["mailgun", "console"]).optional().default("console"),
   MAILGUN_API_KEY: z.string().optional(),
   MAILGUN_DOMAIN: z.string().optional(),
+  MAILGUN_FROM_EMAIL: z.string().optional().default("Secure2Send <noreply@yourdomain.com>"),
   ADMIN_EMAIL: z.string().email().optional().default("james@smartclick.systems"),
   APP_URL: z.string().url().optional().default("http://localhost:3000"),
   
@@ -96,9 +96,9 @@ console.log(`   - PORT: ${env.PORT}`);
 console.log(`   - DATABASE_URL: ${env.DATABASE_URL ? "✓ Set" : "✗ Missing"}`);
 console.log(`   - SESSION_SECRET: ${env.SESSION_SECRET ? "✓ Set" : "✗ Missing"}`);
 console.log(`   - EMAIL_PROVIDER: ${env.EMAIL_PROVIDER}`);
-console.log(`   - RESEND_API_KEY: ${env.RESEND_API_KEY ? "✓ Set" : "✗ Missing"}`);
 console.log(`   - MAILGUN_API_KEY: ${env.MAILGUN_API_KEY ? "✓ Set" : "✗ Missing"}`);
 console.log(`   - MAILGUN_DOMAIN: ${env.MAILGUN_DOMAIN || "✗ Missing"}`);
+console.log(`   - MAILGUN_FROM_EMAIL: ${env.MAILGUN_FROM_EMAIL}`);
 console.log(`   - ADMIN_EMAIL: ${env.ADMIN_EMAIL}`);
 console.log(`   - APP_URL: ${env.APP_URL}`);
 console.log(`   - IRIS_CRM_API_KEY: ${env.IRIS_CRM_API_KEY ? "✓ Set" : "✗ Missing"}`);

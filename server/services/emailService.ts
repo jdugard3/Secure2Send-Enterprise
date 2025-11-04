@@ -1,4 +1,3 @@
-import { Resend } from 'resend';
 import Mailgun from 'mailgun.js';
 import FormData from 'form-data';
 import { render } from '@react-email/render';
@@ -18,9 +17,7 @@ import { MfaOtpEmail } from '../emails/MfaOtpEmail';
 import { MfaMethodChangedEmail } from '../emails/MfaMethodChangedEmail';
 import type { User, Document, Client } from '@shared/schema';
 
-// Initialize email providers based on configuration
-const resend = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null;
-
+// Initialize Mailgun email provider
 let mailgun: any = null;
 if (env.MAILGUN_API_KEY && env.MAILGUN_DOMAIN) {
   const mg = new Mailgun(FormData);
@@ -31,7 +28,7 @@ if (env.MAILGUN_API_KEY && env.MAILGUN_DOMAIN) {
 }
 
 export class EmailService {
-  private static readonly FROM_EMAIL = 'Secure2Send <noreply@sandbox865d9327df914e1485b944a7249f5838.mailgun.org>';
+  private static readonly FROM_EMAIL = env.MAILGUN_FROM_EMAIL || 'Secure2Send <noreply@yourdomain.com>';
   private static readonly ADMIN_EMAIL = env.ADMIN_EMAIL || 'james@smartclick.systems';
 
   /**
@@ -255,32 +252,6 @@ export class EmailService {
       console.log('HTML Preview:');
       console.log(html.substring(0, 500) + '...');
       console.log('=====================================\n');
-      return;
-    }
-
-    // Resend provider
-    if (env.EMAIL_PROVIDER === 'resend') {
-      if (!resend) {
-        throw new Error('Resend API key not configured');
-      }
-
-      try {
-        const result = await resend.emails.send({
-          from: this.FROM_EMAIL,
-          to,
-          subject,
-          html,
-        });
-
-        if (result.error) {
-          throw new Error(`Resend error: ${result.error.message}`);
-        }
-
-        console.log(`✅ Email sent via Resend to ${to} (ID: ${result.data?.id})`);
-      } catch (error) {
-        console.error(`❌ Failed to send email via Resend to ${to}:`, error);
-        throw error;
-      }
       return;
     }
 
