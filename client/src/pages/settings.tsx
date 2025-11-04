@@ -1,4 +1,8 @@
 import { useAuth } from "@/hooks/useAuth";
+import { useState } from "react";
+import Sidebar from "@/components/layout/sidebar";
+import { MobileSidebar } from "@/components/layout/mobile-sidebar";
+import Header from "@/components/layout/header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Settings as SettingsIcon, User, Shield, Bell, Key } from "lucide-react";
@@ -6,6 +10,7 @@ import { MfaSettings } from "@/components/MfaSettings";
 
 export default function SettingsPage() {
   const { user, isLoading } = useAuth();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   if (isLoading) {
     return (
@@ -24,22 +29,30 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      <div className="max-w-4xl mx-auto space-y-8">
+    <div className="flex h-screen bg-gray-50">
+      {/* Mobile Sidebar */}
+      <MobileSidebar />
+
+      {/* Desktop Sidebar */}
+      <div className="hidden lg:block">
+        <Sidebar 
+          isCollapsed={sidebarCollapsed} 
+          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} 
+        />
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center gap-3">
-          <SettingsIcon className="h-8 w-8 text-primary" />
-          <div>
-            <h1 className="text-3xl font-bold">Account Settings</h1>
-            <p className="text-muted-foreground">
-              Manage your account preferences and security settings
-            </p>
-          </div>
-        </div>
+        <Header 
+          title="Account Settings"
+          subtitle="Manage your account preferences and security settings"
+        />
 
-        <Separator />
-
-        <div className="grid gap-8">
+        {/* Page Content */}
+        <main className="flex-1 overflow-y-auto p-6">
+          <div className="max-w-4xl mx-auto space-y-8">
+            <div className="grid gap-8">
           {/* Profile Information */}
           <Card>
             <CardHeader>
@@ -147,7 +160,9 @@ export default function SettingsPage() {
               </div>
             </CardContent>
           </Card>
+          </div>
         </div>
+        </main>
       </div>
     </div>
   );

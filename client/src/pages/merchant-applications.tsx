@@ -347,12 +347,38 @@ export default function MerchantApplicationsPage() {
                                 <Button
                                   variant="default"
                                   size="sm"
-                                  onClick={() => {
-                                    // TODO: Add PDF download functionality
-                                    toast({
-                                      title: "PDF Download",
-                                      description: "PDF download feature coming soon!",
-                                    });
+                                  onClick={async () => {
+                                    try {
+                                      const response = await fetch(`/api/merchant-applications/${app.id}/download-pdf`, {
+                                        credentials: 'include',
+                                      });
+                                      
+                                      if (!response.ok) {
+                                        const error = await response.json();
+                                        throw new Error(error.message || 'Download failed');
+                                      }
+                                      
+                                      const blob = await response.blob();
+                                      const url = window.URL.createObjectURL(blob);
+                                      const a = window.document.createElement('a');
+                                      a.href = url;
+                                      a.download = `merchant-application-${app.legalBusinessName || app.dbaBusinessName || app.id}.pdf`;
+                                      window.document.body.appendChild(a);
+                                      a.click();
+                                      window.URL.revokeObjectURL(url);
+                                      window.document.body.removeChild(a);
+                                      
+                                      toast({
+                                        title: "Success",
+                                        description: "Application PDF downloaded successfully.",
+                                      });
+                                    } catch (error) {
+                                      toast({
+                                        title: "Download Failed",
+                                        description: error instanceof Error ? error.message : "Unable to download the PDF.",
+                                        variant: "destructive",
+                                      });
+                                    }
                                   }}
                                 >
                                   Download PDF

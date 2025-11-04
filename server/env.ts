@@ -40,6 +40,11 @@ const envSchema = z.object({
   IRIS_CRM_API_KEY: z.string().optional(),
   IRIS_CRM_SUBDOMAIN: z.string().optional(),
   
+  // SignNow E-Signature Integration
+  SIGNNOW_API_KEY: z.string().optional(),
+  SIGNNOW_API_BASE_URL: z.string().url().optional().default("https://api.signnow.com"),
+  SIGNNOW_OWNER_EMAIL: z.string().email().optional(),
+  
   // Cloudflare Zero Trust Configuration
   CLOUDFLARE_TEAM_DOMAIN: z.string().optional(),
   CLOUDFLARE_ACCESS_AUD: z.string().optional(),
@@ -98,6 +103,9 @@ console.log(`   - ADMIN_EMAIL: ${env.ADMIN_EMAIL}`);
 console.log(`   - APP_URL: ${env.APP_URL}`);
 console.log(`   - IRIS_CRM_API_KEY: ${env.IRIS_CRM_API_KEY ? "✓ Set" : "✗ Missing"}`);
 console.log(`   - IRIS_CRM_SUBDOMAIN: ${env.IRIS_CRM_SUBDOMAIN || "✗ Missing"}`);
+console.log(`   - SIGNNOW_API_KEY: ${env.SIGNNOW_API_KEY ? "✓ Set" : "✗ Missing"}`);
+console.log(`   - SIGNNOW_API_BASE_URL: ${env.SIGNNOW_API_BASE_URL}`);
+console.log(`   - SIGNNOW_OWNER_EMAIL: ${env.SIGNNOW_OWNER_EMAIL || "✗ Missing"}`);
 console.log(`   - CLOUDFLARE_TEAM_DOMAIN: ${env.CLOUDFLARE_TEAM_DOMAIN || "✗ Missing"}`);
 console.log(`   - CLOUDFLARE_ACCESS_AUD: ${env.CLOUDFLARE_ACCESS_AUD ? "✓ Set" : "✗ Missing"}`);
 console.log(`   - CLOUDFLARE_ACCESS_ISSUER: ${env.CLOUDFLARE_ACCESS_ISSUER || "✗ Missing"}`);

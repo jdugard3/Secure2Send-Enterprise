@@ -348,13 +348,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Audit log the download
       await AuditService.logDocumentDownload(user, req, document.id, document.originalName);
 
-      // Use R2 signed URL if available, fallback to local file
+      // Set headers for download
+      res.setHeader('Content-Disposition', `attachment; filename="${document.originalName}"`);
+      res.setHeader('Content-Type', document.mimeType);
+
+      // Use R2 if available, fallback to local file
       if (document.r2Key && cloudflareR2) {
         try {
-          const downloadUrl = await cloudflareR2.getDownloadUrl(document.r2Key);
-          return res.redirect(downloadUrl);
+          // Stream from R2 through our server (avoids CORS issues)
+          const fileStream = await cloudflareR2.getFileStream(document.r2Key);
+          fileStream.pipe(res);
+          return;
         } catch (error) {
-          console.error('Failed to generate R2 signed URL:', error);
+          console.error('Failed to stream from R2:', error);
           // Fall through to local file handling
         }
       }
@@ -364,8 +370,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "File not found" });
       }
 
-      res.setHeader('Content-Disposition', `attachment; filename="${document.originalName}"`);
-      res.setHeader('Content-Type', document.mimeType);
       res.sendFile(path.resolve(document.filePath));
     } catch (error) {
       console.error("Error downloading document:", error);
@@ -1113,17 +1117,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const applicationOwner = await storage.getUser(client.userId);
         if (applicationOwner) {
           import('./services/irisCrmService').then(async ({ IrisCrmService }) => {
-            let irisLeadId = client.irisLeadId;
+            // USE THE MERCHANT APPLICATION'S LEAD ID (never create duplicates)
+            let irisLeadId = application.irisLeadId;
             
-            // Create IRIS lead ID if it doesn't exist
+            // Only create a new lead if this merchant application doesn't have one yet
             if (!irisLeadId) {
-              console.log('🔄 No IRIS lead ID found, creating new lead for client:', client.id);
+              console.log('🔄 Merchant application missing IRIS lead, creating one now:', application.id);
               try {
                 irisLeadId = await IrisCrmService.createLead(applicationOwner);
                 if (irisLeadId) {
-                  // Update client with the new IRIS lead ID
-                  await storage.updateClientIrisLeadId(client.id, irisLeadId);
-                  console.log('✅ Created and assigned IRIS lead ID:', irisLeadId);
+                  // Store lead ID on the merchant application (not client!)
+                  await storage.updateMerchantApplicationIrisLeadId(application.id, irisLeadId);
+                  console.log('✅ Created and assigned IRIS lead ID to merchant application:', irisLeadId);
                 } else {
                   console.warn('⚠️ Failed to create IRIS lead ID, skipping sync');
                   return;
@@ -1132,6 +1137,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 console.error('❌ Failed to create IRIS lead ID:', error);
                 return;
               }
+            } else {
+              console.log('✅ Using existing IRIS lead ID from merchant application:', irisLeadId);
             }
             
             // Note: Pipeline stage updates happen in the status change endpoint or on creation
@@ -1221,17 +1228,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const applicationOwner = await storage.getUser(client.userId);
           if (applicationOwner) {
             import('./services/irisCrmService').then(async ({ IrisCrmService }) => {
-              let irisLeadId = client.irisLeadId;
+              // USE THE MERCHANT APPLICATION'S LEAD ID (never create duplicates)
+              let irisLeadId = application.irisLeadId;
               
-              // Create IRIS lead ID if it doesn't exist
+              // Only create a new lead if this merchant application doesn't have one yet
               if (!irisLeadId) {
-                console.log('🔄 No IRIS lead ID found, creating new lead for client:', client.id);
+                console.log('🔄 Merchant application missing IRIS lead, creating one now:', application.id);
                 try {
                   irisLeadId = await IrisCrmService.createLead(applicationOwner);
                   if (irisLeadId) {
-                    // Update client with the new IRIS lead ID
-                    await storage.updateClientIrisLeadId(client.id, irisLeadId);
-                    console.log('✅ Created and assigned IRIS lead ID:', irisLeadId);
+                    // Store lead ID on the merchant application (not client!)
+                    await storage.updateMerchantApplicationIrisLeadId(application.id, irisLeadId);
+                    console.log('✅ Created and assigned IRIS lead ID to merchant application:', irisLeadId);
                   } else {
                     console.warn('⚠️ Failed to create IRIS lead ID, skipping sync');
                     return;
@@ -1240,6 +1248,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   console.error('❌ Failed to create IRIS lead ID:', error);
                   return;
                 }
+              } else {
+                console.log('✅ Using existing IRIS lead ID from merchant application:', irisLeadId);
               }
               
               // Update IRIS pipeline stage based on application status
@@ -1338,10 +1348,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========================================================================
-  // E-SIGNATURE ROUTES - DISABLED FOR NOW (to be re-enabled later)
-  // These routes are preserved for future use when e-signature is implemented
+  // E-SIGNATURE ROUTES - SignNow Integration
   // ========================================================================
-  /*
+  
   app.post('/api/merchant-applications/:id/send-for-signature', requireAuth, async (req: any, res: Response) => {
     try {
       const { id } = req.params;
@@ -1371,12 +1380,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Application already signed" });
       }
 
-      // Verify application has IRIS lead ID
-      if (!application.irisLeadId) {
-        return res.status(400).json({ message: "Application must be synced to IRIS CRM first" });
-      }
-
-      // Get client information for email
+      // Get client information for merchant signer
       const client = await storage.getClientById(application.clientId);
       if (!client) {
         return res.status(404).json({ message: "Client not found" });
@@ -1388,50 +1392,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log(`📝 Preparing to send e-signature for application ${id}`);
-      console.log(`🔍 Lead ID: ${application.irisLeadId}`);
 
       // Step 1: Fill PDF with application data
       const { PdfFillService } = await import('./services/pdfFillService');
       const filledPdfBuffer = await PdfFillService.fillMerchantApplicationPDF(application);
       console.log(`✅ PDF filled successfully (${filledPdfBuffer.length} bytes)`);
 
-      // Step 2: Upload PDF document to IRIS CRM
-      const documentId = await IrisCrmService.uploadDocument(
-        application.irisLeadId,
+      // Step 2: Upload PDF to SignNow
+      const { SignNowService } = await import('./services/signNowService');
+      const documentId = await SignNowService.uploadDocument(
         filledPdfBuffer,
-        `merchant-application-${id}.pdf`
+        `merchant-application-${application.legalBusinessName || application.dbaBusinessName || id}.pdf`
       );
-      console.log(`✅ Document uploaded to IRIS, document ID: ${documentId}`);
+      console.log(`✅ Document uploaded to SignNow, document ID: ${documentId}`);
 
-      // Step 3: Generate e-signature application
-      // TODO: Need to determine the correct IRIS field ID for merchant applications
-      // This should be a field in IRIS CRM that represents the merchant agreement/application
-      const IRIS_MERCHANT_APPLICATION_FIELD_ID = 9999; // PLACEHOLDER - NEEDS TO BE CONFIGURED
+      // Step 3: Send simple freeform invite (no roles/fields required - signers click anywhere to sign)
+      const merchantName = `${clientUser.firstName || ''} ${clientUser.lastName || ''}`.trim() || 'Merchant';
+      const adminName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Admin';
       
-      console.log(`⚠️  WARNING: Using placeholder field ID ${IRIS_MERCHANT_APPLICATION_FIELD_ID}`);
-      console.log(`⚠️  This needs to be updated with the actual IRIS field ID for merchant applications`);
+      // Use SignNow account owner email as sender (required for API)
+      const fromEmail = env.SIGNNOW_OWNER_EMAIL || 'submissions@miapayments.com';
       
-      const eSignatureApplicationId = await IrisCrmService.generateESignatureApplication(
-        application.irisLeadId,
-        IRIS_MERCHANT_APPLICATION_FIELD_ID,
-        false // Don't expire previous applications
+      await SignNowService.createFreeformInvite(
+        documentId,
+        clientUser.email, // Merchant signs
+        fromEmail, // From email (SignNow account owner)
+        'Merchant Application - Signature Required',
+        `Please review and sign the merchant application for ${application.legalBusinessName || application.dbaBusinessName || 'your business'}. After you sign, it will be sent to the admin for their signature.`
       );
-      console.log(`✅ E-signature application generated: ${eSignatureApplicationId}`);
+      console.log(`✅ Signing invite sent to ${clientUser.email} (merchant signs first)`);
 
-      // Step 4: Send for signature
-      const recipientName = `${clientUser.firstName || ''} ${clientUser.lastName || ''}`.trim() || clientUser.email;
-      await IrisCrmService.sendESignatureDocument(
-        application.irisLeadId,
-        eSignatureApplicationId,
-        clientUser.email,
-        recipientName
-      );
-      console.log(`✅ E-signature sent to: ${clientUser.email}`);
-
-      // Step 5: Update application status in database
+      // Step 4: Update application status in database
       await storage.updateMerchantApplicationESignature(id, {
         eSignatureStatus: 'PENDING',
-        eSignatureApplicationId: eSignatureApplicationId,
+        eSignatureApplicationId: documentId,
         eSignatureSentAt: new Date(),
       });
 
@@ -1441,14 +1435,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resourceId: id,
         metadata: {
           action: 'send_for_signature',
-          recipientEmail: clientUser.email,
+          merchantEmail: clientUser.email,
+          adminEmail: user.email,
         }
       });
 
       res.json({
         message: "E-signature request sent successfully",
-        eSignatureApplicationId: application.id,
-        recipientEmail: clientUser.email,
+        documentId: documentId,
+        signers: [
+          { email: clientUser.email, role: 'Merchant', order: 1 },
+          { email: user.email, role: 'Admin', order: 2 },
+        ],
       });
     } catch (error) {
       console.error("Error sending e-signature request:", error);
@@ -1483,29 +1481,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status: application.eSignatureStatus || 'NOT_SENT',
           sentAt: null,
           completedAt: null,
+          signers: [],
         });
       }
 
-      // Check status with IRIS if pending
+      // Check status with SignNow if pending
       if (application.eSignatureStatus === 'PENDING') {
         try {
-          const irisStatus = await IrisCrmService.getESignatureStatus(application.eSignatureApplicationId);
+          const { SignNowService } = await import('./services/signNowService');
+          const signNowStatus = await SignNowService.getDocumentStatus(application.eSignatureApplicationId);
           
           // Update local status if changed
-          if (irisStatus.status !== application.eSignatureStatus) {
+          if (signNowStatus.status !== application.eSignatureStatus) {
             await storage.updateMerchantApplicationESignature(id, {
-              eSignatureStatus: irisStatus.status,
-              eSignatureCompletedAt: irisStatus.status === 'SIGNED' ? new Date() : undefined,
+              eSignatureStatus: signNowStatus.status,
+              eSignatureCompletedAt: signNowStatus.status === 'SIGNED' && signNowStatus.completedAt 
+                ? new Date(signNowStatus.completedAt) 
+                : undefined,
             });
           }
 
           return res.json({
-            status: irisStatus.status,
+            status: signNowStatus.status,
             sentAt: application.eSignatureSentAt,
-            completedAt: irisStatus.status === 'SIGNED' ? (irisStatus.signedAt || new Date().toISOString()) : null,
+            completedAt: signNowStatus.completedAt || null,
+            signers: signNowStatus.signers,
           });
         } catch (error) {
-          console.error('Error checking IRIS e-signature status:', error);
+          console.error('Error checking SignNow e-signature status:', error);
           // Fall through to return local status
         }
       }
@@ -1515,6 +1518,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: application.eSignatureStatus || 'NOT_SENT',
         sentAt: application.eSignatureSentAt,
         completedAt: application.eSignatureCompletedAt,
+        signers: [],
       });
     } catch (error) {
       console.error("Error checking signature status:", error);
@@ -1552,18 +1556,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.json({
             message: "Signed document already downloaded",
             documentId: document.id,
+            filename: document.originalName,
           });
         }
       }
 
       console.log(`📥 Downloading signed document for application ${id}`);
 
-      // Download from IRIS
-      const signedPdfBuffer = await IrisCrmService.downloadSignedDocument(application.eSignatureApplicationId);
+      // Download from SignNow
+      const { SignNowService } = await import('./services/signNowService');
+      const signedPdfBuffer = await SignNowService.downloadSignedDocument(application.eSignatureApplicationId);
+      console.log(`✅ Downloaded signed PDF from SignNow (${signedPdfBuffer.length} bytes)`);
 
-      // Save as a document
+      // Generate filename with "signed-" prefix
+      const businessName = (application.legalBusinessName || application.dbaBusinessName || id)
+        .replace(/[^a-z0-9-_.]/gi, '_');
       const timestamp = Date.now();
-      const filename = `signed-application-${id}-${timestamp}.pdf`;
+      const filename = `signed-merchant-application-${businessName}-${timestamp}.pdf`;
       const tempPath = path.join(__dirname, '../uploads', filename);
       
       // Ensure uploads directory exists
@@ -1573,19 +1582,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       fs.writeFileSync(tempPath, signedPdfBuffer);
+      console.log(`✅ Saved signed document locally: ${filename}`);
 
-      // Create document record
+      // Create document record in our system
       const document = await storage.createDocument({
         filename,
-        originalName: `Signed Merchant Application - ${application.legalBusinessName || application.dbaBusinessName || id}.pdf`,
+        originalName: `signed-merchant-application-${businessName}.pdf`,
         fileSize: signedPdfBuffer.length,
         mimeType: 'application/pdf',
         filePath: tempPath,
-        documentType: 'ARTICLES_OF_INCORPORATION', // Or create a new type for signed applications
+        documentType: 'ARTICLES_OF_INCORPORATION',
         clientId: application.clientId,
         merchantApplicationId: id,
         status: 'APPROVED',
       });
+      console.log(`✅ Created document record, ID: ${document.id}`);
+
+      // Upload signed document to IRIS CRM
+      if (application.irisLeadId) {
+        try {
+          await IrisCrmService.uploadDocument(
+            application.irisLeadId,
+            signedPdfBuffer,
+            `signed-merchant-application-${businessName}.pdf`
+          );
+          console.log(`✅ Uploaded signed document to IRIS CRM for lead ${application.irisLeadId}`);
+        } catch (error) {
+          console.error('⚠️  Failed to upload signed document to IRIS:', error);
+          // Continue even if IRIS upload fails
+        }
+      }
 
       // Link document to application
       await storage.updateMerchantApplicationESignature(id, {
@@ -1599,13 +1625,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         metadata: {
           action: 'download_signed_application',
           merchantApplicationId: id,
+          uploadedToIris: !!application.irisLeadId,
         }
       });
 
       res.json({
-        message: "Signed document downloaded successfully",
+        message: "Signed document downloaded and saved successfully",
         documentId: document.id,
         filename: document.originalName,
+        uploadedToIris: !!application.irisLeadId,
       });
     } catch (error) {
       console.error("Error downloading signed document:", error);
@@ -1615,10 +1643,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   });
-  */
-  // ========================================================================
-  // END OF DISABLED E-SIGNATURE ROUTES
-  // ========================================================================
+
+  // Download filled PDF for approved merchant application
+  app.get('/api/merchant-applications/:id/download-pdf', requireAuth, async (req: any, res: Response) => {
+    try {
+      const { id } = req.params;
+      const user = req.user;
+
+      const application = await storage.getMerchantApplicationById(id);
+      if (!application) {
+        return res.status(404).json({ message: "Merchant application not found" });
+      }
+
+      // Check access permissions
+      if (user.role === 'CLIENT') {
+        const client = await storage.getClientByUserId(user.id);
+        if (!client || application.clientId !== client.id) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      // Only allow download for approved applications
+      if (application.status !== 'APPROVED') {
+        return res.status(400).json({ 
+          message: "PDF download is only available for approved applications",
+          status: application.status 
+        });
+      }
+
+      console.log(`📄 Generating PDF for approved application ${id}`);
+
+      // Generate filled PDF
+      const { PdfFillService } = await import('./services/pdfFillService');
+      const filledPdfBuffer = await PdfFillService.fillMerchantApplicationPDF(application);
+      
+      console.log(`✅ PDF generated successfully (${filledPdfBuffer.length} bytes)`);
+
+      // Audit log the download
+      await AuditService.logAction(user, 'DOCUMENT_DOWNLOAD', req, {
+        resourceType: 'merchant_application_pdf',
+        resourceId: id,
+        metadata: {
+          action: 'download_filled_pdf',
+          applicationStatus: application.status,
+        }
+      });
+
+      // Set headers and send PDF
+      const filename = `merchant-application-${application.legalBusinessName || application.dbaBusinessName || id}.pdf`
+        .replace(/[^a-z0-9-_.]/gi, '_');
+      
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Length', filledPdfBuffer.length);
+      res.send(filledPdfBuffer);
+
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      res.status(500).json({ 
+        message: "Failed to generate PDF",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
 
   // MFA (Multi-Factor Authentication) routes
   app.get('/api/mfa/status', requireAuth, async (req: any, res) => {

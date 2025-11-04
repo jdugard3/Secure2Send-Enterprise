@@ -60,6 +60,22 @@ export class CloudflareR2Service {
     return await getSignedUrl(this.s3Client, command, { expiresIn });
   }
 
+  // Get file stream for proxying through backend (avoids CORS issues)
+  async getFileStream(key: string): Promise<any> {
+    const command = new GetObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+    });
+    
+    const response = await this.s3Client.send(command);
+    
+    if (!response.Body) {
+      throw new Error('File not found in R2');
+    }
+    
+    return response.Body;
+  }
+
   // Delete file
   async deleteFile(key: string): Promise<void> {
     await this.s3Client.send(new DeleteObjectCommand({

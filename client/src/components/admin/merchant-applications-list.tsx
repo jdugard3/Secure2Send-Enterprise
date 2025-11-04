@@ -56,6 +56,11 @@ interface MerchantApplication {
   submittedAt?: string;
   reviewedAt?: string;
   rejectionReason?: string;
+  eSignatureStatus?: 'NOT_SENT' | 'PENDING' | 'SIGNED' | 'DECLINED' | 'EXPIRED';
+  eSignatureApplicationId?: string;
+  eSignatureSentAt?: string;
+  eSignatureCompletedAt?: string;
+  signedDocumentId?: number;
   client: {
     id: string;
     user: {
@@ -73,6 +78,14 @@ const STATUS_COLORS = {
   UNDER_REVIEW: 'bg-yellow-100 text-yellow-800',
   APPROVED: 'bg-green-100 text-green-800',
   REJECTED: 'bg-red-100 text-red-800',
+} as const;
+
+const ESIGNATURE_STATUS_COLORS = {
+  NOT_SENT: 'bg-gray-100 text-gray-800',
+  PENDING: 'bg-blue-100 text-blue-800',
+  SIGNED: 'bg-green-100 text-green-800',
+  DECLINED: 'bg-red-100 text-red-800',
+  EXPIRED: 'bg-orange-100 text-orange-800',
 } as const;
 
 // Component to display full application details
@@ -275,6 +288,89 @@ export default function MerchantApplicationsList() {
     },
   });
 
+  // E-Signature mutation - Send for signature
+  const sendForSignatureMutation = useMutation({
+    mutationFn: async (applicationId: string) => {
+      const response = await apiRequest('POST', `/api/merchant-applications/${applicationId}/send-for-signature`);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "E-Signature Request Sent",
+        description: `Signing invitations sent to merchant and admin.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/merchant-applications'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to Send",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Download signed document mutation
+  const downloadSignedDocMutation = useMutation({
+    mutationFn: async (applicationId: string) => {
+      const response = await apiRequest('POST', `/api/merchant-applications/${applicationId}/download-signed-document`);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Signed Document Downloaded",
+        description: `Document saved and ${data.uploadedToIris ? 'uploaded to IRIS CRM' : 'ready for review'}.`,
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/merchant-applications'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Download Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Check signature status mutation
+  const checkStatusMutation = useMutation({
+    mutationFn: async (applicationId: string) => {
+      const response = await apiRequest('GET', `/api/merchant-applications/${applicationId}/signature-status`);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Status Updated",
+        description: `Signature status: ${data.status}`,
+      });
+      // Invalidate queries to refresh the list and the selected application
+      queryClient.invalidateQueries({ queryKey: ['/api/merchant-applications'] });
+      
+      // Force close and reopen dialog to show updated data
+      if (selectedApplication) {
+        setSelectedApplication(null);
+        // Reopen after a brief delay to allow data to refresh
+        setTimeout(() => {
+          // Find the updated application in the refreshed list
+          queryClient.refetchQueries({ queryKey: ['/api/merchant-applications'] }).then(() => {
+            const updated = (queryClient.getQueryData(['/api/merchant-applications']) as MerchantApplication[])
+              ?.find(app => app.id === selectedApplication.id);
+            if (updated) {
+              setSelectedApplication(updated);
+            }
+          });
+        }, 100);
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Status Check Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleReview = (action: 'APPROVED' | 'REJECTED') => {
     if (!selectedApplication) return;
 
@@ -435,6 +531,15 @@ export default function MerchantApplicationsList() {
                                   {selectedApplication.status?.replace('_', ' ') || 'DRAFT'}
                                 </Badge>
                               </div>
+                              <div>
+                                <Label className="text-sm font-medium">E-Signature Status</Label>
+                                <Badge 
+                                  variant="secondary" 
+                                  className={`${ESIGNATURE_STATUS_COLORS[selectedApplication.eSignatureStatus || 'NOT_SENT']} mt-1`}
+                                >
+                                  {selectedApplication.eSignatureStatus?.replace('_', ' ') || 'NOT SENT'}
+                                </Badge>
+                              </div>
                             </div>
 
                             {/* View Full Application Button */}
@@ -493,6 +598,89 @@ export default function MerchantApplicationsList() {
                                 <p className="text-sm bg-red-50 p-3 rounded-md border border-red-200">
                                   {selectedApplication.rejectionReason}
                                 </p>
+                              </div>
+                            )}
+
+                            {/* E-Signature Actions */}
+                            {selectedApplication.status === 'APPROVED' && (
+                              <div className="space-y-4 border-t pt-4">
+                                <h4 className="font-medium">E-Signature</h4>
+                                
+                                {/* Send for E-Signature Button */}
+                                {(!selectedApplication.eSignatureStatus || selectedApplication.eSignatureStatus === 'NOT_SENT') && (
+                                  <div>
+                                    <Button
+                                      onClick={() => sendForSignatureMutation.mutate(selectedApplication.id)}
+                                      disabled={sendForSignatureMutation.isPending}
+                                      className="w-full"
+                                    >
+                                      <CheckCircle className="h-4 w-4 mr-2" />
+                                      {sendForSignatureMutation.isPending ? 'Sending...' : 'Send for E-Signature'}
+                                    </Button>
+                                    <p className="text-xs text-muted-foreground mt-2">
+                                      Send this approved application to merchant and admin for electronic signatures.
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* E-Signature Status Info */}
+                                {selectedApplication.eSignatureStatus === 'PENDING' && (
+                                  <div className="space-y-3">
+                                    <div className="bg-blue-50 p-4 rounded-md border border-blue-200">
+                                      <p className="text-sm font-medium text-blue-900">
+                                        ⏳ Awaiting Signatures
+                                      </p>
+                                      <p className="text-xs text-blue-700 mt-1">
+                                        Sent {selectedApplication.eSignatureSentAt && formatDistanceToNow(new Date(selectedApplication.eSignatureSentAt), { addSuffix: true })}
+                                      </p>
+                                      <p className="text-xs text-blue-600 mt-2">
+                                        Check if the merchant has signed the document
+                                      </p>
+                                    </div>
+                                    <Button
+                                      onClick={() => checkStatusMutation.mutate(selectedApplication.id)}
+                                      disabled={checkStatusMutation.isPending}
+                                      variant="outline"
+                                      className="w-full"
+                                    >
+                                      <Clock className="h-4 w-4 mr-2" />
+                                      {checkStatusMutation.isPending ? 'Checking...' : 'Check Signature Status'}
+                                    </Button>
+                                  </div>
+                                )}
+
+                                {/* Download Signed Document Button */}
+                                {selectedApplication.eSignatureStatus === 'SIGNED' && (
+                                  <div>
+                                    {!selectedApplication.signedDocumentId ? (
+                                      <div>
+                                        <Button
+                                          onClick={() => downloadSignedDocMutation.mutate(selectedApplication.id)}
+                                          disabled={downloadSignedDocMutation.isPending}
+                                          className="w-full bg-green-600 hover:bg-green-700"
+                                        >
+                                          <CheckCircle className="h-4 w-4 mr-2" />
+                                          {downloadSignedDocMutation.isPending ? 'Downloading...' : 'Download Signed Document'}
+                                        </Button>
+                                        <p className="text-xs text-muted-foreground mt-2">
+                                          Download the fully signed document and upload to IRIS CRM.
+                                        </p>
+                                      </div>
+                                    ) : (
+                                      <div className="bg-green-50 p-4 rounded-md border border-green-200">
+                                        <p className="text-sm font-medium text-green-900">
+                                          ✓ Document Fully Signed & Downloaded
+                                        </p>
+                                        <p className="text-xs text-green-700 mt-1">
+                                          Signed {selectedApplication.eSignatureCompletedAt && formatDistanceToNow(new Date(selectedApplication.eSignatureCompletedAt), { addSuffix: true })}
+                                        </p>
+                                        <p className="text-xs text-green-600 mt-2">
+                                          Document saved to system and uploaded to IRIS CRM.
+                                        </p>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             )}
 
