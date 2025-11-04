@@ -10,7 +10,9 @@
     "check": "tsc",
     "db:push": "drizzle-kit push --config=drizzle.config.ts",
     "test:mailgun": "tsx scripts/test-mailgun.ts",
-    "test:email": "tsx scripts/test-email.ts"
+    "test:email": "tsx scripts/test-email.ts",
+    "list:admins": "tsx scripts/list-admin-users.js",
+    "reset:admin:password": "tsx scripts/reset-admin-password.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.864.0",
