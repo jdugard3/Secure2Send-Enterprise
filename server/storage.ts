@@ -202,10 +202,12 @@ export class DatabaseStorage implements IStorage {
       .from(clients)
       .leftJoin(users, eq(clients.userId, users.id))
       .then(rows => 
-        rows.map(row => ({
-          ...row.clients,
-          user: row.users!,
-        }))
+        rows
+          .filter(row => row.users) // Filter out clients without users
+          .map(row => ({
+            ...row.clients,
+            user: row.users!,
+          }))
       );
   }
 
@@ -254,13 +256,15 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(users, eq(clients.userId, users.id))
       .orderBy(desc(documents.uploadedAt))
       .then(rows =>
-        rows.map(row => ({
-          ...row.documents,
-          client: {
-            ...row.clients!,
-            user: row.users!,
-          },
-        }))
+        rows
+          .filter(row => row.clients && row.users) // Filter out orphaned documents
+          .map(row => ({
+            ...row.documents,
+            client: {
+              ...row.clients!,
+              user: row.users!,
+            },
+          }))
       );
   }
 
