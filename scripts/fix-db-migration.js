@@ -80,7 +80,7 @@ async function fixDatabase() {
       await client.query(`ALTER TABLE merchant_applications ADD COLUMN e_signature_completed_at TIMESTAMP`);
       console.log('   ✅ Added e_signature_completed_at');
       
-      await client.query(`ALTER TABLE merchant_applications ADD COLUMN signed_document_id INTEGER REFERENCES documents(id)`);
+      await client.query(`ALTER TABLE merchant_applications ADD COLUMN signed_document_id VARCHAR`);
       console.log('   ✅ Added signed_document_id');
       
       await client.query(`CREATE INDEX IF NOT EXISTS idx_merchant_applications_esignature_app_id ON merchant_applications(e_signature_application_id) WHERE e_signature_application_id IS NOT NULL`);
