@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * Emergency database migration script to add missing merchant_application_id column
+ * Emergency database migration script to add missing columns from migration 010
  * Run this directly on production if migrations failed
  */
 
@@ -9,46 +9,52 @@ import { sql } from 'drizzle-orm';
 
 async function fixDatabase() {
   try {
-    console.log('🔧 Checking for missing merchant_application_id column...');
+    console.log('🔧 Running emergency database migration...');
     
-    // Check if column exists
-    const result = await db.execute(sql`
+    // Check and add iris_lead_id to merchant_applications
+    console.log('\n1️⃣ Checking merchant_applications.iris_lead_id...');
+    const irisLeadCheck = await db.execute(sql`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'merchant_applications' 
+      AND column_name = 'iris_lead_id'
+    `);
+    
+    if (irisLeadCheck.rows.length === 0) {
+      console.log('   ❌ Column missing. Adding iris_lead_id to merchant_applications...');
+      await db.execute(sql`ALTER TABLE merchant_applications ADD COLUMN iris_lead_id VARCHAR`);
+      console.log('   ✅ Column added');
+      
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_merchant_applications_iris_lead_id ON merchant_applications(iris_lead_id)`);
+      console.log('   ✅ Index created');
+    } else {
+      console.log('   ✅ Column already exists');
+    }
+    
+    // Check and add merchant_application_id to documents
+    console.log('\n2️⃣ Checking documents.merchant_application_id...');
+    const merchantAppCheck = await db.execute(sql`
       SELECT column_name 
       FROM information_schema.columns 
       WHERE table_name = 'documents' 
       AND column_name = 'merchant_application_id'
     `);
     
-    if (result.rows.length === 0) {
-      console.log('❌ Column missing. Adding merchant_application_id to documents table...');
+    if (merchantAppCheck.rows.length === 0) {
+      console.log('   ❌ Column missing. Adding merchant_application_id to documents...');
+      await db.execute(sql`ALTER TABLE documents ADD COLUMN merchant_application_id VARCHAR`);
+      console.log('   ✅ Column added');
       
-      // Add the column
-      await db.execute(sql`
-        ALTER TABLE documents ADD COLUMN merchant_application_id VARCHAR
-      `);
-      console.log('✅ Column added');
-      
-      // Add foreign key constraint
-      await db.execute(sql`
-        ALTER TABLE documents ADD CONSTRAINT documents_merchant_application_id_fkey 
-        FOREIGN KEY (merchant_application_id) REFERENCES merchant_applications(id)
-      `);
-      console.log('✅ Foreign key constraint added');
-      
-      // Add index
-      await db.execute(sql`
-        CREATE INDEX idx_documents_merchant_application_id ON documents(merchant_application_id)
-      `);
-      console.log('✅ Index created');
-      
-      console.log('✨ Database migration completed successfully!');
+      await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_documents_merchant_application_id ON documents(merchant_application_id)`);
+      console.log('   ✅ Index created');
     } else {
-      console.log('✅ Column already exists. No migration needed.');
+      console.log('   ✅ Column already exists');
     }
     
+    console.log('\n✨ Database migration completed successfully!');
     process.exit(0);
   } catch (error) {
-    console.error('❌ Migration failed:', error);
+    console.error('\n❌ Migration failed:', error);
     process.exit(1);
   }
 }
