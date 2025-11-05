@@ -16,6 +16,9 @@ import { MfaDisabledEmail } from '../emails/MfaDisabledEmail';
 import { MfaOtpEmail } from '../emails/MfaOtpEmail';
 import { MfaMethodChangedEmail } from '../emails/MfaMethodChangedEmail';
 import type { User, Document, Client } from '@shared/schema';
+import { db } from '../db';
+import { users } from '@shared/schema';
+import { eq } from 'drizzle-orm';
 
 // Initialize Mailgun email provider
 let mailgun: any = null;
@@ -177,10 +180,12 @@ export class EmailService {
   }
 
   /**
-   * Send new user registration notification to admins
+   * Send new user registration notification to ALL admins
    */
   static async sendNewUserNotificationEmail(user: User): Promise<void> {
     try {
+      const adminEmails = await this.getAdminEmails();
+      
       const emailHtml = await render(NewUserNotificationEmail({
         firstName: user.firstName || 'Unknown',
         lastName: user.lastName || 'User',
@@ -190,23 +195,28 @@ export class EmailService {
         appUrl: env.APP_URL!,
       }));
 
-      await this.sendEmail({
-        to: this.ADMIN_EMAIL,
-        subject: 'New User Registration - Secure2Send',
-        html: emailHtml,
-      });
+      // Send to all admin emails
+      for (const adminEmail of adminEmails) {
+        await this.sendEmail({
+          to: adminEmail,
+          subject: 'New User Registration - Secure2Send',
+          html: emailHtml,
+        });
+      }
 
-      console.log(`✅ New user notification email sent to admins for ${user.email}`);
+      console.log(`✅ New user notification email sent to ${adminEmails.length} admin(s) for ${user.email}`);
     } catch (error) {
       console.error('❌ Failed to send new user notification email:', error);
     }
   }
 
   /**
-   * Send new document uploaded notification to admins
+   * Send new document uploaded notification to ALL admins
    */
   static async sendNewDocumentNotificationEmail(user: User, document: Document): Promise<void> {
     try {
+      const adminEmails = await this.getAdminEmails();
+      
       const emailHtml = await render(NewDocumentNotificationEmail({
         firstName: user.firstName || 'Unknown',
         lastName: user.lastName || 'User',
@@ -218,13 +228,16 @@ export class EmailService {
         appUrl: env.APP_URL!,
       }));
 
-      await this.sendEmail({
-        to: this.ADMIN_EMAIL,
-        subject: 'New Document Uploaded for Review - Secure2Send',
-        html: emailHtml,
-      });
+      // Send to all admin emails
+      for (const adminEmail of adminEmails) {
+        await this.sendEmail({
+          to: adminEmail,
+          subject: 'New Document Uploaded for Review - Secure2Send',
+          html: emailHtml,
+        });
+      }
 
-      console.log(`✅ New document notification email sent to admins for ${document.documentType} from ${user.email}`);
+      console.log(`✅ New document notification email sent to ${adminEmails.length} admin(s) for ${document.documentType} from ${user.email}`);
     } catch (error) {
       console.error('❌ Failed to send new document notification email:', error);
     }
@@ -418,10 +431,30 @@ export class EmailService {
   }
 
   /**
-   * Helper method to get admin emails (for future configuration)
+   * Helper method to get all admin emails from the database
    */
-  static getAdminEmails(): string[] {
-    // TODO: Make this configurable via environment or database
-    return [this.ADMIN_EMAIL];
+  static async getAdminEmails(): Promise<string[]> {
+    try {
+      // Fetch all admin users from the database
+      const adminUsers = await db
+        .select({ email: users.email })
+        .from(users)
+        .where(eq(users.role, 'ADMIN'));
+      
+      const adminEmails = adminUsers.map(admin => admin.email);
+      
+      // Fallback to configured admin email if no admins found in database
+      if (adminEmails.length === 0) {
+        console.warn('⚠️ No admin users found in database, using fallback ADMIN_EMAIL');
+        return [this.ADMIN_EMAIL];
+      }
+      
+      console.log(`📧 Found ${adminEmails.length} admin email(s):`, adminEmails);
+      return adminEmails;
+    } catch (error) {
+      console.error('❌ Failed to fetch admin emails from database:', error);
+      // Fallback to configured admin email on error
+      return [this.ADMIN_EMAIL];
+    }
   }
 }

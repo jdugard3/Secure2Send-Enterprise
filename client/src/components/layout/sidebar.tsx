@@ -150,6 +150,7 @@ export default function Sidebar({ isCollapsed = false, onToggle }: SidebarProps)
   const adminItems = [
     { href: "/admin", icon: Users, label: "All Clients", roles: ["ADMIN"] },
     { href: "/admin/documents", icon: ClipboardCheck, label: "Document Review", roles: ["ADMIN"] },
+    { href: "/admin/settings", icon: SettingsIcon, label: "Admin Settings", roles: ["ADMIN"] },
   ];
 
   const filteredNavItems = navItems.filter(item => 

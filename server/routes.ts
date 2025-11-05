@@ -780,6 +780,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin create client endpoint
+  app.post('/api/admin/create-admin', requireAdmin, async (req: any, res: Response) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+
+      if (!user || user.role !== 'ADMIN') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { email, password, firstName, lastName } = req.body;
+
+      // Validate required fields
+      if (!email || !password || !firstName || !lastName) {
+        return res.status(400).json({ message: "All fields are required" });
+      }
+
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "User already exists with this email" });
+      }
+
+      // Hash password and create admin user
+      const hashedPassword = await hashPassword(password);
+      const newAdmin = await storage.createUser({
+        email,
+        password: hashedPassword,
+        firstName,
+        lastName,
+        role: "ADMIN",
+        mfaRequired: true, // Admins require MFA
+      });
+
+      // Send welcome email to new admin
+      EmailService.sendWelcomeEmail(newAdmin).catch(error => {
+        console.error('Failed to send welcome email to new admin:', error);
+      });
+
+      res.status(201).json({
+        message: "Admin user created successfully",
+        user: {
+          id: newAdmin.id,
+          email: newAdmin.email,
+          firstName: newAdmin.firstName,
+          lastName: newAdmin.lastName,
+          role: newAdmin.role,
+        },
+      });
+    } catch (error) {
+      console.error("Error creating admin user:", error);
+      res.status(500).json({ message: "Failed to create admin user" });
+    }
+  });
+
   app.post('/api/admin/create-client', requireAdmin, async (req: any, res: Response) => {
     try {
       const userId = req.user.id;
@@ -825,6 +879,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Send account created email to user (async, don't block response)
       EmailService.sendAccountCreatedEmail(newUser, password).catch(error => {
         console.error('Failed to send account created email:', error);
+      });
+
+      // Send new user notification to ALL admins (async, don't block response)
+      EmailService.sendNewUserNotificationEmail(newUser).catch(error => {
+        console.error('Failed to send new user notification email to admins:', error);
       });
 
       // Return user without password
