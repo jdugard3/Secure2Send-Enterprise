@@ -126,7 +126,7 @@ export default function AdminOverview() {
     return (
       <div className="space-y-6">
         {[...Array(3)].map((_, i) => (
-          <Card key={i}>
+          <Card key={i} className="bg-white border border-gray-200 shadow-sm">
             <CardContent className="p-6">
               <div className="animate-pulse">
                 <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
@@ -146,14 +146,17 @@ export default function AdminOverview() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Company Overview</h2>
-          <p className="text-gray-600">All registered companies and their document status</p>
+          <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Company Overview</h2>
+          <p className="text-sm text-gray-500 mt-1">All registered companies and their document status</p>
         </div>
         <div className="flex items-center gap-4">
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-gray-500 font-medium">
             {companies.length} {companies.length === 1 ? 'company' : 'companies'}
           </div>
-          <Button onClick={() => setShowAddClientForm(true)} className="flex items-center gap-2">
+          <Button 
+            onClick={() => setShowAddClientForm(true)} 
+            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white shadow-sm flex items-center gap-2"
+          >
             <Plus className="h-4 w-4" />
             Add Client
           </Button>
@@ -162,12 +165,12 @@ export default function AdminOverview() {
 
       <div className="grid gap-6">
         {companies.map((company) => (
-          <Card key={company.id} className="hover:shadow-lg transition-shadow">
+          <Card key={company.id} className="bg-white border border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-md transition-all">
             <CardHeader className="pb-4">
               <div className="flex items-start justify-between">
                 <div className="flex items-center space-x-3">
                   <Avatar className="h-12 w-12">
-                    <AvatarFallback className="bg-primary/10 text-primary">
+                    <AvatarFallback className="bg-[#2563EB]/10 text-[#2563EB]">
                       <Building2 className="h-6 w-6" />
                     </AvatarFallback>
                   </Avatar>
@@ -250,21 +253,21 @@ export default function AdminOverview() {
                     Document Summary
                   </h4>
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-3 bg-gray-50 rounded-lg">
-                      <div className="text-2xl font-bold text-gray-900">{company.documents.total}</div>
-                      <div className="text-xs text-gray-600">Total</div>
+                    <div className="text-center p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <div className="text-2xl font-semibold text-gray-900">{company.documents.total}</div>
+                      <div className="text-xs text-gray-600 font-medium mt-1">Total</div>
                     </div>
-                    <div className="text-center p-3 bg-yellow-50 rounded-lg">
-                      <div className="text-2xl font-bold text-yellow-600">{company.documents.pending}</div>
-                      <div className="text-xs text-gray-600">Pending</div>
+                    <div className="text-center p-4 bg-[#F59E0B]/5 rounded-lg border border-[#F59E0B]/20">
+                      <div className="text-2xl font-semibold text-[#F59E0B]">{company.documents.pending}</div>
+                      <div className="text-xs text-gray-600 font-medium mt-1">Pending</div>
                     </div>
-                    <div className="text-center p-3 bg-green-50 rounded-lg">
-                      <div className="text-2xl font-bold text-green-600">{company.documents.approved}</div>
-                      <div className="text-xs text-gray-600">Approved</div>
+                    <div className="text-center p-4 bg-[#10B981]/5 rounded-lg border border-[#10B981]/20">
+                      <div className="text-2xl font-semibold text-[#10B981]">{company.documents.approved}</div>
+                      <div className="text-xs text-gray-600 font-medium mt-1">Approved</div>
                     </div>
-                    <div className="text-center p-3 bg-red-50 rounded-lg">
-                      <div className="text-2xl font-bold text-red-600">{company.documents.rejected}</div>
-                      <div className="text-xs text-gray-600">Rejected</div>
+                    <div className="text-center p-4 bg-red-50 rounded-lg border border-red-100">
+                      <div className="text-2xl font-semibold text-red-600">{company.documents.rejected}</div>
+                      <div className="text-xs text-gray-600 font-medium mt-1">Rejected</div>
                     </div>
                   </div>
                 </div>
@@ -278,22 +281,22 @@ export default function AdminOverview() {
                   <div className="space-y-2 max-h-32 overflow-y-auto">
                     {company.documents.pendingList.length > 0 ? (
                       company.documents.pendingList.map((doc) => (
-                        <div key={doc.id} className="flex items-center justify-between p-2 bg-yellow-50 rounded text-sm">
+                        <div key={doc.id} className="flex items-center justify-between p-3 bg-[#F59E0B]/5 rounded-lg border border-[#F59E0B]/20 text-sm">
                           <div className="flex-1 min-w-0">
                             <div className="font-medium text-gray-900 truncate">
                               {formatDocumentType(doc.documentType)}
                             </div>
-                            <div className="text-xs text-gray-500 truncate">
+                            <div className="text-xs text-gray-500 truncate mt-1">
                               {doc.filename}
                             </div>
                           </div>
-                          <div className="text-xs text-gray-500 ml-2">
+                          <div className="text-xs text-gray-500 ml-2 font-medium">
                             {formatDistanceToNow(new Date(doc.uploadedAt), { addSuffix: true })}
                           </div>
                         </div>
                       ))
                     ) : (
-                      <div className="text-sm text-gray-500 italic p-2 bg-gray-50 rounded">
+                      <div className="text-sm text-gray-500 p-3 bg-gray-50 rounded-lg border border-gray-200">
                         No pending documents
                       </div>
                     )}
@@ -303,10 +306,10 @@ export default function AdminOverview() {
 
               {/* Action needed indicator */}
               {company.documents.pending > 0 && (
-                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="mt-4 p-3 bg-[#F59E0B]/5 border border-[#F59E0B]/20 rounded-lg">
                   <div className="flex items-center">
-                    <AlertCircle className="h-4 w-4 text-yellow-600 mr-2" />
-                    <span className="text-sm font-medium text-yellow-800">
+                    <AlertCircle className="h-4 w-4 text-[#F59E0B] mr-2" />
+                    <span className="text-sm font-medium text-gray-700">
                       Action needed: {company.documents.pending} document{company.documents.pending !== 1 ? 's' : ''} waiting for review
                     </span>
                   </div>
@@ -317,11 +320,13 @@ export default function AdminOverview() {
         ))}
 
         {companies.length === 0 && (
-          <Card>
+          <Card className="bg-white border border-gray-200 shadow-sm">
             <CardContent className="p-12 text-center">
-              <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No companies found</h3>
-              <p className="text-gray-600">No companies have registered yet.</p>
+              <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+                <Building2 className="h-6 w-6 text-gray-400" />
+              </div>
+              <h3 className="text-base font-semibold text-gray-900 mb-2">No companies found</h3>
+              <p className="text-sm text-gray-500">No companies have registered yet.</p>
             </CardContent>
           </Card>
         )}

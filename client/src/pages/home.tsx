@@ -57,17 +57,17 @@ export default function Home() {
 
   if (isLoading || !isAuthenticated || (user?.role === 'ADMIN' && !user?.isImpersonating)) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <div className="animate-spin rounded-full h-10 w-10 border-2 border-[#2563EB] border-t-transparent mx-auto mb-4"></div>
+          <p className="text-sm text-gray-500 font-medium">Loading...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-white">
       {/* Mobile Sidebar */}
       <MobileSidebar />
       
@@ -81,18 +81,20 @@ export default function Home() {
       
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header 
-          title="Client Dashboard"
+          title="Dashboard"
           subtitle="Manage your compliance documents"
         />
         
-        <main className="flex-1 overflow-auto p-6">
-          <ProgressCards />
-          
-          <div className="mb-8">
-            <DocumentUpload />
+        <main className="flex-1 overflow-auto p-6 lg:p-8 bg-gray-50/50">
+          <div className="max-w-7xl mx-auto space-y-6">
+            <ProgressCards />
+            
+            <div>
+              <DocumentUpload />
+            </div>
+            
+            <DocumentList />
           </div>
-          
-          <DocumentList />
         </main>
       </div>
     </div>

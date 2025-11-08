@@ -112,7 +112,7 @@ export default function ReviewQueue() {
 
   if (isLoading) {
     return (
-      <Card>
+      <Card className="bg-white border border-gray-200 shadow-sm">
         <CardContent className="p-6">
           <div className="animate-pulse space-y-4">
             <div className="h-4 bg-gray-200 rounded w-1/4"></div>
@@ -129,10 +129,10 @@ export default function ReviewQueue() {
 
   return (
     <>
-      <Card className="hover:shadow-lg transition-shadow">
-        <div className="p-6 border-b border-gray-200">
+      <Card className="bg-white border border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-md transition-all">
+        <div className="p-6 border-b border-gray-200/50">
           <div className="flex items-center justify-between">
-            <h3 className="text-xl font-semibold text-gray-900">Document Review Queue</h3>
+            <h3 className="text-lg font-semibold text-gray-900">Document Review Queue</h3>
             <div className="flex items-center space-x-3">
               <Select value={clientFilter} onValueChange={setClientFilter}>
                 <SelectTrigger className="w-48">
@@ -165,7 +165,7 @@ export default function ReviewQueue() {
                   <SelectItem value="rejected">Rejected</SelectItem>
                 </SelectContent>
               </Select>
-              <Button variant="outline" className="border-primary text-primary hover:bg-blue-50">
+              <Button variant="outline" className="border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-gray-900">
                 <Download className="h-4 w-4 mr-2" />
                 Export
               </Button>
@@ -174,10 +174,12 @@ export default function ReviewQueue() {
         </div>
 
         {filteredDocuments.length === 0 ? (
-          <CardContent className="p-6 text-center">
-            <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h4 className="text-lg font-medium text-gray-900 mb-2">No documents found</h4>
-            <p className="text-gray-600">
+          <CardContent className="p-8 text-center">
+            <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+              <FileText className="h-6 w-6 text-gray-400" />
+            </div>
+            <h4 className="text-base font-semibold text-gray-900 mb-2">No documents found</h4>
+            <p className="text-sm text-gray-500">
               {statusFilter === "all" ? 
                 "No documents have been uploaded yet." : 
                 `No ${statusFilter} documents found.`
@@ -187,7 +189,7 @@ export default function ReviewQueue() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50">
+              <thead className="bg-gray-50/50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Client
@@ -209,14 +211,14 @@ export default function ReviewQueue() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white divide-y divide-gray-200/50">
                 {filteredDocuments.map((document: any) => (
-                  <tr key={document.id} className="hover:bg-gray-50">
+                  <tr key={document.id} className="hover:bg-gray-50/50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <Avatar className="h-8 w-8 mr-3">
                           <AvatarImage src={document.client?.user?.profileImageUrl} />
-                          <AvatarFallback className="bg-primary text-white text-sm">
+                          <AvatarFallback className="bg-[#2563EB]/10 text-[#2563EB] text-sm font-medium">
                             {getInitials(document.client?.user?.firstName, document.client?.user?.lastName)}
                           </AvatarFallback>
                         </Avatar>
@@ -225,7 +227,7 @@ export default function ReviewQueue() {
                             {document.client?.user?.firstName} {document.client?.user?.lastName}
                           </div>
                           {document.client?.user?.companyName && (
-                            <div className="text-sm text-gray-500">
+                            <div className="text-xs text-gray-500">
                               {document.client.user.companyName}
                             </div>
                           )}
@@ -234,7 +236,7 @@ export default function ReviewQueue() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <FileText className="h-4 w-4 text-primary mr-2" />
+                        <FileText className="h-4 w-4 text-[#2563EB] mr-2" />
                         <span className="text-sm text-gray-900">{document.originalName}</span>
                       </div>
                     </td>
@@ -253,7 +255,7 @@ export default function ReviewQueue() {
                           variant="ghost"
                           size="sm"
                           onClick={() => setSelectedDocument(document)}
-                          className="text-primary hover:text-blue-700"
+                          className="text-gray-500 hover:text-gray-700 hover:bg-gray-100"
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
@@ -261,7 +263,7 @@ export default function ReviewQueue() {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleDownload(document)}
-                          className="text-gray-400 hover:text-gray-600"
+                          className="text-gray-500 hover:text-gray-700 hover:bg-gray-100"
                         >
                           <Download className="h-4 w-4" />
                         </Button>

@@ -31,17 +31,17 @@ export default function Admin() {
 
   if (isLoading || !isAuthenticated || user?.role !== 'ADMIN') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
+          <div className="animate-spin rounded-full h-10 w-10 border-2 border-[#2563EB] border-t-transparent mx-auto mb-4"></div>
+          <p className="text-sm text-gray-500 font-medium">Loading...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-white">
       {/* Mobile Sidebar */}
       <MobileSidebar />
       
@@ -59,12 +59,14 @@ export default function Admin() {
           subtitle={location === '/admin/documents' ? "Review and approve client documents" : "Overview of all companies, users, and pending documents"}
         />
         
-        <main className="flex-1 overflow-auto p-6">
-          {location === '/admin/documents' ? (
-            <ReviewQueue />
-          ) : (
-            <AdminOverview />
-          )}
+        <main className="flex-1 overflow-auto p-6 lg:p-8 bg-gray-50/50">
+          <div className="max-w-7xl mx-auto">
+            {location === '/admin/documents' ? (
+              <ReviewQueue />
+            ) : (
+              <AdminOverview />
+            )}
+          </div>
         </main>
       </div>
     </div>

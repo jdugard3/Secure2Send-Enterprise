@@ -102,44 +102,57 @@ export default function ProgressCards() {
     }));
 
   return (
-    <div className="space-y-6 mb-8">
+    <div className="space-y-6">
       {/* Top row with Upload Progress and Approval Status */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
+        <Card className="bg-white border border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-md transition-all">
+          <CardContent className="p-8">
+            <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-900">Upload Progress</h3>
-              <BarChart3 className="h-5 w-5 text-primary" />
-            </div>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Documents Uploaded</span>
-                <span className="font-medium">{uploadedCount} of {totalRequired}</span>
+              <div className="w-10 h-10 bg-[#2563EB]/10 rounded-lg flex items-center justify-center">
+                <BarChart3 className="h-5 w-5 text-[#2563EB]" />
               </div>
-              <Progress value={progressPercentage} className="h-2" />
-              <p className="text-sm text-gray-500">{progressPercentage}% Complete</p>
+            </div>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600 font-medium">Documents Uploaded</span>
+                <span className="text-xl font-semibold text-gray-900">{uploadedCount} <span className="text-base text-gray-500 font-normal">/ {totalRequired}</span></span>
+              </div>
+              <Progress value={progressPercentage} className="h-2 bg-gray-200" />
+              <p className="text-sm text-gray-500 font-medium">{progressPercentage}% Complete</p>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-4">
+        <Card className="bg-white border border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-md transition-all">
+          <CardContent className="p-8">
+            <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-900">Approval Status</h3>
-              <CheckCircle className="h-5 w-5 text-success" />
+              <div className="w-10 h-10 bg-[#10B981]/10 rounded-lg flex items-center justify-center">
+                <CheckCircle className="h-5 w-5 text-[#10B981]" />
+              </div>
             </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-success text-sm">Approved</span>
-                <span className="font-medium">{approvedCount}</span>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-[#10B981]/5 rounded-lg border border-[#10B981]/20">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-[#10B981] rounded-full"></div>
+                  <span className="text-sm text-gray-700 font-medium">Approved</span>
+                </div>
+                <span className="text-lg font-semibold text-gray-900">{approvedCount}</span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-warning text-sm">Pending</span>
-                <span className="font-medium">{pendingCount}</span>
+              <div className="flex items-center justify-between p-3 bg-[#F59E0B]/5 rounded-lg border border-[#F59E0B]/20">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-[#F59E0B] rounded-full"></div>
+                  <span className="text-sm text-gray-700 font-medium">Pending</span>
+                </div>
+                <span className="text-lg font-semibold text-gray-900">{pendingCount}</span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-destructive text-sm">Rejected</span>
-                <span className="font-medium">{rejectedCount}</span>
+              <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                  <span className="text-sm text-gray-700 font-medium">Rejected</span>
+                </div>
+                <span className="text-lg font-semibold text-gray-900">{rejectedCount}</span>
               </div>
             </div>
           </CardContent>
@@ -147,36 +160,40 @@ export default function ProgressCards() {
       </div>
 
       {/* Full-width Next Steps section below */}
-      <Card className="hover:shadow-lg transition-shadow">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-4">
+      <Card className="bg-white border border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-md transition-all">
+        <CardContent className="p-8">
+          <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-semibold text-gray-900">Next Steps</h3>
-            <AlertCircle className="h-5 w-5 text-warning" />
+            <div className="w-10 h-10 bg-[#F59E0B]/10 rounded-lg flex items-center justify-center">
+              <AlertCircle className="h-5 w-5 text-[#F59E0B]" />
+            </div>
           </div>
-          <div className="space-y-3">
+          <div className="space-y-4">
             {missingDocuments.length > 0 ? (
               <>
-                <p className="text-sm text-gray-600">Missing required documents:</p>
+                <p className="text-sm text-gray-600 font-medium">Missing required documents:</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {missingDocuments.map((doc) => (
-                    <div key={doc.key} className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-                      <div className="text-sm font-medium text-orange-900">{doc.name}</div>
-                      <div className="text-xs text-orange-700 mt-1">{doc.description}</div>
-                      <div className="text-xs text-orange-600 mt-1">
+                    <div key={doc.key} className="p-4 bg-[#F59E0B]/5 rounded-lg border border-[#F59E0B]/20 hover:border-[#F59E0B]/30 transition-colors">
+                      <div className="text-sm font-semibold text-gray-900 mb-1">{doc.name}</div>
+                      <div className="text-xs text-gray-600 mb-2 leading-relaxed">{doc.description}</div>
+                      <div className="text-xs text-gray-500 font-medium">
                         Max size: {doc.maxSize}MB
                       </div>
                     </div>
                   ))}
                 </div>
-                <p className="text-sm text-gray-500 text-center mt-4">
+                <p className="text-sm text-gray-500 text-center mt-4 font-medium">
                   {missingDocuments.length} document{missingDocuments.length !== 1 ? 's' : ''} remaining
                 </p>
               </>
             ) : (
-              <div className="text-center py-8">
-                <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-3" />
-                <p className="text-green-700 text-base font-medium">All required documents uploaded!</p>
-                <p className="text-gray-500 text-sm mt-2">Great job completing your compliance requirements</p>
+              <div className="text-center py-10 bg-[#10B981]/5 rounded-lg border border-[#10B981]/20">
+                <div className="w-12 h-12 bg-[#10B981]/10 rounded-lg flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle className="h-6 w-6 text-[#10B981]" />
+                </div>
+                <p className="text-[#10B981] text-base font-semibold mb-1">All required documents uploaded!</p>
+                <p className="text-gray-500 text-sm">Great job completing your compliance requirements</p>
               </div>
             )}
           </div>
