@@ -145,6 +145,9 @@ export default function AdminOverview() {
 
   return (
     <div className="space-y-6">
+      {/* Invitation Codes Section */}
+      <InvitationCodesManager />
+
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Company Overview</h2>
@@ -331,11 +334,6 @@ export default function AdminOverview() {
             </CardContent>
           </Card>
         )}
-      </div>
-
-      {/* Invitation Codes Section */}
-      <div className="mt-8">
-        <InvitationCodesManager />
       </div>
 
       {/* Merchant Applications Section */}
