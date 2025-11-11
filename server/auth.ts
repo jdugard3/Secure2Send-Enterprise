@@ -11,6 +11,7 @@ import { pool } from "./db";
 import { env } from "./env";
 import { authLimiter } from "./middleware/rateLimiting";
 import { EmailService } from "./services/emailService";
+import { AuditService } from "./services/auditService";
 
 declare global {
   namespace Express {
@@ -106,7 +107,26 @@ export async function setupAuth(app: Express) {
   // Authentication routes with rate limiting
   app.post("/api/register", authLimiter, async (req, res, next) => {
     try {
-      const { email, password, firstName, lastName, companyName } = req.body;
+      const { email, password, firstName, lastName, companyName, invitationCode } = req.body;
+
+      // REQUIRE invitation code for signup
+      if (!invitationCode || invitationCode.trim().length === 0) {
+        return res.status(400).json({ message: "Invitation code is required to sign up" });
+      }
+
+      // Validate invitation code
+      const invitation = await storage.getInvitationCodeByCode(invitationCode.trim().toUpperCase());
+      if (!invitation) {
+        return res.status(400).json({ message: "Invalid invitation code" });
+      }
+
+      if (invitation.status === 'USED') {
+        return res.status(400).json({ message: "This invitation code has already been used" });
+      }
+
+      if (invitation.status === 'EXPIRED') {
+        return res.status(400).json({ message: "This invitation code has expired" });
+      }
 
       // Check if user already exists
       const existingUser = await storage.getUserByEmail(email);
@@ -133,6 +153,21 @@ export async function setupAuth(app: Express) {
         mfaEnabled: user.mfaEnabled,
         mfaRequired: user.mfaRequired,
         createdAt: user.createdAt
+      });
+
+      // Mark invitation code as used
+      await storage.markInvitationCodeAsUsed(invitation.code, user.id);
+      console.log(`✅ Invitation code ${invitation.code} marked as used by ${user.email}`);
+
+      // Audit log the invitation code usage
+      await AuditService.logAction(user, 'INVITATION_CODE_USED', req, {
+        resourceType: 'invitation_code',
+        resourceId: invitation.id,
+        metadata: { 
+          code: invitation.code, 
+          label: invitation.label,
+          createdBy: invitation.createdBy 
+        }
       });
 
       // Also create a client record for this user

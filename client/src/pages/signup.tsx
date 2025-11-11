@@ -20,6 +20,7 @@ import { z } from "zod";
 const signupSchema = insertUserSchema.extend({
   password: z.string().min(6, "Password must be at least 6 characters"),
   confirmPassword: z.string(),
+  invitationCode: z.string().min(1, "Invitation code is required"),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
@@ -43,6 +44,7 @@ export default function Signup() {
       firstName: "",
       lastName: "",
       companyName: "",
+      invitationCode: "",
       role: "CLIENT",
     },
   });
@@ -178,7 +180,7 @@ export default function Signup() {
             <CardHeader className="space-y-1">
               <CardTitle className="text-2xl text-center">Get Started Today</CardTitle>
               <CardDescription className="text-center">
-                Join businesses already using Secure2Send
+                You'll need an invitation code from your administrator to sign up
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -243,6 +245,29 @@ export default function Signup() {
                           <Input placeholder="Your Business" {...field} value={field.value ?? ""} />
                         </FormControl>
                         <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="invitationCode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Invitation Code</FormLabel>
+                        <FormControl>
+                          <Input 
+                            placeholder="INV-XXXXXX" 
+                            {...field} 
+                            value={field.value ?? ""}
+                            onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                            className="font-mono"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Enter the invitation code provided by your administrator
+                        </p>
                       </FormItem>
                     )}
                   />

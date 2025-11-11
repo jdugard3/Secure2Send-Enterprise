@@ -79,8 +79,11 @@ export const auditLogEnum = pgEnum('audit_action', [
   'MFA_EMAIL_OTP_VERIFIED',
   'MFA_EMAIL_OTP_FAILED',
   'MFA_EMAIL_RATE_LIMIT_EXCEEDED',
-  'MFA_METHOD_SWITCHED'
+  'MFA_METHOD_SWITCHED',
+  'INVITATION_CODE_CREATED',
+  'INVITATION_CODE_USED'
 ]);
+export const invitationCodeStatusEnum = pgEnum('invitation_code_status', ['ACTIVE', 'USED', 'EXPIRED']);
 
 // Users table
 export const users = pgTable("users", {
@@ -324,6 +327,18 @@ export const auditLogs = pgTable("audit_logs", {
   timestamp: timestamp("timestamp").defaultNow(),
 });
 
+// Invitation codes table for merchant onboarding
+export const invitationCodes = pgTable("invitation_codes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: varchar("code").unique().notNull(),
+  label: varchar("label").notNull(), // Who this code is for (e.g., "Joe's Pizza Shop")
+  status: invitationCodeStatusEnum("status").default('ACTIVE'),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  usedBy: varchar("used_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  usedAt: timestamp("used_at"),
+});
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   clients: many(clients),
@@ -382,6 +397,17 @@ export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
   }),
 }));
 
+export const invitationCodesRelations = relations(invitationCodes, ({ one }) => ({
+  createdByUser: one(users, {
+    fields: [invitationCodes.createdBy],
+    references: [users.id],
+  }),
+  usedByUser: one(users, {
+    fields: [invitationCodes.usedBy],
+    references: [users.id],
+  }),
+}));
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -434,6 +460,8 @@ export type InsertSensitiveData = typeof sensitiveData.$inferInsert;
 export type SensitiveData = typeof sensitiveData.$inferSelect;
 export type InsertAuditLog = typeof auditLogs.$inferInsert;
 export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertInvitationCode = typeof invitationCodes.$inferInsert;
+export type InvitationCode = typeof invitationCodes.$inferSelect;
 
 // Combined types
 export type ClientWithUser = Client & { user: User };

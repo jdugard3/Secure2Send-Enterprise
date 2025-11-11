@@ -5,6 +5,7 @@ import {
   merchantApplications,
   sensitiveData,
   auditLogs,
+  invitationCodes,
   type User,
   type InsertUser,
   type Client,
@@ -16,6 +17,7 @@ import {
   type ClientWithUser,
   type DocumentWithClient,
   type MerchantApplicationWithClient,
+  type InvitationCode,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and } from "drizzle-orm";
@@ -72,6 +74,12 @@ export interface IStorage {
   clearEmailOtp(userId: string): Promise<void>;
   updateEmailRateLimit(userId: string, sendCount: number, resetAt: Date): Promise<void>;
   getEmailRateLimitData(userId: string): Promise<{ sendCount: number; lastSentAt?: Date; resetAt?: Date }>;
+  
+  // Invitation code operations
+  createInvitationCode(code: string, label: string, createdBy: string): Promise<any>;
+  getInvitationCodeByCode(code: string): Promise<any | undefined>;
+  getAllInvitationCodes(): Promise<any[]>;
+  markInvitationCodeAsUsed(code: string, userId: string): Promise<any>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -767,6 +775,49 @@ export class DatabaseStorage implements IStorage {
       lastSentAt: user.lastSentAt ? new Date(user.lastSentAt) : undefined,
       resetAt: user.resetAt ? new Date(user.resetAt) : undefined,
     };
+  }
+
+  // Invitation code operations
+  async createInvitationCode(code: string, label: string, createdBy: string): Promise<InvitationCode> {
+    const [invitationCode] = await db
+      .insert(invitationCodes)
+      .values({
+        code,
+        label,
+        createdBy,
+        status: 'ACTIVE',
+      })
+      .returning();
+    return invitationCode;
+  }
+
+  async getInvitationCodeByCode(code: string): Promise<InvitationCode | undefined> {
+    const [invitationCode] = await db
+      .select()
+      .from(invitationCodes)
+      .where(eq(invitationCodes.code, code));
+    return invitationCode;
+  }
+
+  async getAllInvitationCodes(): Promise<InvitationCode[]> {
+    const codes = await db
+      .select()
+      .from(invitationCodes)
+      .orderBy(desc(invitationCodes.createdAt));
+    return codes;
+  }
+
+  async markInvitationCodeAsUsed(code: string, userId: string): Promise<InvitationCode> {
+    const [invitationCode] = await db
+      .update(invitationCodes)
+      .set({
+        status: 'USED',
+        usedBy: userId,
+        usedAt: new Date(),
+      })
+      .where(eq(invitationCodes.code, code))
+      .returning();
+    return invitationCode;
   }
 }
 

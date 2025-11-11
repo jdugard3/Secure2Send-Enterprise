@@ -2165,6 +2165,111 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========================================================================
+  // INVITATION CODE ROUTES - Merchant Onboarding
+  // ========================================================================
+
+  // Generate new invitation code (admin only)
+  app.post('/api/admin/invitation-codes', requireAdmin, async (req: any, res: Response) => {
+    try {
+      const { label } = req.body;
+      const adminId = req.user.id;
+      const admin = await storage.getUser(adminId);
+
+      if (!admin || admin.role !== 'ADMIN') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      if (!label || label.trim().length === 0) {
+        return res.status(400).json({ message: "Label is required (who this code is for)" });
+      }
+
+      // Generate a unique, readable invitation code (format: INV-XXXXXX)
+      const generateCode = () => {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Removed ambiguous characters
+        let code = 'INV-';
+        for (let i = 0; i < 6; i++) {
+          code += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return code;
+      };
+
+      // Ensure code is unique
+      let code = generateCode();
+      let existingCode = await storage.getInvitationCodeByCode(code);
+      while (existingCode) {
+        code = generateCode();
+        existingCode = await storage.getInvitationCodeByCode(code);
+      }
+
+      const invitationCode = await storage.createInvitationCode(code, label.trim(), adminId);
+
+      // Audit log
+      await AuditService.logAction(admin, 'INVITATION_CODE_CREATED', req, {
+        resourceType: 'invitation_code',
+        resourceId: invitationCode.id,
+        metadata: { code: invitationCode.code, label: invitationCode.label }
+      });
+
+      res.status(201).json(invitationCode);
+    } catch (error) {
+      console.error("Error creating invitation code:", error);
+      res.status(500).json({ message: "Failed to create invitation code" });
+    }
+  });
+
+  // Get all invitation codes (admin only)
+  app.get('/api/admin/invitation-codes', requireAdmin, async (req: any, res: Response) => {
+    try {
+      const adminId = req.user.id;
+      const admin = await storage.getUser(adminId);
+
+      if (!admin || admin.role !== 'ADMIN') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const codes = await storage.getAllInvitationCodes();
+      res.json(codes);
+    } catch (error) {
+      console.error("Error fetching invitation codes:", error);
+      res.status(500).json({ message: "Failed to fetch invitation codes" });
+    }
+  });
+
+  // Validate invitation code (public endpoint - used during signup)
+  app.post('/api/invitation-codes/validate', async (req: Request, res: Response) => {
+    try {
+      const { code } = req.body;
+
+      if (!code || code.trim().length === 0) {
+        return res.status(400).json({ message: "Invitation code is required" });
+      }
+
+      const invitationCode = await storage.getInvitationCodeByCode(code.trim().toUpperCase());
+
+      if (!invitationCode) {
+        return res.status(404).json({ message: "Invalid invitation code" });
+      }
+
+      if (invitationCode.status === 'USED') {
+        return res.status(400).json({ message: "This invitation code has already been used" });
+      }
+
+      if (invitationCode.status === 'EXPIRED') {
+        return res.status(400).json({ message: "This invitation code has expired" });
+      }
+
+      res.json({ 
+        valid: true, 
+        message: "Invitation code is valid",
+        label: invitationCode.label 
+      });
+    } catch (error) {
+      console.error("Error validating invitation code:", error);
+      res.status(500).json({ message: "Failed to validate invitation code" });
+    }
+  });
+
   // Email preview routes for development
   if (env.NODE_ENV === 'development') {
     app.get('/api/emails/preview', (req, res) => {

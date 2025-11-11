@@ -18,6 +18,7 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import AddClientForm from "./add-client-form";
 import MerchantApplicationsList from "./merchant-applications-list";
+import { InvitationCodesManager } from "./invitation-codes-manager";
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -330,6 +331,11 @@ export default function AdminOverview() {
             </CardContent>
           </Card>
         )}
+      </div>
+
+      {/* Invitation Codes Section */}
+      <div className="mt-8">
+        <InvitationCodesManager />
       </div>
 
       {/* Merchant Applications Section */}
