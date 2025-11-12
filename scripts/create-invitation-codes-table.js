@@ -8,8 +8,35 @@ async function createTable() {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });
   
   try {
-    console.log('Creating invitation_codes table...');
+    // First, create the enum type
+    console.log('Creating invitation_code_status enum...');
+    await pool.query(`
+      DO $$ 
+      BEGIN
+          IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'invitation_code_status') THEN
+              CREATE TYPE invitation_code_status AS ENUM ('ACTIVE', 'USED', 'EXPIRED');
+          END IF;
+      END $$;
+    `);
+    console.log('✅ Enum created');
     
+    // Create audit action enum values
+    console.log('Adding audit action enum values...');
+    await pool.query(`
+      DO $$ 
+      BEGIN
+          IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'INVITATION_CODE_CREATED' AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'audit_action')) THEN
+              ALTER TYPE audit_action ADD VALUE 'INVITATION_CODE_CREATED';
+          END IF;
+          IF NOT EXISTS (SELECT 1 FROM pg_enum WHERE enumlabel = 'INVITATION_CODE_USED' AND enumtypid = (SELECT oid FROM pg_type WHERE typname = 'audit_action')) THEN
+              ALTER TYPE audit_action ADD VALUE 'INVITATION_CODE_USED';
+          END IF;
+      END $$;
+    `);
+    console.log('✅ Audit enums added');
+    
+    // Create the table
+    console.log('Creating invitation_codes table...');
     await pool.query(`
       CREATE TABLE IF NOT EXISTS invitation_codes (
         id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
