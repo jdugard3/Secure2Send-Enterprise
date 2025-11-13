@@ -6,7 +6,8 @@ import { MobileSidebar } from "@/components/layout/mobile-sidebar";
 import Header from "@/components/layout/header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Shield, Users, UserPlus, Settings as SettingsIcon, Key } from "lucide-react";
+import { Shield, Users, UserPlus, Settings as SettingsIcon, Key, Mail, Smartphone } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { MfaSettings } from "@/components/MfaSettings";
 import AddAdminForm from "@/components/admin/add-admin-form";
 import { apiRequest } from "@/lib/queryClient";
@@ -18,6 +19,8 @@ interface User {
   lastName: string;
   role: string;
   createdAt: string;
+  mfaEnabled?: boolean;
+  mfaEmailEnabled?: boolean;
 }
 
 export default function AdminSettingsPage() {
@@ -160,11 +163,11 @@ export default function AdminSettingsPage() {
                         key={admin.id} 
                         className="p-4 flex items-center justify-between hover:bg-gray-50/50 transition-colors"
                       >
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 flex-1">
                           <div className="h-10 w-10 rounded-lg bg-[#2563EB]/10 flex items-center justify-center">
                             <Shield className="h-5 w-5 text-[#2563EB]" />
                           </div>
-                          <div>
+                          <div className="flex-1">
                             <p className="font-medium text-gray-900">
                               {admin.firstName} {admin.lastName}
                               {admin.id === user.id && (
@@ -172,6 +175,26 @@ export default function AdminSettingsPage() {
                               )}
                             </p>
                             <p className="text-sm text-gray-500">{admin.email}</p>
+                            <div className="flex items-center gap-2 mt-2">
+                              <span className="text-xs text-gray-500 font-medium">MFA:</span>
+                              {admin.mfaEnabled && (
+                                <Badge variant="outline" className="text-xs gap-1">
+                                  <Smartphone className="h-3 w-3" />
+                                  Authenticator
+                                </Badge>
+                              )}
+                              {admin.mfaEmailEnabled && (
+                                <Badge variant="outline" className="text-xs gap-1">
+                                  <Mail className="h-3 w-3" />
+                                  Email
+                                </Badge>
+                              )}
+                              {!admin.mfaEnabled && !admin.mfaEmailEnabled && (
+                                <Badge variant="secondary" className="text-xs">
+                                  Not Set Up
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                         </div>
                         <div className="text-right text-sm text-gray-500 font-medium">

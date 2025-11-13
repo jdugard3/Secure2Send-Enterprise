@@ -8,20 +8,22 @@ import {
   Section,
   Text,
   Hr,
-} from '@react-email/components';
-import * as React from 'react';
+} from "@react-email/components";
+import * as React from "react";
 
 interface MfaOtpEmailProps {
-  firstName?: string;
+  userName?: string;
+  userEmail: string;
   otpCode: string;
-  expiresInMinutes: number;
+  expiryMinutes: number;
 }
 
-export const MfaOtpEmail = ({
-  firstName = 'there',
+export default function MfaOtpEmail({
+  userName,
+  userEmail,
   otpCode,
-  expiresInMinutes = 5,
-}: MfaOtpEmailProps) => {
+  expiryMinutes,
+}: MfaOtpEmailProps) {
   return (
     <Html>
       <Head />
@@ -31,160 +33,150 @@ export const MfaOtpEmail = ({
           <Section style={header}>
             <Heading style={h1}>🔒 Secure2Send</Heading>
           </Section>
-          
+
           <Section style={content}>
-            <Text style={greeting}>Hi {firstName},</Text>
+            <Heading as="h2" style={h2}>
+              Your Verification Code
+            </Heading>
             
-            <Text style={paragraph}>
-              You requested a verification code to sign in to your Secure2Send account.
+            <Text style={text}>
+              Hi {userName || userEmail},
+            </Text>
+
+            <Text style={text}>
+              You requested a verification code to access your Secure2Send account.
+              Use the code below to complete your sign-in:
             </Text>
 
             <Section style={otpContainer}>
-              <Text style={otpLabel}>Your verification code is:</Text>
-              <Heading style={otpCodeStyle}>{otpCode}</Heading>
-              <Text style={otpExpiry}>
-                This code will expire in <strong>{expiresInMinutes} minutes</strong>
-              </Text>
+              <Text style={otpText}>{otpCode}</Text>
             </Section>
+
+            <Text style={text}>
+              This code will expire in <strong>{expiryMinutes} minutes</strong>.
+            </Text>
 
             <Hr style={hr} />
 
-            <Section style={securityNotice}>
-              <Text style={securityTitle}>🛡️ Security Notice</Text>
-              <Text style={paragraph}>
+            <Section style={warningSection}>
+              <Text style={warningText}>
+                ⚠️ <strong>Security Notice</strong>
+              </Text>
+              <Text style={text}>
+                • Never share this code with anyone, including Secure2Send staff
+              </Text>
+              <Text style={text}>
+                • If you didn't request this code, please ignore this email and secure your account
+              </Text>
+              <Text style={text}>
                 • This code can only be used once
               </Text>
-              <Text style={paragraph}>
-                • Never share this code with anyone
-              </Text>
-              <Text style={paragraph}>
-                • Secure2Send will never ask for this code via phone or email
-              </Text>
             </Section>
 
             <Hr style={hr} />
 
             <Text style={footer}>
-              Didn't request this code? Please secure your account immediately by changing your password.
+              If you have any questions or concerns, please contact our support team.
             </Text>
-            
+
             <Text style={footer}>
-              If you need assistance, contact our support team.
+              © {new Date().getFullYear()} Secure2Send Enterprise. All rights reserved.
             </Text>
           </Section>
         </Container>
       </Body>
     </Html>
   );
-};
-
-export default MfaOtpEmail;
+}
 
 // Styles
 const main = {
-  backgroundColor: '#f6f9fc',
-  fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Ubuntu,sans-serif',
+  backgroundColor: "#f6f9fc",
+  fontFamily:
+    '-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Ubuntu,sans-serif',
 };
 
 const container = {
-  backgroundColor: '#ffffff',
-  margin: '0 auto',
-  padding: '20px 0 48px',
-  marginBottom: '64px',
-  maxWidth: '600px',
+  backgroundColor: "#ffffff",
+  margin: "0 auto",
+  padding: "20px 0 48px",
+  marginBottom: "64px",
+  maxWidth: "600px",
 };
 
 const header = {
-  backgroundColor: '#2563eb',
-  padding: '32px',
-  textAlign: 'center' as const,
+  padding: "32px 32px 0",
+  textAlign: "center" as const,
 };
 
 const h1 = {
-  color: '#ffffff',
-  fontSize: '32px',
-  fontWeight: 'bold',
-  margin: '0',
-  padding: '0',
-  lineHeight: '1.4',
+  color: "#1a1a1a",
+  fontSize: "28px",
+  fontWeight: "700",
+  margin: "0",
+  padding: "0",
+};
+
+const h2 = {
+  color: "#1a1a1a",
+  fontSize: "24px",
+  fontWeight: "600",
+  margin: "30px 0 15px",
 };
 
 const content = {
-  padding: '0 48px',
+  padding: "0 32px",
 };
 
-const greeting = {
-  fontSize: '18px',
-  lineHeight: '1.4',
-  color: '#484848',
-  marginTop: '32px',
-  marginBottom: '16px',
-};
-
-const paragraph = {
-  fontSize: '16px',
-  lineHeight: '1.6',
-  color: '#484848',
-  marginTop: '8px',
-  marginBottom: '8px',
+const text = {
+  color: "#525252",
+  fontSize: "16px",
+  lineHeight: "24px",
+  margin: "16px 0",
 };
 
 const otpContainer = {
-  backgroundColor: '#f8fafc',
-  border: '2px solid #e2e8f0',
-  borderRadius: '12px',
-  padding: '32px',
-  textAlign: 'center' as const,
-  margin: '32px 0',
+  background: "#f4f4f5",
+  borderRadius: "8px",
+  margin: "32px 0",
+  padding: "24px",
+  textAlign: "center" as const,
+  border: "2px dashed #d4d4d8",
 };
 
-const otpLabel = {
-  fontSize: '14px',
-  color: '#64748b',
-  textTransform: 'uppercase' as const,
-  letterSpacing: '0.5px',
-  marginBottom: '8px',
-};
-
-const otpCodeStyle = {
-  fontSize: '48px',
-  fontWeight: 'bold',
-  color: '#2563eb',
-  letterSpacing: '8px',
-  margin: '16px 0',
-  fontFamily: 'monospace',
-};
-
-const otpExpiry = {
-  fontSize: '14px',
-  color: '#64748b',
-  marginTop: '16px',
+const otpText = {
+  color: "#18181b",
+  fontSize: "42px",
+  fontWeight: "700",
+  letterSpacing: "8px",
+  margin: "0",
+  fontFamily: "'Courier New', monospace",
 };
 
 const hr = {
-  borderColor: '#e2e8f0',
-  margin: '32px 0',
+  borderColor: "#e6e6e6",
+  margin: "32px 0",
 };
 
-const securityNotice = {
-  backgroundColor: '#fef3c7',
-  border: '1px solid #fbbf24',
-  borderRadius: '8px',
-  padding: '24px',
-  margin: '24px 0',
+const warningSection = {
+  backgroundColor: "#fef3c7",
+  borderRadius: "8px",
+  padding: "16px 20px",
+  margin: "24px 0",
+  border: "1px solid #fbbf24",
 };
 
-const securityTitle = {
-  fontSize: '16px',
-  fontWeight: 'bold',
-  color: '#78350f',
-  marginBottom: '12px',
+const warningText = {
+  color: "#92400e",
+  fontSize: "16px",
+  fontWeight: "600",
+  margin: "0 0 12px 0",
 };
 
 const footer = {
-  fontSize: '14px',
-  lineHeight: '1.6',
-  color: '#64748b',
-  marginTop: '16px',
+  color: "#8898aa",
+  fontSize: "14px",
+  lineHeight: "20px",
+  marginTop: "12px",
+  textAlign: "center" as const,
 };
-

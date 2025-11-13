@@ -13,7 +13,7 @@ import { NewDocumentNotificationEmail } from '../emails/NewDocumentNotificationE
 import { SecurityAlertEmail } from '../emails/SecurityAlertEmail';
 import { MfaEnabledEmail } from '../emails/MfaEnabledEmail';
 import { MfaDisabledEmail } from '../emails/MfaDisabledEmail';
-import { MfaOtpEmail } from '../emails/MfaOtpEmail';
+import MfaOtpEmail from '../emails/MfaOtpEmail';
 import { MfaMethodChangedEmail } from '../emails/MfaMethodChangedEmail';
 import type { User, Document, Client } from '@shared/schema';
 import { db } from '../db';
@@ -377,17 +377,18 @@ export class EmailService {
   /**
    * Send MFA OTP code via email
    */
-  static async sendMfaOtpEmail(user: User, otpCode: string, expiresInMinutes: number = 5): Promise<void> {
+  static async sendMfaOtpEmail(user: User, otpCode: string, expiryMinutes: number = 5): Promise<void> {
     try {
       const emailHtml = await render(MfaOtpEmail({
-        firstName: user.firstName || 'there',
+        userName: user.firstName || undefined,
+        userEmail: user.email,
         otpCode,
-        expiresInMinutes,
+        expiryMinutes,
       }));
 
       await this.sendEmail({
         to: user.email,
-        subject: `Your Secure2Send verification code: ${otpCode}`,
+        subject: `Your Secure2Send Verification Code: ${otpCode}`,
         html: emailHtml,
       });
 

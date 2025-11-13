@@ -239,7 +239,7 @@ export async function setupAuth(app: Express) {
       }
 
       // Check if user needs to set up MFA (new users)
-      if (user.mfaRequired && !user.mfaEnabled) {
+      if (user.mfaRequired && !user.mfaEnabled && !user.mfaEmailEnabled) {
         console.log('⚠️ User needs MFA setup:', user.email);
         // Log the user in but indicate MFA setup is required
         req.login(user, (err) => {

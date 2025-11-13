@@ -4,51 +4,100 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { Shield, AlertTriangle, Key } from 'lucide-react';
+import { Shield, AlertTriangle, Key, Mail, Smartphone } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface MfaVerificationProps {
   userId: string;
   email: string;
+  mfaTotp: boolean; // Whether TOTP is available
+  mfaEmail: boolean; // Whether Email is available
   onVerificationSuccess: (userData: any) => void;
   onCancel: () => void;
 }
 
-export function MfaVerification({ userId, email, onVerificationSuccess, onCancel }: MfaVerificationProps) {
+type MfaMethod = 'email' | 'totp' | 'backup';
+
+export function MfaVerification({ 
+  userId, 
+  email, 
+  mfaTotp,
+  mfaEmail,
+  onVerificationSuccess, 
+  onCancel 
+}: MfaVerificationProps) {
+  // Determine default method - prefer email if available
+  const getDefaultMethod = (): MfaMethod => {
+    if (mfaEmail) return 'email';
+    if (mfaTotp) return 'totp';
+    return 'backup';
+  };
+
+  const [selectedMethod, setSelectedMethod] = useState<MfaMethod>(getDefaultMethod());
   const [verificationCode, setVerificationCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [useBackupCode, setUseBackupCode] = useState(false);
-  const [checkingMfaStatus, setCheckingMfaStatus] = useState(true);
+  const [emailOtpSent, setEmailOtpSent] = useState(false);
+  const [resendCountdown, setResendCountdown] = useState(0);
   const { toast } = useToast();
 
-  // Check if user actually has MFA enabled
+  // Auto-send email OTP if email MFA is available and selected
   useEffect(() => {
-    const checkMfaStatus = async () => {
-      try {
-        const response = await fetch('/api/mfa/status', {
-          credentials: 'include',
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (!data.enabled) {
-            // User doesn't have MFA enabled, redirect to setup
-            console.log('🔄 User needs MFA setup, redirecting...');
-            window.location.href = '/mfa-setup';
-            return;
-          }
-        }
-      } catch (error) {
-        console.error('Error checking MFA status:', error);
-      } finally {
-        setCheckingMfaStatus(false);
-      }
-    };
+    if (selectedMethod === 'email' && !emailOtpSent) {
+      sendEmailOtp();
+    }
+  }, [selectedMethod]);
 
-    checkMfaStatus();
-  }, []);
+  const sendEmailOtp = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/mfa/email/send-login-otp', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ userId }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (data.resetAt) {
+          const countdown = Math.ceil((new Date(data.resetAt).getTime() - Date.now()) / 1000);
+          setResendCountdown(countdown);
+          startCountdown();
+        }
+        throw new Error(data.error || 'Failed to send OTP');
+      }
+
+      setEmailOtpSent(true);
+      toast({
+        title: "Code Sent",
+        description: `A 6-digit code has been sent to ${email}`,
+      });
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to send OTP');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startCountdown = () => {
+    const interval = setInterval(() => {
+      setResendCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
 
   const verifyMfa = async () => {
     if (!verificationCode.trim()) {
@@ -60,17 +109,35 @@ export function MfaVerification({ userId, email, onVerificationSuccess, onCancel
     setError(null);
 
     try {
-      const response = await fetch('/api/login/mfa', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          userId,
-          code: verificationCode.trim(),
-        }),
-      });
+      let response;
+      
+      if (selectedMethod === 'email') {
+        // Email MFA verification
+        response = await fetch('/api/mfa/email/verify-login-otp', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            userId,
+            otp: verificationCode.trim(),
+          }),
+        });
+      } else {
+        // TOTP or backup code verification (existing endpoint)
+        response = await fetch('/api/login/mfa', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            userId,
+            code: verificationCode.trim(),
+          }),
+        });
+      }
 
       const data = await response.json();
 
@@ -100,25 +167,169 @@ export function MfaVerification({ userId, email, onVerificationSuccess, onCancel
     }
   };
 
-  // Show loading while checking MFA status
-  if (checkingMfaStatus) {
-    return (
-      <Card className="w-full max-w-md mx-auto">
-        <CardHeader className="space-y-1">
-          <div className="flex items-center justify-center mb-4">
-            <Shield className="h-8 w-8 text-primary" />
-          </div>
-          <CardTitle className="text-2xl text-center">Checking Security Status</CardTitle>
-          <CardDescription className="text-center">
-            Verifying your account security settings...
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex justify-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </CardContent>
-      </Card>
-    );
-  }
+  const handleMethodChange = (method: string) => {
+    setSelectedMethod(method as MfaMethod);
+    setVerificationCode('');
+    setError(null);
+    
+    // Auto-send email OTP when switching to email
+    if (method === 'email' && !emailOtpSent) {
+      sendEmailOtp();
+    }
+  };
+
+  const renderEmailVerification = () => (
+    <div className="space-y-4">
+      <Alert>
+        <Mail className="h-4 w-4" />
+        <AlertDescription>
+          We sent a 6-digit code to <strong>{email}</strong>
+        </AlertDescription>
+      </Alert>
+
+      <div className="space-y-2">
+        <Label htmlFor="email-code">Email Verification Code</Label>
+        <Input
+          id="email-code"
+          placeholder="000000"
+          value={verificationCode}
+          onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+          className="text-center text-lg tracking-widest font-mono"
+          maxLength={6}
+          onKeyPress={handleKeyPress}
+          autoFocus
+        />
+        <p className="text-xs text-muted-foreground text-center">
+          Enter the 6-digit code from your email
+        </p>
+      </div>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      <Button 
+        onClick={verifyMfa} 
+        disabled={loading || verificationCode.length !== 6}
+        className="w-full"
+      >
+        {loading ? 'Verifying...' : 'Verify and Sign In'}
+      </Button>
+
+      <div className="text-center">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={sendEmailOtp}
+          disabled={loading || resendCountdown > 0}
+          className="text-sm"
+        >
+          {resendCountdown > 0 ? `Resend code in ${resendCountdown}s` : 'Resend code'}
+        </Button>
+      </div>
+    </div>
+  );
+
+  const renderTotpVerification = () => (
+    <div className="space-y-4">
+      <Alert>
+        <Smartphone className="h-4 w-4" />
+        <AlertDescription>
+          Open your authenticator app and enter the 6-digit code
+        </AlertDescription>
+      </Alert>
+
+      <div className="space-y-2">
+        <Label htmlFor="totp-code">Authenticator Code</Label>
+        <Input
+          id="totp-code"
+          placeholder="000000"
+          value={verificationCode}
+          onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+          className="text-center text-lg tracking-widest font-mono"
+          maxLength={6}
+          onKeyPress={handleKeyPress}
+          autoFocus
+        />
+        <p className="text-xs text-muted-foreground text-center">
+          Enter the 6-digit code from your authenticator app
+        </p>
+      </div>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      <Button 
+        onClick={verifyMfa} 
+        disabled={loading || verificationCode.length !== 6}
+        className="w-full"
+      >
+        {loading ? 'Verifying...' : 'Verify and Sign In'}
+      </Button>
+    </div>
+  );
+
+  const renderBackupCodeVerification = () => (
+    <div className="space-y-4">
+      <Alert>
+        <Key className="h-4 w-4" />
+        <AlertDescription>
+          Enter one of your backup codes (format: XXXX-XXXX)
+        </AlertDescription>
+      </Alert>
+
+      <div className="space-y-2">
+        <Label htmlFor="backup-code">Backup Code</Label>
+        <Input
+          id="backup-code"
+          placeholder="XXXX-XXXX"
+          value={verificationCode}
+          onChange={(e) => {
+            const value = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+            if (value.length <= 9) {
+              setVerificationCode(value);
+            }
+          }}
+          className="text-center text-lg tracking-wider font-mono"
+          maxLength={9}
+          onKeyPress={handleKeyPress}
+          autoFocus
+        />
+        <p className="text-xs text-muted-foreground text-center">
+          This code can only be used once
+        </p>
+      </div>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      <Button 
+        onClick={verifyMfa} 
+        disabled={loading || !verificationCode.trim()}
+        className="w-full"
+      >
+        {loading ? 'Verifying...' : 'Verify and Sign In'}
+      </Button>
+
+      <Alert>
+        <AlertTriangle className="h-4 w-4" />
+        <AlertDescription className="text-xs">
+          Lost all your backup codes? Please contact support to regain access to your account.
+        </AlertDescription>
+      </Alert>
+    </div>
+  );
 
   return (
     <Card className="w-full max-w-md mx-auto">
@@ -128,98 +339,65 @@ export function MfaVerification({ userId, email, onVerificationSuccess, onCancel
         </div>
         <CardTitle>Two-Factor Authentication</CardTitle>
         <CardDescription>
-          Enter the verification code from your authenticator app for {email}
+          Verify your identity for {email}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="mfa-code">
-            {useBackupCode ? 'Backup Code' : 'Verification Code'}
-          </Label>
-          <Input
-            id="mfa-code"
-            placeholder={useBackupCode ? "XXXX-XXXX" : "000000"}
-            value={verificationCode}
-            onChange={(e) => {
-              if (useBackupCode) {
-                // Allow backup code format (XXXX-XXXX)
-                const value = e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
-                if (value.length <= 9) { // 4 chars + dash + 4 chars
-                  setVerificationCode(value);
-                }
-              } else {
-                // Only allow digits for TOTP codes
-                const value = e.target.value.replace(/\D/g, '').slice(0, 6);
-                setVerificationCode(value);
-              }
-            }}
-            className={`text-center text-lg tracking-widest font-mono ${
-              useBackupCode ? '' : 'tracking-widest'
-            }`}
-            maxLength={useBackupCode ? 9 : 6}
-            onKeyPress={handleKeyPress}
-            autoFocus
-          />
-          <p className="text-xs text-muted-foreground text-center">
-            {useBackupCode 
-              ? 'Enter one of your backup codes'
-              : 'Enter the 6-digit code from your authenticator app'
-            }
-          </p>
-        </div>
+        {/* Show tabs only if multiple methods are available */}
+        {(mfaEmail || mfaTotp) && (
+          <Tabs value={selectedMethod} onValueChange={handleMethodChange}>
+            <TabsList className="grid w-full grid-cols-3">
+              {mfaEmail && (
+                <TabsTrigger value="email" className="flex items-center gap-1 text-xs sm:text-sm">
+                  <Mail className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="hidden sm:inline">Email</span>
+                </TabsTrigger>
+              )}
+              {mfaTotp && (
+                <TabsTrigger value="totp" className="flex items-center gap-1 text-xs sm:text-sm">
+                  <Smartphone className="h-3 w-3 sm:h-4 sm:w-4" />
+                  <span className="hidden sm:inline">App</span>
+                </TabsTrigger>
+              )}
+              <TabsTrigger value="backup" className="flex items-center gap-1 text-xs sm:text-sm">
+                <Key className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Backup</span>
+              </TabsTrigger>
+            </TabsList>
 
-        {error && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
+            {mfaEmail && (
+              <TabsContent value="email" className="mt-6">
+                {renderEmailVerification()}
+              </TabsContent>
+            )}
+
+            {mfaTotp && (
+              <TabsContent value="totp" className="mt-6">
+                {renderTotpVerification()}
+              </TabsContent>
+            )}
+
+            <TabsContent value="backup" className="mt-6">
+              {renderBackupCodeVerification()}
+            </TabsContent>
+          </Tabs>
         )}
 
-        <div className="space-y-3">
-          <Button 
-            onClick={verifyMfa} 
-            disabled={loading || !verificationCode.trim()}
-            className="w-full"
+        {/* If only one method available, show it directly without tabs */}
+        {!mfaEmail && !mfaTotp && renderBackupCodeVerification()}
+
+        <Separator />
+
+        <div className="text-center">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onCancel}
+            className="text-sm text-muted-foreground"
           >
-            {loading ? 'Verifying...' : 'Verify and Sign In'}
+            Back to login
           </Button>
-
-          <Separator />
-
-          <div className="text-center">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setUseBackupCode(!useBackupCode);
-                setVerificationCode('');
-                setError(null);
-              }}
-              className="text-sm"
-            >
-              <Key className="w-4 h-4 mr-2" />
-              {useBackupCode ? 'Use authenticator code instead' : 'Use backup code instead'}
-            </Button>
-          </div>
-
-          <div className="text-center">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onCancel}
-              className="text-sm text-muted-foreground"
-            >
-              Back to login
-            </Button>
-          </div>
         </div>
-
-        <Alert>
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription className="text-xs">
-            If you've lost access to your authenticator app, use one of your backup codes or contact support.
-          </AlertDescription>
-        </Alert>
       </CardContent>
     </Card>
   );

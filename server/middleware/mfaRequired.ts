@@ -14,15 +14,20 @@ export const requireMfaSetup = (req: any, res: Response, next: NextFunction) => 
     '/api/auth/user',
     '/api/login/mfa',
     
-    // MFA setup routes
+    // MFA setup routes (TOTP)
     '/api/mfa/status',
     '/api/mfa/setup/generate', 
     '/api/mfa/setup/verify',
     '/api/mfa/verify',
     
+    // MFA setup routes (Email)
+    '/api/mfa/email/send-setup-otp',
+    '/api/mfa/email/verify-setup-otp',
+    
     // MFA login verification routes (must be accessible during login)
     '/api/mfa/verify-with-method',
     '/api/mfa/email/send-login-otp',
+    '/api/mfa/email/verify-login-otp',
     
     // Health check (for Fly.io monitoring)
     '/api/health',
@@ -46,8 +51,8 @@ export const requireMfaSetup = (req: any, res: Response, next: NextFunction) => 
     return res.status(401).json({ message: 'Authentication required' });
   }
 
-  // Check if user needs to set up MFA
-  if (req.user.mfaRequired && !req.user.mfaEnabled) {
+  // Check if user needs to set up MFA (must have at least one method enabled)
+  if (req.user.mfaRequired && !req.user.mfaEnabled && !req.user.mfaEmailEnabled) {
     console.log('🚫 MFA Setup Required - Blocking access to:', req.path, 'for user:', req.user.email);
     return res.status(403).json({ 
       message: 'MFA setup required before accessing this resource',
@@ -73,6 +78,10 @@ export const mfaExemptRoutes = [
   '/api/mfa/setup/generate',
   '/api/mfa/setup/verify',
   '/api/mfa/verify',
+  '/api/mfa/email/send-setup-otp',
+  '/api/mfa/email/verify-setup-otp',
+  '/api/mfa/email/send-login-otp',
+  '/api/mfa/email/verify-login-otp',
   '/api/health',
   '/api/emails/preview'
 ];

@@ -936,6 +936,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             firstName: client.user.firstName,
             lastName: client.user.lastName,
             email: client.user.email,
+            role: client.user.role,
+            mfaEnabled: client.user.mfaEnabled,
+            mfaEmailEnabled: client.user.mfaEmailEnabled,
             createdAt: client.user.createdAt,
           },
           status: client.status,
@@ -1775,8 +1778,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/mfa/status', requireAuth, async (req: any, res) => {
     try {
       const { MfaService } = await import('./services/mfaService');
-      const status = await MfaService.getMfaStatus(req.user.id);
-      res.json(status);
+      const { EmailMfaService } = await import('./services/emailMfaService');
+      
+      const totpStatus = await MfaService.getMfaStatus(req.user.id);
+      const emailStatus = await EmailMfaService.getEmailMfaStatus(req.user.id);
+      
+      res.json({
+        totp: {
+          enabled: totpStatus.enabled,
+          setupAt: totpStatus.setupAt,
+          lastUsed: totpStatus.lastUsed,
+          backupCodesRemaining: totpStatus.backupCodesRemaining,
+        },
+        email: {
+          enabled: emailStatus.enabled,
+          setupAt: emailStatus.setupAt,
+          lastUsed: emailStatus.lastUsed,
+        },
+        anyEnabled: totpStatus.enabled || emailStatus.enabled,
+      });
     } catch (error) {
       console.error('Failed to get MFA status:', error);
       res.status(500).json({ message: 'Failed to get MFA status' });
@@ -1890,6 +1910,182 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Failed to regenerate backup codes:', error);
       res.status(500).json({ message: 'Failed to regenerate backup codes' });
+    }
+  });
+
+  // ====== Email MFA Routes ======
+  
+  // Send OTP for email MFA setup
+  app.post('/api/mfa/email/send-setup-otp', requireAuth, async (req: any, res) => {
+    try {
+      const { EmailMfaService } = await import('./services/emailMfaService');
+      const result = await EmailMfaService.sendSetupOtp(req.user.id);
+      
+      if (result.success) {
+        res.json({ success: true });
+      } else {
+        res.status(400).json({
+          success: false,
+          error: result.error,
+          resetAt: result.resetAt,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to send setup OTP:', error);
+      res.status(500).json({ message: 'Failed to send OTP email' });
+    }
+  });
+
+  // Verify OTP and enable email MFA during setup
+  app.post('/api/mfa/email/verify-setup-otp', requireAuth, async (req: any, res) => {
+    try {
+      const { otp, password } = req.body;
+      
+      if (!otp || !password) {
+        return res.status(400).json({ message: 'OTP and password are required' });
+      }
+
+      const { EmailMfaService } = await import('./services/emailMfaService');
+      const result = await EmailMfaService.verifySetupOtp(req.user.id, otp, password);
+      
+      if (result.success) {
+        // Log email MFA setup completion
+        await AuditService.logAction(req.user, 'MFA_SETUP_COMPLETED', req, {
+          resourceType: 'user',
+          resourceId: req.user.id,
+          details: { method: 'email' },
+        });
+
+        res.json({ success: true });
+      } else {
+        res.status(400).json({
+          success: false,
+          error: result.error,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to verify setup OTP:', error);
+      res.status(500).json({ message: 'Failed to verify OTP' });
+    }
+  });
+
+  // Send OTP for login
+  app.post('/api/mfa/email/send-login-otp', async (req, res) => {
+    try {
+      const { userId } = req.body;
+      
+      if (!userId) {
+        return res.status(400).json({ message: 'User ID is required' });
+      }
+
+      const { EmailMfaService } = await import('./services/emailMfaService');
+      const result = await EmailMfaService.sendLoginOtp(userId);
+      
+      if (result.success) {
+        res.json({ success: true });
+      } else {
+        res.status(400).json({
+          success: false,
+          error: result.error,
+          resetAt: result.resetAt,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to send login OTP:', error);
+      res.status(500).json({ message: 'Failed to send OTP email' });
+    }
+  });
+
+  // Verify OTP for login
+  app.post('/api/mfa/email/verify-login-otp', async (req, res) => {
+    try {
+      const { userId, otp } = req.body;
+      
+      if (!userId || !otp) {
+        return res.status(400).json({ message: 'User ID and OTP are required' });
+      }
+
+      const { EmailMfaService } = await import('./services/emailMfaService');
+      const result = await EmailMfaService.verifyLoginOtp(userId, otp);
+      
+      if (result.success) {
+        // Log the user in
+        const user = await storage.getUser(userId);
+        if (!user) {
+          return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Log successful MFA verification
+        await AuditService.logAction(user, 'MFA_VERIFICATION_SUCCESS', req, {
+          resourceType: 'user',
+          resourceId: userId,
+          details: { method: 'email' },
+        });
+
+        req.login(user, (err: any) => {
+          if (err) {
+            console.error('Failed to establish session after email MFA:', err);
+            return res.status(500).json({ message: 'Failed to establish session' });
+          }
+          
+          const { password: _, ...userWithoutPassword } = user;
+          res.json({
+            ...userWithoutPassword,
+            message: 'MFA verification successful',
+          });
+        });
+      } else {
+        // Log failed verification
+        const user = await storage.getUser(userId);
+        if (user) {
+          await AuditService.logAction(user, 'MFA_VERIFICATION_FAILED', req, {
+            resourceType: 'user',
+            resourceId: userId,
+            details: { method: 'email', error: result.error },
+          });
+        }
+
+        res.status(400).json({
+          success: false,
+          error: result.error,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to verify login OTP:', error);
+      res.status(500).json({ message: 'Failed to verify OTP' });
+    }
+  });
+
+  // Disable email MFA
+  app.post('/api/mfa/email/disable', requireAuth, async (req: any, res) => {
+    try {
+      const { password } = req.body;
+      
+      if (!password) {
+        return res.status(400).json({ message: 'Current password is required' });
+      }
+
+      const { EmailMfaService } = await import('./services/emailMfaService');
+      const result = await EmailMfaService.disableEmailMfa(req.user.id, password);
+      
+      if (result.success) {
+        // Log email MFA disable
+        await AuditService.logAction(req.user, 'MFA_DISABLED', req, {
+          resourceType: 'user',
+          resourceId: req.user.id,
+          details: { method: 'email' },
+        });
+
+        res.json({ success: true });
+      } else {
+        res.status(400).json({
+          success: false,
+          error: result.error,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to disable email MFA:', error);
+      res.status(500).json({ message: 'Failed to disable email MFA' });
     }
   });
 

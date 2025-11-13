@@ -13,13 +13,18 @@ import { MfaSetup } from './MfaSetup';
 import { BackupCodes } from './BackupCodes';
 
 interface MfaStatus {
-  enabled: boolean; // TOTP enabled
-  emailEnabled?: boolean; // Email MFA enabled
-  setupAt?: string;
-  lastUsed?: string;
-  backupCodesRemaining: number;
-  emailLastSentAt?: string;
-  emailSendCount?: number;
+  totp: {
+    enabled: boolean;
+    setupAt?: string;
+    lastUsed?: string;
+    backupCodesRemaining: number;
+  };
+  email: {
+    enabled: boolean;
+    setupAt?: string;
+    lastUsed?: string;
+  };
+  anyEnabled: boolean;
 }
 
 export function MfaSettings() {
@@ -310,7 +315,7 @@ export function MfaSettings() {
     );
   }
 
-  const hasAnyMfa = mfaStatus?.enabled || mfaStatus?.emailEnabled;
+  const hasAnyMfa = mfaStatus?.anyEnabled || false;
 
   return (
     <Card>
@@ -349,7 +354,7 @@ export function MfaSettings() {
                 </p>
               </div>
             </div>
-            {mfaStatus?.enabled ? (
+            {mfaStatus?.totp?.enabled ? (
               <Badge variant="default" className="gap-1">
                 <CheckCircle className="h-3 w-3" />
                 Enabled
@@ -362,21 +367,21 @@ export function MfaSettings() {
             )}
           </div>
 
-          {mfaStatus?.enabled ? (
+          {mfaStatus?.totp?.enabled ? (
             <div className="ml-8 space-y-3 p-4 bg-muted/50 rounded-lg">
               <div className="text-sm space-y-1">
-                {mfaStatus.setupAt && (
+                {mfaStatus.totp.setupAt && (
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <span className="text-muted-foreground">Enabled:</span>
-                    <span>{new Date(mfaStatus.setupAt).toLocaleDateString()}</span>
+                    <span>{new Date(mfaStatus.totp.setupAt).toLocaleDateString()}</span>
                   </div>
                 )}
-                {mfaStatus.lastUsed && (
+                {mfaStatus.totp.lastUsed && (
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-muted-foreground" />
                     <span className="text-muted-foreground">Last used:</span>
-                    <span>{new Date(mfaStatus.lastUsed).toLocaleDateString()}</span>
+                    <span>{new Date(mfaStatus.totp.lastUsed).toLocaleDateString()}</span>
                   </div>
                 )}
               </div>
@@ -427,7 +432,7 @@ export function MfaSettings() {
                 </p>
               </div>
             </div>
-            {mfaStatus?.emailEnabled ? (
+            {mfaStatus?.email?.enabled ? (
               <Badge variant="default" className="gap-1">
                 <CheckCircle className="h-3 w-3" />
                 Enabled
@@ -440,7 +445,7 @@ export function MfaSettings() {
             )}
           </div>
 
-          {mfaStatus?.emailEnabled ? (
+          {mfaStatus?.email?.enabled ? (
             <div className="ml-8 space-y-3 p-4 bg-muted/50 rounded-lg">
               <p className="text-sm text-muted-foreground">
                 You can receive verification codes via email as a backup authentication method.
@@ -602,17 +607,17 @@ export function MfaSettings() {
                 <div>
                   <h3 className="font-medium">Backup Codes</h3>
                   <p className="text-sm text-muted-foreground">
-                    Emergency access codes - {mfaStatus?.backupCodesRemaining || 0} remaining
+                    Emergency access codes - {mfaStatus?.totp?.backupCodesRemaining || 0} remaining
                   </p>
                 </div>
               </div>
 
               <div className="ml-8 space-y-3 p-4 bg-muted/50 rounded-lg">
-                {(mfaStatus?.backupCodesRemaining || 0) < 3 && (
+                {(mfaStatus?.totp?.backupCodesRemaining || 0) < 3 && (
                   <Alert>
                     <AlertTriangle className="h-4 w-4" />
                     <AlertDescription>
-                      You have {mfaStatus?.backupCodesRemaining || 0} backup codes remaining. Consider regenerating new ones.
+                      You have {mfaStatus?.totp?.backupCodesRemaining || 0} backup codes remaining. Consider regenerating new ones.
                     </AlertDescription>
                   </Alert>
                 )}

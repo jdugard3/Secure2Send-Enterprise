@@ -13,7 +13,10 @@ import {
   XCircle,
   AlertCircle,
   Plus,
-  Trash2
+  Trash2,
+  Mail,
+  Smartphone,
+  ShieldOff
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import AddClientForm from "./add-client-form";
@@ -42,6 +45,9 @@ interface CompanyOverview {
     lastName: string | null;
     email: string;
     createdAt: Date | null;
+    role?: string;
+    mfaEnabled?: boolean;
+    mfaEmailEnabled?: boolean;
   };
   status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'INCOMPLETE';
   createdAt: Date | null;
@@ -182,21 +188,44 @@ export default function AdminOverview() {
                     <CardTitle className="text-xl">
                       {company.companyName || 'No Company Name'}
                     </CardTitle>
-                    <div className="flex items-center space-x-2 mt-1">
-                      <Avatar className="h-6 w-6">
-                        <AvatarFallback className="text-xs">
-                          {getInitials(company.user.firstName, company.user.lastName)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="text-sm text-gray-600">
-                        {company.user.firstName} {company.user.lastName}
-                      </span>
-                      <span className="text-sm text-gray-400">•</span>
-                      <span className="text-sm text-gray-600">{company.user.email}</span>
-                      <span className="text-sm text-gray-400">•</span>
-                      <Badge variant={company.user.role === 'ADMIN' ? 'destructive' : 'secondary'} className="text-xs">
-                        {company.user.role || 'CLIENT'}
-                      </Badge>
+                    <div className="space-y-1.5">
+                      <div className="flex items-center space-x-2">
+                        <Avatar className="h-6 w-6">
+                          <AvatarFallback className="text-xs">
+                            {getInitials(company.user.firstName, company.user.lastName)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-sm text-gray-600">
+                          {company.user.firstName} {company.user.lastName}
+                        </span>
+                        <span className="text-sm text-gray-400">•</span>
+                        <span className="text-sm text-gray-600">{company.user.email}</span>
+                        <span className="text-sm text-gray-400">•</span>
+                        <Badge variant={company.user.role === 'ADMIN' ? 'destructive' : 'secondary'} className="text-xs">
+                          {company.user.role || 'CLIENT'}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center space-x-2 ml-8">
+                        <span className="text-xs text-gray-500 font-medium">MFA:</span>
+                        {company.user.mfaEnabled && (
+                          <Badge variant="outline" className="text-xs gap-1">
+                            <Smartphone className="h-3 w-3" />
+                            Authenticator
+                          </Badge>
+                        )}
+                        {company.user.mfaEmailEnabled && (
+                          <Badge variant="outline" className="text-xs gap-1">
+                            <Mail className="h-3 w-3" />
+                            Email
+                          </Badge>
+                        )}
+                        {!company.user.mfaEnabled && !company.user.mfaEmailEnabled && (
+                          <Badge variant="secondary" className="text-xs gap-1">
+                            <ShieldOff className="h-3 w-3" />
+                            Not Set Up
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>

@@ -79,7 +79,8 @@ export function MfaVerificationDual({ userId, email, onVerificationSuccess, onCa
       }
 
       setEmailOtpSent(true);
-      setEmailOtpExpiresAt(new Date(data.expiresAt));
+      // Set expiry to 5 minutes from now (OTP duration)
+      setEmailOtpExpiresAt(new Date(Date.now() + 5 * 60 * 1000));
       toast({
         title: "Verification Code Sent",
         description: "Check your email for the 6-digit verification code.",
@@ -101,13 +102,14 @@ export function MfaVerificationDual({ userId, email, onVerificationSuccess, onCa
     setError(null);
 
     try {
-      const endpoint = useBackupCode 
-        ? '/api/login/mfa' 
-        : '/api/mfa/verify-with-method';
-      
-      const body = useBackupCode 
-        ? { userId, code: verificationCode.trim() }
-        : { userId, code: verificationCode.trim(), method: activeMethod };
+      let endpoint = '/api/login/mfa'; // Default for TOTP and backup codes
+      let body: any = { userId, code: verificationCode.trim() };
+
+      // Use specific endpoint for email MFA
+      if (activeMethod === 'email' && !useBackupCode) {
+        endpoint = '/api/mfa/email/verify-login-otp';
+        body = { userId, otp: verificationCode.trim() };
+      }
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -121,7 +123,7 @@ export function MfaVerificationDual({ userId, email, onVerificationSuccess, onCa
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Invalid verification code');
+        throw new Error(data.message || data.error || 'Invalid verification code');
       }
 
       if (data.isBackupCode || data.usedBackupCode) {

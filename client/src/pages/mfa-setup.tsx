@@ -29,15 +29,22 @@ export default function MfaSetupPage() {
     return null;
   }
 
-  // If user already has MFA enabled, redirect to dashboard
-  if (user.mfaEnabled) {
+  // If user already has MFA enabled (either type), redirect to dashboard
+  if (user.mfaEnabled || user.mfaEmailEnabled) {
     navigate("/");
     return null;
   }
 
-  const handleSetupComplete = (codes: string[]) => {
-    setBackupCodes(codes);
-    setShowBackupCodes(true);
+  const handleSetupComplete = (codes?: string[]) => {
+    // If backup codes were provided (TOTP), show them
+    // If no codes (Email MFA), redirect directly
+    if (codes && codes.length > 0) {
+      setBackupCodes(codes);
+      setShowBackupCodes(true);
+    } else {
+      // Email MFA - no backup codes, redirect immediately
+      handleBackupCodesClose();
+    }
   };
 
   const handleBackupCodesClose = async () => {
