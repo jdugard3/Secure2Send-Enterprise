@@ -1019,11 +1019,16 @@ export class IrisCrmService {
       const FormData = (await import('form-data')).default;
       const form = new FormData();
       
-      // Append the PDF file
+      // Append the PDF file with proper field name
       form.append('file', pdfBuffer, {
         filename: filename,
         contentType: 'application/pdf',
       });
+      
+      // Add required IRIS API fields
+      form.append('filename', filename);
+      form.append('label', 'Merchant Application'); // Document label/title
+      form.append('tab', 'Documents'); // Tab/category in IRIS
 
       console.log(`📤 Uploading PDF (${pdfBuffer.length} bytes) to IRIS...`);
 
