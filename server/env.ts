@@ -54,6 +54,9 @@ const envSchema = z.object({
   ZAPIER_KINDTAP_WEBHOOK_URL: z.string().url().optional(),
   ZAPIER_DOCUMENT_WEBHOOK_URL: z.string().url().optional(),
   ZAPIER_APPLICATION_WEBHOOK_URL: z.string().url().optional(),
+  
+  // Webhook Security - Secret token for authenticating webhook requests
+  ZAPIER_WEBHOOK_SECRET: z.string().min(32).optional(),
 });
 
 // Parse and validate environment variables

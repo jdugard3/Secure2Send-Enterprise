@@ -1460,6 +1460,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             urlsValidFor: '3 hours',
             totalDocuments: documentsWithSignedUrls.length,
             includesFilledApplicationPdf: !!filledApplicationPdf,
+          },
+          // Security: Include secret token for webhook authentication
+          _auth: {
+            token: env.ZAPIER_WEBHOOK_SECRET || '',
+            timestamp: new Date().toISOString(),
           }
         };
 
@@ -1782,6 +1787,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           urlsValidFor: '3 hours',
           totalDocuments: documentsWithSignedUrls.length,
           includesFilledApplicationPdf: !!filledApplicationPdf,
+        },
+        // Security: Include secret token for webhook authentication
+        _auth: {
+          token: env.ZAPIER_WEBHOOK_SECRET || '',
+          timestamp: new Date().toISOString(),
         }
       };
 
