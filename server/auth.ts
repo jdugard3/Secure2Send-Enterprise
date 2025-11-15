@@ -62,7 +62,7 @@ export async function setupAuth(app: Express) {
     cookie: {
       secure: env.NODE_ENV === "production", // Secure cookies in production
       httpOnly: true,
-      maxAge: 30 * 60 * 1000, // 30 minutes of inactivity before timeout
+      maxAge: 2 * 60 * 60 * 1000, // 2 hours of inactivity before timeout (increased from 30 min to prevent interruptions during document uploads)
       sameSite: env.NODE_ENV === "production" ? "strict" : "lax", // CSRF protection
     },
     rolling: true, // Reset the cookie maxAge on every response (keeps session alive with activity)

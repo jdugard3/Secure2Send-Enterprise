@@ -295,13 +295,18 @@ export default function MerchantApplicationWizard({
       // Update the applicationId if this was a new application
       if (!applicationId && data.id) {
         setApplicationId(data.id);
+        // Update URL without navigation to keep user in the wizard
         window.history.replaceState(
           null, 
           '', 
-          `/documents?tab=merchant-application&id=${data.id}`
+          `/merchant-applications?id=${data.id}`
         );
+        // Dispatch custom event so parent component updates
+        window.dispatchEvent(new Event('urlchange'));
       }
       queryClient.setQueryData([`/api/merchant-applications/${data.id}`], data);
+      // Also invalidate the list query so the application appears in the list without refresh
+      queryClient.invalidateQueries({ queryKey: ['/api/merchant-applications'] });
     },
     onError: (error) => {
       console.error('Auto-save failed:', error);
@@ -596,8 +601,61 @@ export default function MerchantApplicationWizard({
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
-      // BYPASS CLIENT-SIDE VALIDATION - Server will handle null values
-      console.log("BYPASSING all client-side validation due to cache issues");
+      // CRITICAL: Check if all required documents are uploaded before submission
+      if (!applicationId) {
+        toast({
+          title: "Cannot Submit Application",
+          description: "Application must be saved before checking documents. Please save as draft first.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Fetch documents for this application
+      const documentsResponse = await apiRequest('GET', '/api/documents');
+      const allDocuments = await documentsResponse.json();
+      
+      // Filter documents for this specific application
+      const applicationDocuments = allDocuments.filter(
+        (doc: any) => doc.merchantApplicationId === applicationId
+      );
+
+      // Check which required documents are missing
+      const requiredDocTypes = [
+        'SS4_EIN_LETTER',
+        'DRIVERS_LICENSE', 
+        'BANK_STATEMENTS',
+        'ARTICLES_OF_INCORPORATION',
+        'BUSINESS_LICENSE',
+        'VOIDED_CHECK',
+        'INSURANCE_COVERAGE'
+      ];
+
+      const uploadedDocTypes = new Set(applicationDocuments.map((doc: any) => doc.documentType));
+      const missingDocs = requiredDocTypes.filter(docType => !uploadedDocTypes.has(docType));
+
+      if (missingDocs.length > 0) {
+        // Map document types to readable names
+        const docNames: Record<string, string> = {
+          'SS4_EIN_LETTER': 'SS-4 IRS EIN Confirmation Letter or W9',
+          'DRIVERS_LICENSE': "Driver's License or US Passport",
+          'BANK_STATEMENTS': '3 Most Recent Business Bank Statements',
+          'ARTICLES_OF_INCORPORATION': 'Articles of Incorporation',
+          'BUSINESS_LICENSE': 'Business License & State/Local Permits',
+          'VOIDED_CHECK': 'Voided Check or Bank Letter',
+          'INSURANCE_COVERAGE': 'Insurance Coverage'
+        };
+
+        const missingDocNames = missingDocs.map(type => docNames[type] || type).join('\n• ');
+        
+        toast({
+          title: "Missing Required Documents",
+          description: `You must upload all required documents before submitting your application. Missing:\n\n• ${missingDocNames}`,
+          variant: "destructive",
+          duration: 10000,
+        });
+        return;
+      }
       
       // Get form data and clean null values that cause validation errors
       let formData = form.getValues();
@@ -689,7 +747,7 @@ export default function MerchantApplicationWizard({
       } else {
         toast({
           title: "Submission Error",
-          description: "Please complete all required fields before submitting.",
+          description: error instanceof Error ? error.message : "Please complete all required fields before submitting.",
           variant: "destructive",
         });
       }

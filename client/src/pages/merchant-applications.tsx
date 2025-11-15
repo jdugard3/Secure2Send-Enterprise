@@ -1,7 +1,7 @@
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Sidebar from "@/components/layout/sidebar";
 import { MobileSidebar } from "@/components/layout/mobile-sidebar";
 import Header from "@/components/layout/header";
@@ -32,10 +32,32 @@ export default function MerchantApplicationsPage() {
   const { toast } = useToast();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   
-  // Get URL parameters to check for existing application ID
-  const urlParams = new URLSearchParams(window.location.search);
-  const applicationId = urlParams.get('id');
-  const isNewApplication = urlParams.get('new') === 'true';
+  // Use state for URL parameters to make them reactive
+  const [applicationId, setApplicationId] = useState<string | null>(null);
+  const [isNewApplication, setIsNewApplication] = useState(false);
+  
+  // Update state when URL changes
+  useEffect(() => {
+    const updateFromUrl = () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      setApplicationId(urlParams.get('id'));
+      setIsNewApplication(urlParams.get('new') === 'true');
+    };
+    
+    // Update on mount
+    updateFromUrl();
+    
+    // Listen for URL changes (popstate, pushstate, replacestate)
+    window.addEventListener('popstate', updateFromUrl);
+    
+    // Custom event for when we update URL manually
+    window.addEventListener('urlchange', updateFromUrl);
+    
+    return () => {
+      window.removeEventListener('popstate', updateFromUrl);
+      window.removeEventListener('urlchange', updateFromUrl);
+    };
+  }, []);
   
   // Fetch merchant applications for this user
   const { data: merchantApplications = [], isLoading } = useQuery<MerchantApplication[]>({
@@ -97,19 +119,27 @@ export default function MerchantApplicationsPage() {
   };
 
   const handleViewApplication = (id: string) => {
-    window.location.href = `/merchant-applications?id=${id}`;
+    // Use pushState for better navigation without full page reload
+    window.history.pushState({}, '', `/merchant-applications?id=${id}`);
+    window.dispatchEvent(new Event('urlchange'));
   };
 
   const handleEditApplication = (id: string) => {
-    window.location.href = `/merchant-applications?id=${id}`;
+    // Use pushState for better navigation without full page reload
+    window.history.pushState({}, '', `/merchant-applications?id=${id}`);
+    window.dispatchEvent(new Event('urlchange'));
   };
 
   const handleNewApplication = () => {
-    window.location.href = '/merchant-applications?new=true';
+    // Use pushState for better navigation without full page reload
+    window.history.pushState({}, '', '/merchant-applications?new=true');
+    window.dispatchEvent(new Event('urlchange'));
   };
 
   const handleBackToList = () => {
-    window.location.href = '/merchant-applications';
+    // Use pushState for better navigation without full page reload
+    window.history.pushState({}, '', '/merchant-applications');
+    window.dispatchEvent(new Event('urlchange'));
   };
 
   // Group applications by status

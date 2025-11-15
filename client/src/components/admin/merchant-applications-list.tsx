@@ -32,6 +32,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   CreditCard, 
   Eye, 
@@ -224,6 +225,7 @@ export default function MerchantApplicationsList() {
   const [selectedApplication, setSelectedApplication] = useState<MerchantApplication | null>(null);
   const [reviewAction, setReviewAction] = useState<'APPROVED' | 'REJECTED' | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [sendToKindTap, setSendToKindTap] = useState(false);
   const { toast} = useToast();
   const queryClient = useQueryClient();
 
@@ -236,26 +238,29 @@ export default function MerchantApplicationsList() {
   });
 
   const reviewMutation = useMutation({
-    mutationFn: async ({ applicationId, status, reason }: { 
+    mutationFn: async ({ applicationId, status, reason, sendToKindTap }: { 
       applicationId: string; 
       status: string; 
       reason?: string;
+      sendToKindTap?: boolean;
     }) => {
       const response = await apiRequest('PUT', `/api/merchant-applications/${applicationId}/status`, {
         status,
         rejectionReason: reason,
+        sendToKindTap,
       });
       return response.json();
     },
     onSuccess: () => {
       toast({
         title: "Application Updated",
-        description: `Application has been ${reviewAction?.toLowerCase()}.`,
+        description: `Application has been ${reviewAction?.toLowerCase()}.${sendToKindTap ? ' Data sent to KindTap.' : ''}`,
       });
       queryClient.invalidateQueries({ queryKey: ['/api/merchant-applications'] });
       setSelectedApplication(null);
       setReviewAction(null);
       setRejectionReason('');
+      setSendToKindTap(false);
     },
     onError: (error: Error) => {
       toast({
@@ -283,6 +288,37 @@ export default function MerchantApplicationsList() {
       toast({
         title: "Delete Failed",
         description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Send to KindTap mutation for already-approved applications
+  const sendToKindTapMutation = useMutation({
+    mutationFn: async (applicationId: string) => {
+      const response = await apiRequest('POST', `/api/merchant-applications/${applicationId}/send-to-kindtap`);
+      
+      // Handle response - could be JSON or text
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        return response.json();
+      } else {
+        const text = await response.text();
+        return { success: true, message: text };
+      }
+    },
+    onSuccess: (data) => {
+      console.log('KindTap send successful:', data);
+      toast({
+        title: "Sent to KindTap ✓",
+        description: "Application and documents have been sent to KindTap via Zapier webhook.",
+      });
+    },
+    onError: (error: Error) => {
+      console.error('KindTap send error:', error);
+      toast({
+        title: "Failed to Send",
+        description: error.message || "An unexpected error occurred while sending to KindTap.",
         variant: "destructive",
       });
     },
@@ -387,6 +423,7 @@ export default function MerchantApplicationsList() {
       applicationId: selectedApplication.id,
       status: action,
       reason: action === 'REJECTED' ? rejectionReason : undefined,
+      sendToKindTap: action === 'APPROVED' ? sendToKindTap : false,
     });
   };
 
@@ -601,6 +638,26 @@ export default function MerchantApplicationsList() {
                               </div>
                             )}
 
+                            {/* Send to KindTap Section - For already approved applications */}
+                            {selectedApplication.status === 'APPROVED' && (
+                              <div className="space-y-4 border-t pt-4">
+                                <h4 className="font-medium">Send to KindTap</h4>
+                                <div>
+                                  <Button
+                                    onClick={() => sendToKindTapMutation.mutate(selectedApplication.id)}
+                                    disabled={sendToKindTapMutation.isPending}
+                                    className="w-full bg-blue-600 hover:bg-blue-700"
+                                  >
+                                    <CheckCircle className="h-4 w-4 mr-2" />
+                                    {sendToKindTapMutation.isPending ? 'Sending...' : 'Send to KindTap'}
+                                  </Button>
+                                  <p className="text-xs text-muted-foreground mt-2">
+                                    Upload approved application and all documents to Box.com via KindTap Zapier webhook.
+                                  </p>
+                                </div>
+                              </div>
+                            )}
+
                             {/* E-Signature Actions */}
                             {selectedApplication.status === 'APPROVED' && (
                               <div className="space-y-4 border-t pt-4">
@@ -699,6 +756,23 @@ export default function MerchantApplicationsList() {
                                       onChange={(e) => setRejectionReason(e.target.value)}
                                       className="min-h-[80px]"
                                     />
+                                  </div>
+                                )}
+
+                                {/* KindTap Checkbox - only show when approving */}
+                                {reviewAction === 'APPROVED' && (
+                                  <div className="flex items-center space-x-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                    <Checkbox
+                                      id="send-to-kindtap"
+                                      checked={sendToKindTap}
+                                      onCheckedChange={(checked) => setSendToKindTap(checked === true)}
+                                    />
+                                    <Label 
+                                      htmlFor="send-to-kindtap"
+                                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                                    >
+                                      Send to KindTap (uploads approved application and documents to Box.com)
+                                    </Label>
                                   </div>
                                 )}
 

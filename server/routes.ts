@@ -1240,7 +1240,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put('/api/merchant-applications/:id/status', requireAuth, async (req: any, res: Response) => {
     try {
       const { id } = req.params;
-      const { status, rejectionReason } = req.body;
+      const { status, rejectionReason, sendToKindTap } = req.body;
       const user = req.user;
 
       const existingApplication = await storage.getMerchantApplicationById(id);
@@ -1261,6 +1261,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         if (existingApplication.status !== 'DRAFT') {
           return res.status(400).json({ message: "Can only submit draft applications" });
+        }
+
+        // CRITICAL: Validate that all required documents are uploaded before submission
+        const documents = await storage.getDocumentsByApplicationId(id);
+        const requiredDocTypes = [
+          'SS4_EIN_LETTER',
+          'DRIVERS_LICENSE', 
+          'BANK_STATEMENTS',
+          'ARTICLES_OF_INCORPORATION',
+          'BUSINESS_LICENSE',
+          'VOIDED_CHECK',
+          'INSURANCE_COVERAGE'
+        ];
+
+        const uploadedDocTypes = new Set(documents.map((doc: any) => doc.documentType));
+        const missingDocs = requiredDocTypes.filter(docType => !uploadedDocTypes.has(docType));
+
+        if (missingDocs.length > 0) {
+          const docNames: Record<string, string> = {
+            'SS4_EIN_LETTER': 'SS-4 IRS EIN Confirmation Letter or W9',
+            'DRIVERS_LICENSE': "Driver's License or US Passport",
+            'BANK_STATEMENTS': '3 Most Recent Business Bank Statements',
+            'ARTICLES_OF_INCORPORATION': 'Articles of Incorporation',
+            'BUSINESS_LICENSE': 'Business License & State/Local Permits',
+            'VOIDED_CHECK': 'Voided Check or Bank Letter',
+            'INSURANCE_COVERAGE': 'Insurance Coverage'
+          };
+
+          const missingDocNames = missingDocs.map(type => docNames[type] || type).join(', ');
+          return res.status(400).json({ 
+            message: `Cannot submit application without all required documents. Missing: ${missingDocNames}` 
+          });
         }
       }
 
@@ -1283,9 +1315,176 @@ export async function registerRoutes(app: Express): Promise<Server> {
           applicationId: id,
           oldStatus: existingApplication.status,
           newStatus: status,
-          rejectionReason
+          rejectionReason,
+          sendToKindTap: sendToKindTap || false
         }
       });
+
+      // Trigger KindTap webhook if requested and approved
+      if (status === 'APPROVED' && sendToKindTap) {
+        console.log('🚀 Triggering KindTap webhook for approved application:', id);
+        
+        // Fetch all documents for this application
+        const documents = await storage.getDocumentsByApplicationId(id);
+        const client = await storage.getClientById(application.clientId);
+        const applicationOwner = client ? await storage.getUser(client.userId) : null;
+        
+        // Generate the filled merchant application PDF
+        console.log('📄 Generating filled merchant application PDF...');
+        let filledApplicationPdf: { url: string; r2Key?: string } | null = null;
+        
+        try {
+          const { PdfFillService } = await import('./services/pdfFillService');
+          const pdfBuffer = await PdfFillService.fillMerchantApplicationPDF(application);
+          console.log(`✅ Generated filled PDF (${pdfBuffer.length} bytes)`);
+          
+          // Upload to R2 for temporary access
+          if (cloudflareR2) {
+            try {
+              // Save to temp file first
+              const tempFilePath = path.join(process.cwd(), 'uploads', `temp-app-${application.id}.pdf`);
+              await fs.promises.writeFile(tempFilePath, pdfBuffer);
+              
+              // Upload to R2
+              const r2Result = await cloudflareR2.uploadFile(
+                tempFilePath,
+                `merchant-application-${application.legalBusinessName || application.dbaBusinessName || application.id}.pdf`,
+                application.clientId
+              );
+              
+              // Generate pre-signed URL
+              const signedUrl = await cloudflareR2.getDownloadUrl(r2Result.key, 10800); // 3 hours
+              filledApplicationPdf = { url: signedUrl, r2Key: r2Result.key };
+              
+              // Clean up temp file
+              await fs.promises.unlink(tempFilePath).catch(() => {});
+              
+              console.log('✅ Uploaded filled PDF to R2 and generated pre-signed URL');
+            } catch (error) {
+              console.error('Failed to upload filled PDF to R2:', error);
+            }
+          }
+        } catch (error) {
+          console.error('Failed to generate filled PDF:', error);
+        }
+        
+        // Generate pre-signed URLs for all documents (valid for 3 hours)
+        console.log(`📝 Generating pre-signed URLs for ${documents.length} documents...`);
+        const documentsWithSignedUrls = await Promise.all(
+          documents.map(async (doc) => {
+            let signedUrl = null;
+            
+            // Generate pre-signed URL if document is in R2
+            if (doc.r2Key && cloudflareR2) {
+              try {
+                // 3 hours (10800 seconds) - plenty of time for Zapier to download
+                signedUrl = await cloudflareR2.getDownloadUrl(doc.r2Key, 10800);
+                console.log(`✓ Generated pre-signed URL for ${doc.originalName} (expires in 3 hours)`);
+              } catch (error) {
+                console.error(`Failed to generate pre-signed URL for document ${doc.id}:`, error);
+                // Fallback to API endpoint
+                signedUrl = `${req.protocol}://${req.get('host')}/api/documents/${doc.id}/download`;
+              }
+            } else {
+              // Fallback to API endpoint for local files
+              signedUrl = `${req.protocol}://${req.get('host')}/api/documents/${doc.id}/download`;
+              console.log(`⚠️ Document ${doc.originalName} not in R2, using API endpoint`);
+            }
+            
+            return {
+              id: doc.id,
+              documentType: doc.documentType,
+              originalName: doc.originalName,
+              status: doc.status,
+              uploadedAt: doc.uploadedAt,
+              fileSize: doc.fileSize,
+              mimeType: doc.mimeType,
+              // Pre-signed URL that Zapier can access directly
+              downloadUrl: signedUrl,
+              // Metadata
+              expiresAt: new Date(Date.now() + 10800 * 1000).toISOString(), // 3 hours from now
+            };
+          })
+        );
+        
+        // Add the filled application PDF to the documents array
+        if (filledApplicationPdf) {
+          documentsWithSignedUrls.unshift({
+            id: `app-pdf-${application.id}`,
+            documentType: 'MERCHANT_APPLICATION_PDF',
+            originalName: `Merchant-Application-${application.legalBusinessName || application.dbaBusinessName || application.id}.pdf`,
+            status: 'APPROVED',
+            uploadedAt: new Date().toISOString(),
+            fileSize: 0, // Unknown at this point
+            mimeType: 'application/pdf',
+            downloadUrl: filledApplicationPdf.url,
+            expiresAt: new Date(Date.now() + 10800 * 1000).toISOString(),
+            isApplicationPdf: true, // Flag to identify it as the application itself
+          });
+          console.log('✅ Added filled application PDF to documents array');
+        }
+        
+        console.log(`✅ Generated ${documentsWithSignedUrls.length} pre-signed URLs (including application PDF)`);
+        
+        // Prepare webhook payload with application and document data
+        const webhookPayload = {
+          applicationId: application.id,
+          status: application.status,
+          approvedAt: new Date().toISOString(),
+          approvedBy: {
+            id: user.id,
+            email: user.email,
+            name: `${user.firstName} ${user.lastName}`
+          },
+          merchant: {
+            legalBusinessName: application.legalBusinessName,
+            dbaBusinessName: application.dbaBusinessName,
+            contactName: application.contactName,
+            contactEmail: application.contactEmail,
+            businessPhone: application.businessPhone,
+            federalTaxIdNumber: application.federalTaxIdNumber,
+            ownershipType: application.ownershipType,
+          },
+          owner: applicationOwner ? {
+            email: applicationOwner.email,
+            firstName: applicationOwner.firstName,
+            lastName: applicationOwner.lastName,
+            companyName: applicationOwner.companyName,
+          } : null,
+          documents: documentsWithSignedUrls,
+          applicationData: application,
+          // Add metadata about URLs
+          _metadata: {
+            urlsExpireAt: new Date(Date.now() + 10800 * 1000).toISOString(),
+            urlsValidFor: '3 hours',
+            totalDocuments: documentsWithSignedUrls.length,
+            includesFilledApplicationPdf: !!filledApplicationPdf,
+          }
+        };
+
+        // Send to KindTap Zapier webhook (async, don't block response)
+        fetch('https://hooks.zapier.com/hooks/catch/24656561/u8ijsc1/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(webhookPayload),
+        })
+          .then(response => {
+            if (response.ok) {
+              console.log('✅ KindTap webhook triggered successfully');
+            } else {
+              console.error('❌ KindTap webhook failed:', response.status, response.statusText);
+            }
+            return response.json();
+          })
+          .then(data => {
+            console.log('KindTap webhook response:', data);
+          })
+          .catch(error => {
+            console.error('❌ Failed to trigger KindTap webhook:', error);
+          });
+      }
 
       // Sync merchant application to IRIS CRM via Zapier webhook (async, don't block response)
       // Trigger on any status change (SUBMITTED, UNDER_REVIEW, APPROVED, REJECTED)
@@ -1411,6 +1610,234 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting merchant application:", error);
       res.status(500).json({ message: "Failed to delete merchant application" });
+    }
+  });
+
+  // ========================================================================
+  // KINDTAP WEBHOOK ROUTE - Send approved applications to Box.com
+  // ========================================================================
+  
+  app.post('/api/merchant-applications/:id/send-to-kindtap', requireAuth, async (req: any, res: Response) => {
+    try {
+      const { id } = req.params;
+      const user = req.user;
+
+      // Only admins can send to KindTap
+      if (user.role !== 'ADMIN') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const application = await storage.getMerchantApplicationById(id);
+      if (!application) {
+        return res.status(404).json({ message: "Merchant application not found" });
+      }
+
+      // Verify application is approved
+      if (application.status !== 'APPROVED') {
+        return res.status(400).json({ message: "Only approved applications can be sent to KindTap" });
+      }
+
+      console.log('🚀 Triggering KindTap webhook for approved application:', id);
+      
+      // Fetch all documents for this application
+      const documents = await storage.getDocumentsByApplicationId(id);
+      const client = await storage.getClientById(application.clientId);
+      const applicationOwner = client ? await storage.getUser(client.userId) : null;
+      
+      // Generate the filled merchant application PDF
+      console.log('📄 Generating filled merchant application PDF...');
+      let filledApplicationPdf: { url: string; r2Key?: string } | null = null;
+      
+      try {
+        const { PdfFillService } = await import('./services/pdfFillService');
+        const pdfBuffer = await PdfFillService.fillMerchantApplicationPDF(application);
+        console.log(`✅ Generated filled PDF (${pdfBuffer.length} bytes)`);
+        
+        // Upload to R2 for temporary access
+        if (cloudflareR2) {
+          try {
+            // Save to temp file first
+            const tempFilePath = path.join(process.cwd(), 'uploads', `temp-app-${application.id}.pdf`);
+            await fs.promises.writeFile(tempFilePath, pdfBuffer);
+            
+            // Upload to R2
+            const r2Result = await cloudflareR2.uploadFile(
+              tempFilePath,
+              `merchant-application-${application.legalBusinessName || application.dbaBusinessName || application.id}.pdf`,
+              application.clientId
+            );
+            
+            // Generate pre-signed URL
+            const signedUrl = await cloudflareR2.getDownloadUrl(r2Result.key, 10800); // 3 hours
+            filledApplicationPdf = { url: signedUrl, r2Key: r2Result.key };
+            
+            // Clean up temp file
+            await fs.promises.unlink(tempFilePath).catch(() => {});
+            
+            console.log('✅ Uploaded filled PDF to R2 and generated pre-signed URL');
+          } catch (error) {
+            console.error('Failed to upload filled PDF to R2:', error);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to generate filled PDF:', error);
+      }
+      
+      // Generate pre-signed URLs for all documents (valid for 3 hours)
+      console.log(`📝 Generating pre-signed URLs for ${documents.length} documents...`);
+      const documentsWithSignedUrls = await Promise.all(
+        documents.map(async (doc) => {
+          let signedUrl = null;
+          
+          // Generate pre-signed URL if document is in R2
+          if (doc.r2Key && cloudflareR2) {
+            try {
+              // 3 hours (10800 seconds) - plenty of time for Zapier to download
+              signedUrl = await cloudflareR2.getDownloadUrl(doc.r2Key, 10800);
+              console.log(`✓ Generated pre-signed URL for ${doc.originalName} (expires in 3 hours)`);
+            } catch (error) {
+              console.error(`Failed to generate pre-signed URL for document ${doc.id}:`, error);
+              // Fallback to API endpoint
+              signedUrl = `${req.protocol}://${req.get('host')}/api/documents/${doc.id}/download`;
+            }
+          } else {
+            // Fallback to API endpoint for local files
+            signedUrl = `${req.protocol}://${req.get('host')}/api/documents/${doc.id}/download`;
+            console.log(`⚠️ Document ${doc.originalName} not in R2, using API endpoint`);
+          }
+          
+          return {
+            id: doc.id,
+            documentType: doc.documentType,
+            originalName: doc.originalName,
+            status: doc.status,
+            uploadedAt: doc.uploadedAt,
+            fileSize: doc.fileSize,
+            mimeType: doc.mimeType,
+            // Pre-signed URL that Zapier can access directly
+            downloadUrl: signedUrl,
+            // Metadata
+            expiresAt: new Date(Date.now() + 10800 * 1000).toISOString(), // 3 hours from now
+          };
+        })
+      );
+      
+      // Add the filled application PDF to the documents array
+      if (filledApplicationPdf) {
+        documentsWithSignedUrls.unshift({
+          id: `app-pdf-${application.id}`,
+          documentType: 'MERCHANT_APPLICATION_PDF',
+          originalName: `Merchant-Application-${application.legalBusinessName || application.dbaBusinessName || application.id}.pdf`,
+          status: 'APPROVED',
+          uploadedAt: new Date().toISOString(),
+          fileSize: 0, // Unknown at this point
+          mimeType: 'application/pdf',
+          downloadUrl: filledApplicationPdf.url,
+          expiresAt: new Date(Date.now() + 10800 * 1000).toISOString(),
+          isApplicationPdf: true, // Flag to identify it as the application itself
+        });
+        console.log('✅ Added filled application PDF to documents array');
+      }
+      
+      console.log(`✅ Generated ${documentsWithSignedUrls.length} pre-signed URLs (including application PDF)`);
+      
+      // Prepare webhook payload with application and document data
+      const webhookPayload = {
+        applicationId: application.id,
+        status: application.status,
+        approvedAt: application.reviewedAt || new Date().toISOString(),
+        sentToKindTapAt: new Date().toISOString(),
+        sentBy: {
+          id: user.id,
+          email: user.email,
+          name: `${user.firstName} ${user.lastName}`
+        },
+        merchant: {
+          legalBusinessName: application.legalBusinessName,
+          dbaBusinessName: application.dbaBusinessName,
+          contactName: application.contactName,
+          contactEmail: application.contactEmail,
+          businessPhone: application.businessPhone,
+          federalTaxIdNumber: application.federalTaxIdNumber,
+          ownershipType: application.ownershipType,
+        },
+        owner: applicationOwner ? {
+          email: applicationOwner.email,
+          firstName: applicationOwner.firstName,
+          lastName: applicationOwner.lastName,
+          companyName: applicationOwner.companyName,
+        } : null,
+        documents: documentsWithSignedUrls,
+        applicationData: application,
+        // Add metadata about URLs
+        _metadata: {
+          urlsExpireAt: new Date(Date.now() + 10800 * 1000).toISOString(),
+          urlsValidFor: '3 hours',
+          totalDocuments: documentsWithSignedUrls.length,
+          includesFilledApplicationPdf: !!filledApplicationPdf,
+        }
+      };
+
+      // Send to KindTap Zapier webhook
+      const webhookResponse = await fetch('https://hooks.zapier.com/hooks/catch/24656561/u8ijsc1/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(webhookPayload),
+      });
+
+      if (!webhookResponse.ok) {
+        console.error('❌ KindTap webhook failed:', webhookResponse.status, webhookResponse.statusText);
+        const errorText = await webhookResponse.text();
+        console.error('KindTap webhook error response:', errorText);
+        return res.status(500).json({ 
+          message: `Failed to send to KindTap: ${webhookResponse.status} ${webhookResponse.statusText}` 
+        });
+      }
+
+      // Zapier webhooks return plain text, not JSON
+      let webhookResult;
+      const responseText = await webhookResponse.text();
+      console.log('KindTap webhook raw response:', responseText);
+      
+      try {
+        // Try to parse as JSON first
+        webhookResult = JSON.parse(responseText);
+      } catch (e) {
+        // If it's not JSON, use the text response
+        webhookResult = { 
+          status: 'success', 
+          message: responseText,
+          raw: responseText 
+        };
+      }
+      
+      console.log('✅ KindTap webhook triggered successfully:', webhookResult);
+
+      // Audit log the KindTap send
+      await AuditService.logAction(user, 'MERCHANT_APPLICATION_REVIEW', req, {
+        resourceType: 'merchant_application',
+        resourceId: id,
+        metadata: {
+          action: 'KINDTAP_SEND',
+          applicationId: id,
+          documentsCount: documents.length,
+          webhookResponse: webhookResult,
+          preSignedUrlsGenerated: documentsWithSignedUrls.length
+        }
+      });
+
+      res.json({ 
+        success: true, 
+        message: "Application and documents sent to KindTap successfully",
+        webhookResponse: webhookResult
+      });
+    } catch (error) {
+      console.error("Error sending to KindTap:", error);
+      res.status(500).json({ 
+        message: error instanceof Error ? error.message : "Failed to send to KindTap" 
+      });
     }
   });
 

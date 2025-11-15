@@ -43,6 +43,7 @@ export interface IStorage {
   // Document operations
   createDocument(document: InsertDocument): Promise<Document>;
   getDocumentsByClientId(clientId: string): Promise<Document[]>;
+  getDocumentsByApplicationId(applicationId: string): Promise<Document[]>;
   getDocumentById(id: string): Promise<Document | undefined>;
   getAllDocumentsForReview(): Promise<DocumentWithClient[]>;
   updateDocumentStatus(id: string, status: 'PENDING' | 'APPROVED' | 'REJECTED', rejectionReason?: string): Promise<Document>;
@@ -248,6 +249,14 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(documents)
       .where(eq(documents.clientId, clientId))
+      .orderBy(desc(documents.uploadedAt));
+  }
+
+  async getDocumentsByApplicationId(applicationId: string): Promise<Document[]> {
+    return await db
+      .select()
+      .from(documents)
+      .where(eq(documents.merchantApplicationId, applicationId))
       .orderBy(desc(documents.uploadedAt));
   }
 
