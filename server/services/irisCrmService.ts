@@ -42,8 +42,14 @@ export interface ZapierDocumentPayload {
 }
 
 export class IrisCrmService {
-  private static readonly ZAPIER_DOCUMENT_WEBHOOK_URL = 'https://hooks.zapier.com/hooks/catch/24656561/umq3mle/';
-  private static readonly ZAPIER_APPLICATION_WEBHOOK_URL = 'https://hooks.zapier.com/hooks/catch/15790762/umqr4bb/';
+  // Webhook URLs are now loaded from environment variables for security
+  private static get ZAPIER_DOCUMENT_WEBHOOK_URL() {
+    return env.ZAPIER_DOCUMENT_WEBHOOK_URL;
+  }
+  
+  private static get ZAPIER_APPLICATION_WEBHOOK_URL() {
+    return env.ZAPIER_APPLICATION_WEBHOOK_URL;
+  }
 
   // IRIS CRM Pipeline Stage Mappings
   // Based on actual IRIS CRM configuration

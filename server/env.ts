@@ -49,6 +49,11 @@ const envSchema = z.object({
   CLOUDFLARE_TEAM_DOMAIN: z.string().optional(),
   CLOUDFLARE_ACCESS_AUD: z.string().optional(),
   CLOUDFLARE_ACCESS_ISSUER: z.string().url().optional(),
+  
+  // Zapier Webhook URLs (for integrations)
+  ZAPIER_KINDTAP_WEBHOOK_URL: z.string().url().optional(),
+  ZAPIER_DOCUMENT_WEBHOOK_URL: z.string().url().optional(),
+  ZAPIER_APPLICATION_WEBHOOK_URL: z.string().url().optional(),
 });
 
 // Parse and validate environment variables

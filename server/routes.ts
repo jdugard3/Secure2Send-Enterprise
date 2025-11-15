@@ -1464,7 +1464,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
 
         // Send to KindTap Zapier webhook (async, don't block response)
-        fetch('https://hooks.zapier.com/hooks/catch/24656561/u8ijsc1/', {
+        const kindTapWebhookUrl = env.ZAPIER_KINDTAP_WEBHOOK_URL;
+        if (!kindTapWebhookUrl) {
+          console.warn('⚠️  ZAPIER_KINDTAP_WEBHOOK_URL not configured, skipping KindTap webhook');
+          return;
+        }
+        
+        fetch(kindTapWebhookUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -1780,7 +1786,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Send to KindTap Zapier webhook
-      const webhookResponse = await fetch('https://hooks.zapier.com/hooks/catch/24656561/u8ijsc1/', {
+      const kindTapWebhookUrl = env.ZAPIER_KINDTAP_WEBHOOK_URL;
+      if (!kindTapWebhookUrl) {
+        throw new Error('ZAPIER_KINDTAP_WEBHOOK_URL not configured');
+      }
+      
+      const webhookResponse = await fetch(kindTapWebhookUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
