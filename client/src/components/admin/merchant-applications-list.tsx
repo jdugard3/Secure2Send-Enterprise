@@ -46,6 +46,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { formatDistanceToNow } from "date-fns";
+import { PricingTermsModal, type PricingTermsData } from "./PricingTermsModal";
 
 interface MerchantApplication {
   id: string;
@@ -62,6 +63,7 @@ interface MerchantApplication {
   eSignatureSentAt?: string;
   eSignatureCompletedAt?: string;
   signedDocumentId?: number;
+  feeScheduleData?: PricingTermsData;
   client: {
     id: string;
     user: {
@@ -226,6 +228,8 @@ export default function MerchantApplicationsList() {
   const [reviewAction, setReviewAction] = useState<'APPROVED' | 'REJECTED' | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [sendToKindTap, setSendToKindTap] = useState(false);
+  const [pricingModalOpen, setPricingModalOpen] = useState(false);
+  const [pendingApprovalAppId, setPendingApprovalAppId] = useState<string | null>(null);
   const { toast} = useToast();
   const queryClient = useQueryClient();
 
@@ -238,12 +242,22 @@ export default function MerchantApplicationsList() {
   });
 
   const reviewMutation = useMutation({
-    mutationFn: async ({ applicationId, status, reason, sendToKindTap }: { 
+    mutationFn: async ({ applicationId, status, reason, sendToKindTap, pricingData }: { 
       applicationId: string; 
       status: string; 
       reason?: string;
       sendToKindTap?: boolean;
+      pricingData?: PricingTermsData;
     }) => {
+      // If approving with pricing data, save pricing first
+      if (status === 'APPROVED' && pricingData) {
+        console.log('💰 Saving pricing data:', pricingData);
+        await apiRequest('PUT', `/api/merchant-applications/${applicationId}`, {
+          feeScheduleData: pricingData,
+        });
+        console.log('✅ Pricing data saved successfully');
+      }
+
       const response = await apiRequest('PUT', `/api/merchant-applications/${applicationId}/status`, {
         status,
         rejectionReason: reason,
@@ -261,6 +275,8 @@ export default function MerchantApplicationsList() {
       setReviewAction(null);
       setRejectionReason('');
       setSendToKindTap(false);
+      setPricingModalOpen(false);
+      setPendingApprovalAppId(null);
     },
     onError: (error: Error) => {
       toast({
@@ -419,11 +435,19 @@ export default function MerchantApplicationsList() {
       return;
     }
 
+    // If approving, open pricing modal first
+    if (action === 'APPROVED') {
+      setPendingApprovalAppId(selectedApplication.id);
+      setPricingModalOpen(true);
+      return;
+    }
+
+    // For rejection, proceed directly
     reviewMutation.mutate({
       applicationId: selectedApplication.id,
       status: action,
       reason: action === 'REJECTED' ? rejectionReason : undefined,
-      sendToKindTap: action === 'APPROVED' ? sendToKindTap : false,
+      sendToKindTap: false,
     });
   };
 
@@ -675,7 +699,7 @@ export default function MerchantApplicationsList() {
                                       {sendForSignatureMutation.isPending ? 'Sending...' : 'Send for E-Signature'}
                                     </Button>
                                     <p className="text-xs text-muted-foreground mt-2">
-                                      Send this approved application to merchant and admin for electronic signatures.
+                                      Send to merchant and admin for electronic signatures (pricing already set during approval).
                                     </p>
                                   </div>
                                 )}
@@ -861,6 +885,27 @@ export default function MerchantApplicationsList() {
           </Table>
         )}
       </CardContent>
+
+      {/* Pricing Terms Modal */}
+      <PricingTermsModal
+        open={pricingModalOpen}
+        onClose={() => {
+          setPricingModalOpen(false);
+          setPendingApprovalAppId(null);
+        }}
+        onSubmit={(pricingData) => {
+          if (pendingApprovalAppId) {
+            reviewMutation.mutate({
+              applicationId: pendingApprovalAppId,
+              status: 'APPROVED',
+              pricingData,
+              sendToKindTap: sendToKindTap,
+            });
+          }
+        }}
+        isLoading={reviewMutation.isPending}
+        initialData={selectedApplication?.feeScheduleData as PricingTermsData}
+      />
     </Card>
   );
 }

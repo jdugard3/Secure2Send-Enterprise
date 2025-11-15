@@ -208,13 +208,24 @@ export const beneficialOwnerSchema = z.object({
   controlPerson: z.boolean().default(false),
 });
 
-// Fee Schedule Schema
+// Fee Schedule Schema - Pricing Terms for Page 3 of PDF
 export const feeScheduleSchema = z.object({
-  qualificationDiscountFee: z.number().min(0).optional(),
-  qualificationPerItem: z.number().min(0).optional(),
-  minimumFee: z.number().min(0).optional(),
-  consumerFee: z.number().default(3.50),
-  dispensaryFee: z.number().default(1.00),
+  otherServices: z.object({
+    qualification: z.string().optional(),
+    discFee: z.number().min(0).max(100).optional(),
+    perItem: z.number().min(0).optional(),
+  }).optional(),
+  surcharge: z.object({
+    qualification: z.string().optional(),
+    discFee: z.number().min(0).max(100).optional(),
+    perItem: z.number().min(0).optional(),
+    minimumFee: z.number().min(0).optional(),
+  }).optional(),
+  fees: z.object({
+    qualification: z.string().optional(),
+    discFee: z.number().min(0).max(100).optional(),
+    perItem: z.number().min(0).optional(),
+  }).optional(),
 });
 
 // Supporting Information Schema

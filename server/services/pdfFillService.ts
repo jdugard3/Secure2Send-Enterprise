@@ -98,6 +98,12 @@ export class PdfFillService {
         this.fillEquipment(form, equipmentData);
       }
 
+      // Pricing Terms (Page 3) - Fee Schedule
+      const feeScheduleData = this.parseJSON(application.feeScheduleData);
+      if (feeScheduleData) {
+        this.fillPricingTerms(form, feeScheduleData);
+      }
+
       // Signature fields
       this.setTextField(form, 'Name', application.merchantName);
       this.setTextField(form, 'Title', application.merchantTitle);
@@ -194,6 +200,43 @@ export class PdfFillService {
       this.setTextField(form, `Equi pment Na me${row}`, equipment.equipmentName || '');
       this.setTextField(form, `Qua nti ty${row}`, equipment.quantity?.toString() || '');
       this.setTextField(form, `Pri ce${row}`, equipment.price ? `$ ${equipment.price.toFixed(2)}` : '');
+    }
+  }
+
+  /**
+   * Fill pricing terms (Page 3 - Fee Schedule)
+   */
+  private static fillPricingTerms(form: any, feeScheduleData: any) {
+    try {
+      // Other Services section (Row 1)
+      if (feeScheduleData.otherServices) {
+        const os = feeScheduleData.otherServices;
+        this.setTextField(form, 'Other ServicesRow1', os.qualification || '');
+        this.setTextField(form, 'Other ServicesRow1_2', os.discFee ? `${os.discFee}%` : '');
+        this.setTextField(form, 'Other ServicesRow1_3', os.perItem ? `$${os.perItem.toFixed(2)}` : '');
+      }
+
+      // Surcharge section (Consumer row)
+      if (feeScheduleData.surcharge) {
+        const sc = feeScheduleData.surcharge;
+        this.setTextField(form, 'QualificationCons umer', sc.qualification || 'Consumer');
+        this.setTextField(form, 'FeesCons umer', sc.discFee ? `${sc.discFee}%` : '');
+        this.setTextField(form, 'Per Item Cons umer', sc.perItem ? `$${sc.perItem.toFixed(2)}` : '');
+        this.setTextField(form, 'Minimum FeeCons umer', sc.minimumFee ? `$${sc.minimumFee.toFixed(2)}` : '');
+      }
+
+      // Fees section (Base row)
+      if (feeScheduleData.fees) {
+        const fees = feeScheduleData.fees;
+        this.setTextField(form, 'Qualification', fees.qualification || '');
+        this.setTextField(form, 'Fees', fees.discFee ? `${fees.discFee}%` : '');
+        this.setTextField(form, 'Per Item', fees.perItem ? `$${fees.perItem.toFixed(2)}` : '');
+      }
+
+      console.log('✅ Pricing terms filled successfully');
+    } catch (error) {
+      console.error('❌ Error filling pricing terms:', error);
+      // Don't fail the entire PDF generation if pricing fails
     }
   }
 

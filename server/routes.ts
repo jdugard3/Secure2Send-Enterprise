@@ -1168,6 +1168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: "Cannot modify submitted application" });
         }
       }
+      // ADMIN and PARTNER users can update any application (including pricing terms)
 
       const application = await storage.updateMerchantApplication(id, sanitizedBody);
 
