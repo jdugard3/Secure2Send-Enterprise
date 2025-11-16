@@ -1461,11 +1461,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
             totalDocuments: documentsWithSignedUrls.length,
             includesFilledApplicationPdf: !!filledApplicationPdf,
           },
-          // Security: Include secret token for webhook authentication
-          _auth: {
-            token: env.ZAPIER_WEBHOOK_SECRET || '',
-            timestamp: new Date().toISOString(),
-          }
+          // Security: Include secret token for webhook authentication (flattened for Zapier)
+          auth_token: env.ZAPIER_WEBHOOK_SECRET || '',
+          auth_timestamp: new Date().toISOString(),
         };
 
         // Send to KindTap Zapier webhook (async, don't block response)
@@ -1788,11 +1786,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalDocuments: documentsWithSignedUrls.length,
           includesFilledApplicationPdf: !!filledApplicationPdf,
         },
-        // Security: Include secret token for webhook authentication
-        _auth: {
-          token: env.ZAPIER_WEBHOOK_SECRET || '',
-          timestamp: new Date().toISOString(),
-        }
+        // Security: Include secret token for webhook authentication (flattened for Zapier)
+        auth_token: env.ZAPIER_WEBHOOK_SECRET || '',
+        auth_timestamp: new Date().toISOString(),
       };
 
       // Send to KindTap Zapier webhook

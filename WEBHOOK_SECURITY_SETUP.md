@@ -42,28 +42,58 @@ ZAPIER_WEBHOOK_SECRET=8f4a2c9d7e3b1a5f6c8d9e2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f
 
 ---
 
-## Step 3: Configure Zapier to Validate the Token
+## Step 3: Configure Zapier to Parse and Validate the Token
 
-In your Zapier zap, add a **Filter** step right after the webhook trigger:
+### **3.1 Add a Code Step to Parse JSON** (Required!)
 
-### **3.1 Add a Filter Step**
+Zapier sometimes doesn't auto-parse JSON webhooks. Add this step first:
 
-1. In your Zap, click **+** between the Webhook and your next action
+1. In your Zap, click **+** after the Webhook trigger
+2. Search for **"Code by Zapier"**
+3. Choose **"Run JavaScript"**
+4. Set up the code:
+
+**Input Data:**
+- `raw_body`: Select "Raw Body" from the webhook trigger data
+
+**Code:**
+```javascript
+// Parse the raw JSON body
+const parsed = JSON.parse(inputData.raw_body);
+
+// Return all fields
+return {
+  applicationId: parsed.applicationId,
+  status: parsed.status,
+  auth_token: parsed.auth_token,
+  auth_timestamp: parsed.auth_timestamp,
+  merchant: parsed.merchant,
+  documents: parsed.documents,
+  // Return the full parsed object too
+  ...parsed
+};
+```
+
+**Test** this step - you should now see `auth_token` as an output field!
+
+### **3.2 Add a Filter Step**
+
+1. Click **+** after the Code step
 2. Choose **Filter by Zapier**
 3. Set up the filter:
 
 **Filter Setup:**
-- **Field**: `_auth token`
-- **Condition**: `Text Contains`
+- **Field**: Select `auth_token` from the **Code by Zapier** step output
+- **Condition**: `Text Exactly Matches`
 - **Value**: `YOUR_SECRET_TOKEN` (paste your generated token here)
 
-### **3.2 Optional: Add Timestamp Validation**
+### **3.3 Optional: Add Timestamp Validation**
 
-To prevent replay attacks, add another filter condition:
+To prevent replay attacks, add another filter condition in the same Filter step:
 
-- **Field**: `_auth timestamp`
-- **Condition**: `Greater than`  
-- **Value**: Use a Formatter step to calculate "5 minutes ago"
+- **Field**: `auth_timestamp`
+- **Condition**: Use a Formatter to check it's within last 5 minutes
+- **Value**: Prevent replay attacks by validating timestamp freshness
 
 ---
 
@@ -106,14 +136,12 @@ Your App + Secret Token → Zapier → Filter Check → Your Actions
   "applicationId": "...",
   "merchant": { ... },
   "documents": [ ... ],
-  "_auth": {
-    "token": "8f4a2c9d7e3b...",  ← Your secret token
-    "timestamp": "2024-01-15T12:00:00Z"
-  }
+  "auth_token": "8f4a2c9d7e3b...",  ← Your secret token (top-level field)
+  "auth_timestamp": "2024-01-15T12:00:00Z"
 }
 ```
 
-Zapier will check the `_auth.token` field and only proceed if it matches your configured secret.
+Zapier will check the `auth_token` field and only proceed if it matches your configured secret.
 
 ---
 
