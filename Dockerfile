@@ -37,8 +37,11 @@ COPY --from=builder /app/migrations ./migrations
 COPY --from=builder /app/drizzle.config.ts ./drizzle.config.ts
 COPY --from=builder /app/vite.config.ts ./vite.config.ts
 
-# Create uploads directory with proper permissions
-RUN mkdir -p uploads && chown -R node:node uploads
+# Copy PDF template to uploads directory
+COPY --from=builder /app/uploads ./uploads
+
+# Ensure uploads directory has proper permissions
+RUN chown -R node:node uploads
 
 # Switch to non-root user for security
 USER node
