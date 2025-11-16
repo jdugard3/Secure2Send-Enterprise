@@ -1,19 +1,17 @@
 import { PDFDocument, PDFTextField, PDFCheckBox } from 'pdf-lib';
 import * as fs from 'fs';
 import * as path from 'path';
-import { fileURLToPath } from 'url';
 import type { MerchantApplication } from '@shared/schema';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 /**
  * Service to fill PDF forms with merchant application data
  */
 export class PdfFillService {
+  // Use process.cwd() which is /app in Docker container
+  // This is more reliable than __dirname in bundled code
   private static readonly PDF_TEMPLATE_PATH = path.join(
-    __dirname,
-    '../../templates/CorduroMSA_CRB (2025.10.23) (5).pdf'
+    process.cwd(),
+    'templates/CorduroMSA_CRB (2025.10.23) (5).pdf'
   );
 
   /**
