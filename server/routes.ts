@@ -2085,10 +2085,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .replace(/[^a-z0-9-_.]/gi, '_');
       const timestamp = Date.now();
       const filename = `signed-merchant-application-${businessName}-${timestamp}.pdf`;
-      const tempPath = path.join(__dirname, '../uploads', filename);
+      const tempPath = path.join(process.cwd(), 'uploads', filename);
       
       // Ensure uploads directory exists
-      const uploadsDir = path.join(__dirname, '../uploads');
+      const uploadsDir = path.join(process.cwd(), 'uploads');
       if (!fs.existsSync(uploadsDir)) {
         fs.mkdirSync(uploadsDir, { recursive: true });
       }
