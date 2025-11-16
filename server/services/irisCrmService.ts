@@ -1038,30 +1038,24 @@ export class IrisCrmService {
 
       console.log(`📤 Uploading PDF (${pdfBuffer.length} bytes) to IRIS...`);
 
-      const response = await fetch(apiUrl, {
-        method: 'POST',
+      // Use axios for better multipart/form-data support (same as SignNow)
+      const axios = (await import('axios')).default;
+
+      const response = await axios.post(apiUrl, form, {
         headers: {
           'X-API-KEY': env.IRIS_CRM_API_KEY,
           'accept': 'application/json',
           ...form.getHeaders(),
         },
-        body: form as any,
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
       });
 
-      console.log(`📥 IRIS API Response Status: ${response.status} ${response.statusText}`);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`❌ IRIS Document Upload Error:`, errorText);
-        console.error(`❌ Endpoint: ${apiUrl}`);
-        throw new Error(`IRIS document upload API error: ${response.status} - ${errorText}`);
-      }
-
-      const result = await response.json();
-      console.log('✅ Document uploaded to IRIS successfully:', result);
+      console.log(`📥 IRIS API Response Status: ${response.status}`);
+      console.log('✅ Document uploaded to IRIS successfully:', response.data);
       
       // Return the document ID from IRIS response
-      return result.id || result.documentId || result.document_id;
+      return response.data.id || response.data.documentId || response.data.document_id;
     } catch (error) {
       console.error('❌ Failed to upload document to IRIS:', error);
       throw error;
