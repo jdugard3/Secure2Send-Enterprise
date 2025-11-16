@@ -13,7 +13,7 @@ const __dirname = path.dirname(__filename);
 export class PdfFillService {
   private static readonly PDF_TEMPLATE_PATH = path.join(
     __dirname,
-    '../../uploads/CorduroMSA_CRB (2025.10.23) (5).pdf'
+    '../../templates/CorduroMSA_CRB (2025.10.23) (5).pdf'
   );
 
   /**
