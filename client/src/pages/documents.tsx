@@ -7,7 +7,6 @@ import { MobileSidebar } from "@/components/layout/mobile-sidebar";
 import Header from "@/components/layout/header";
 import DocumentUpload from "@/components/documents/document-upload";
 import DocumentList from "@/components/documents/document-list";
-import DocumentDebug from "@/components/debug/DocumentDebug";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -176,10 +175,6 @@ export default function DocumentsPage() {
                 <CheckCircle className="h-4 w-4" />
                 Approved ({documentsByStatus.approved.length})
               </TabsTrigger>
-              <TabsTrigger value="debug" className="flex items-center gap-2">
-                <AlertCircle className="h-4 w-4" />
-                Debug
-              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="upload" className="flex-1 p-0 -mx-6 -mb-6 h-full">
@@ -238,10 +233,6 @@ export default function DocumentsPage() {
                   )}
                 </CardContent>
               </Card>
-            </TabsContent>
-
-            <TabsContent value="debug" className="space-y-6">
-              <DocumentDebug />
             </TabsContent>
             </Tabs>
           </div>

@@ -79,7 +79,7 @@ function DocumentUploadZone({
   const hasContent = existingDocs.length > 0 || stagedFiles.length > 0;
 
   return (
-    <Card className={`w-full transition-all duration-200 min-h-[400px] ${
+    <Card className={`w-full max-w-4xl transition-all duration-200 ${
       isDragActive ? 'border-primary border-2 bg-blue-50' : 
       'hover:border-gray-300 hover:shadow-md bg-white'
     }`}>
@@ -537,23 +537,62 @@ export default function DocumentUpload() {
           </Card>
         </div>
 
-        <div className="flex flex-wrap gap-8 pb-8 justify-center">
-          {Object.entries(DOCUMENT_TYPES).map(([key, docInfo]) => (
-            <DocumentUploadZone
-              key={key}
-              documentType={key}
-              documentInfo={docInfo}
-              existingDocs={documentsByType[key] || []}
-              onUpload={() => {}}
-              onDelete={handleDelete}
-              isUploading={uploadingTypes.has(key)}
-              stagedFiles={stagedFilesByType[key] || []}
-              onStageFiles={handleStageFiles}
-              onRemoveStagedFile={handleRemoveStagedFile}
-              onUploadStaged={handleUploadStaged}
-              merchantAppMap={merchantAppMap}
-            />
-          ))}
+        <div className="space-y-8 pb-8">
+          {/* Required Documents Section */}
+          <div>
+            <div className="mb-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Required Documents</h3>
+              <p className="text-sm text-gray-600">These documents are mandatory for compliance review</p>
+            </div>
+            <div className="flex flex-col gap-6 items-center">
+              {Object.entries(DOCUMENT_TYPES)
+                .filter(([_, docInfo]) => docInfo.required)
+                .map(([key, docInfo]) => (
+                  <DocumentUploadZone
+                    key={key}
+                    documentType={key}
+                    documentInfo={docInfo}
+                    existingDocs={documentsByType[key] || []}
+                    onUpload={() => {}}
+                    onDelete={handleDelete}
+                    isUploading={uploadingTypes.has(key)}
+                    stagedFiles={stagedFilesByType[key] || []}
+                    onStageFiles={handleStageFiles}
+                    onRemoveStagedFile={handleRemoveStagedFile}
+                    onUploadStaged={handleUploadStaged}
+                    merchantAppMap={merchantAppMap}
+                  />
+                ))}
+            </div>
+          </div>
+
+          {/* Optional Documents Section */}
+          <div>
+            <div className="mb-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Optional Documents</h3>
+              <p className="text-sm text-gray-600">These documents are optional but may be helpful for your application</p>
+            </div>
+            <div className="flex flex-col gap-6 items-center">
+              {Object.entries(DOCUMENT_TYPES)
+                .filter(([_, docInfo]) => !docInfo.required)
+                .map(([key, docInfo]) => (
+                  <DocumentUploadZone
+                    key={key}
+                    documentType={key}
+                    documentInfo={docInfo}
+                    existingDocs={documentsByType[key] || []}
+                    onUpload={() => {}}
+                    onDelete={handleDelete}
+                    isUploading={uploadingTypes.has(key)}
+                    stagedFiles={stagedFilesByType[key] || []}
+                    onStageFiles={handleStageFiles}
+                    onRemoveStagedFile={handleRemoveStagedFile}
+                    onUploadStaged={handleUploadStaged}
+                    merchantAppMap={merchantAppMap}
+                  />
+                ))}
+            </div>
+          </div>
         </div>
 
         {documents.length > 0 && (() => {

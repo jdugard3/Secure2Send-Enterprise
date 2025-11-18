@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Building2, 
   Users, 
@@ -16,7 +17,8 @@ import {
   Trash2,
   Mail,
   Smartphone,
-  ShieldOff
+  ShieldOff,
+  Filter
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import AddClientForm from "./add-client-form";
@@ -67,6 +69,8 @@ interface CompanyOverview {
 
 export default function AdminOverview() {
   const [showAddClientForm, setShowAddClientForm] = useState(false);
+  const [sortBy, setSortBy] = useState<'recent' | 'oldest' | 'name' | 'status' | 'pending'>('recent');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'INCOMPLETE'>('all');
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
@@ -82,6 +86,44 @@ export default function AdminOverview() {
       return response.json();
     },
   });
+
+  // Filter and sort companies
+  const filteredAndSortedCompanies = useMemo(() => {
+    let filtered = companies;
+    
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(company => company.status === statusFilter);
+    }
+    
+    // Apply sorting
+    const sorted = [...filtered].sort((a, b) => {
+      switch (sortBy) {
+        case 'recent':
+          // Most recently created (newest first)
+          return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+        case 'oldest':
+          // Oldest first
+          return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+        case 'name':
+          // Alphabetical by company name
+          const nameA = (a.companyName || '').toLowerCase();
+          const nameB = (b.companyName || '').toLowerCase();
+          return nameA.localeCompare(nameB);
+        case 'status':
+          // Sort by status: PENDING, INCOMPLETE, APPROVED, REJECTED
+          const statusOrder = { 'PENDING': 0, 'INCOMPLETE': 1, 'APPROVED': 2, 'REJECTED': 3 };
+          return (statusOrder[a.status] || 99) - (statusOrder[b.status] || 99);
+        case 'pending':
+          // Sort by number of pending documents (most first)
+          return (b.documents.pending || 0) - (a.documents.pending || 0);
+        default:
+          return 0;
+      }
+    });
+    
+    return sorted;
+  }, [companies, sortBy, statusFilter]);
 
   // Delete user mutation
   const deleteUserMutation = useMutation({
@@ -154,27 +196,69 @@ export default function AdminOverview() {
       {/* Invitation Codes Section */}
       <InvitationCodesManager />
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Company Overview</h2>
-          <p className="text-sm text-gray-500 mt-1">All registered companies and their document status</p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="text-sm text-gray-500 font-medium">
-            {companies.length} {companies.length === 1 ? 'company' : 'companies'}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">Company Overview</h2>
+            <p className="text-sm text-gray-500 mt-1">All registered companies and their document status</p>
           </div>
-          <Button 
-            onClick={() => setShowAddClientForm(true)} 
-            className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white shadow-sm flex items-center gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            Add Client
-          </Button>
+          <div className="flex items-center gap-4">
+            <div className="text-sm text-gray-500 font-medium">
+              {filteredAndSortedCompanies.length} of {companies.length} {companies.length === 1 ? 'company' : 'companies'}
+            </div>
+            <Button 
+              onClick={() => setShowAddClientForm(true)} 
+              className="bg-[#2563EB] hover:bg-[#1D4ED8] text-white shadow-sm flex items-center gap-2"
+            >
+              <Plus className="h-4 w-4" />
+              Add Client
+            </Button>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-gray-500" />
+            <span className="text-sm font-medium text-gray-700">Filters:</span>
+          </div>
+          
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-600">Status:</label>
+            <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
+              <SelectTrigger className="w-40 h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="PENDING">Pending</SelectItem>
+                <SelectItem value="APPROVED">Approved</SelectItem>
+                <SelectItem value="REJECTED">Rejected</SelectItem>
+                <SelectItem value="INCOMPLETE">Incomplete</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-600">Sort by:</label>
+            <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+              <SelectTrigger className="w-48 h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="recent">Most Recently Created</SelectItem>
+                <SelectItem value="oldest">Oldest First</SelectItem>
+                <SelectItem value="name">Company Name (A-Z)</SelectItem>
+                <SelectItem value="status">Status</SelectItem>
+                <SelectItem value="pending">Most Pending Docs</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
       <div className="grid gap-6">
-        {companies.map((company) => (
+        {filteredAndSortedCompanies.map((company) => (
           <Card key={company.id} className="bg-white border border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-md transition-all">
             <CardHeader className="pb-4">
               <div className="flex items-start justify-between">
@@ -351,6 +435,18 @@ export default function AdminOverview() {
             </CardContent>
           </Card>
         ))}
+
+        {filteredAndSortedCompanies.length === 0 && companies.length > 0 && (
+          <Card className="bg-white border border-gray-200 shadow-sm">
+            <CardContent className="p-12 text-center">
+              <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+                <Filter className="h-6 w-6 text-gray-400" />
+              </div>
+              <h3 className="text-base font-semibold text-gray-900 mb-2">No companies match your filters</h3>
+              <p className="text-sm text-gray-500">Try adjusting your filter criteria.</p>
+            </CardContent>
+          </Card>
+        )}
 
         {companies.length === 0 && (
           <Card className="bg-white border border-gray-200 shadow-sm">
