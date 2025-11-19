@@ -11,7 +11,7 @@ export class PdfFillService {
   // This is more reliable than __dirname in bundled code
   private static readonly PDF_TEMPLATE_PATH = path.join(
     process.cwd(),
-    'templates/CorduroMSA_CRB (2025.10.23) (5).pdf'
+    'templates/NEW CorduroMSA_CRB (combined).pdf'
   );
 
   /**
@@ -66,22 +66,6 @@ export class PdfFillService {
       this.setTextField(form, 'Account Name', application.nameOnBankAccount || application.accountName);
       this.setTextField(form, 'Bank Officer Phone', application.bankOfficerPhone);
       this.setTextField(form, 'Bank Officer Email', application.bankOfficerEmail);
-      
-      // New fields from updated PDF (Page 6 - Bank & Provider Info)
-      this.setTextField(form, 'MerchantName', application.dbaBusinessName || application.legalBusinessName);
-      this.setTextField(form, 'CorporateLegalName', application.legalBusinessName);
-      this.setTextField(form, 'LocationAddress', application.locationAddress);
-      this.setTextField(form, 'CorporateMailingAddress', application.billingAddress);
-      this.setTextField(form, 'Bank Address', application.billingAddress); // Or bank's physical address if available
-      this.setTextField(form, 'Primary Contact', application.contactName || application.legalContactName);
-      this.setTextField(form, 'Primary Contact Email', application.contactEmail || application.legalEmail);
-      this.setTextField(form, 'Primary Contact Phone', application.businessPhone);
-      this.setTextField(form, 'POS Provider', application.posSystem);
-      this.setTextField(form, 'S2S provider', ''); // Seed-to-Sale provider - add to schema if needed
-      this.setTextField(form, 'Compliance Provider', ''); // Compliance provider - add to schema if needed
-      
-      // Page 11 - Merchant Initials
-      this.setTextField(form, 'Merchant Initials', this.getInitials(application.merchantName || ''));
 
       // Principal Officers (up to 5 supported)
       this.fillPrincipalOfficers(form, principalOfficers);
@@ -154,19 +138,6 @@ export class PdfFillService {
       this.setTextField(form, `State Issued ID${suffix}`, officer.idState || '');
       this.setTextField(form, `ID Number${suffix}`, officer.idNumber || '');
       this.setTextField(form, `Exp Date${suffix}`, officer.idExpDate ? this.formatDate(officer.idExpDate) : '');
-      
-      // Detailed fields (another section) - Principal #1, Principal #2, etc.
-      this.setTextField(form, `Principal #${i + 1} Name`, officer.name);
-      this.setTextField(form, `Principal #${i + 1} SSN`, officer.ssn);
-      this.setTextField(form, `Principal #${i + 1} DOB`, officer.dob ? this.formatDate(officer.dob) : '');
-      this.setTextField(form, `Principal #${i + 1} Title`, officer.title || '');
-      this.setTextField(form, `Principal #${i + 1} Residential Address`, officer.residentialAddress);
-      this.setTextField(form, `Principal #${i + 1} City/State/Zip`, `${officer.city || ''}, ${officer.state || ''} ${officer.zip || ''}`.trim());
-      this.setTextField(form, `Principal #${i + 1} Home Phone`, officer.homePhone || officer.phoneNumber);
-      this.setTextField(form, `Principal #${i + 1} Cell Phone`, officer.phoneNumber);
-      this.setTextField(form, `Principal #${i + 1} Email`, officer.email);
-      this.setTextField(form, `Principal #${i + 1} State Issued ID${i === 0 ? ' Number' : ''}`, officer.idNumber || '');
-      this.setTextField(form, `Principal #${i + 1} Exp Date`, officer.idExpDate ? this.formatDate(officer.idExpDate) : '');
     }
 
     // Administrator field (5th officer)
