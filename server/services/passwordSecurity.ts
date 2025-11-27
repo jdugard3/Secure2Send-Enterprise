@@ -265,6 +265,9 @@ export class PasswordSecurityService {
   }
 }
 
+// Export as PasswordSecurity for easier imports
+export const PasswordSecurity = PasswordSecurityService;
+
 console.log("✅ Enhanced password security service configured");
 console.log("   - Password strength validation: enabled");
 console.log("   - Breach detection: enabled");

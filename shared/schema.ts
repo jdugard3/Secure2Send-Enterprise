@@ -110,6 +110,10 @@ export const users = pgTable("users", {
   mfaEmailLastSentAt: timestamp("mfa_email_last_sent_at"),
   mfaEmailSendCount: integer("mfa_email_send_count").default(0),
   mfaEmailRateLimitResetAt: timestamp("mfa_email_rate_limit_reset_at"),
+  // Password reset fields
+  passwordResetToken: text("password_reset_token"),
+  passwordResetTokenExpiresAt: timestamp("password_reset_token_expires_at"),
+  passwordResetRequestedAt: timestamp("password_reset_requested_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

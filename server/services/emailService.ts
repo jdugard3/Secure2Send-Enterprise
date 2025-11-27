@@ -15,6 +15,7 @@ import { MfaEnabledEmail } from '../emails/MfaEnabledEmail';
 import { MfaDisabledEmail } from '../emails/MfaDisabledEmail';
 import MfaOtpEmail from '../emails/MfaOtpEmail';
 import { MfaMethodChangedEmail } from '../emails/MfaMethodChangedEmail';
+import { PasswordResetEmail } from '../emails/PasswordResetEmail';
 import type { User, Document, Client } from '@shared/schema';
 import { db } from '../db';
 import { users } from '@shared/schema';
@@ -428,6 +429,36 @@ export class EmailService {
       console.log(`✅ MFA method changed email sent to ${user.email} (${method} ${action})`);
     } catch (error) {
       console.error('❌ Failed to send MFA method changed email:', error);
+    }
+  }
+
+  /**
+   * Send password reset email with secure token
+   */
+  static async sendPasswordResetEmail(
+    user: User,
+    resetToken: string,
+    expiryMinutes: number = 60
+  ): Promise<void> {
+    try {
+      const resetUrl = `${env.APP_URL}/reset-password?token=${resetToken}`;
+      
+      const emailHtml = await render(PasswordResetEmail({
+        firstName: user.firstName || 'there',
+        resetUrl,
+        expiryMinutes,
+      }));
+
+      await this.sendEmail({
+        to: user.email,
+        subject: '🔐 Password Reset Request - Secure2Send',
+        html: emailHtml,
+      });
+
+      console.log(`✅ Password reset email sent to ${user.email}`);
+    } catch (error) {
+      console.error('❌ Failed to send password reset email:', error);
+      throw error; // Re-throw so caller knows it failed
     }
   }
 

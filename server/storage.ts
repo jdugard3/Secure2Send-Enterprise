@@ -20,14 +20,16 @@ import {
   type InvitationCode,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, sql } from "drizzle-orm";
 import { LogSanitizer, safeLog } from "./utils/logSanitizer";
 
 export interface IStorage {
   // User operations
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getUserByPasswordResetToken(token: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: string, data: Partial<User>): Promise<User>;
   upsertUser(user: any): Promise<User>;
   getAllUsers(): Promise<User[]>;
   deleteUser(id: string): Promise<void>;
@@ -95,8 +97,27 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getUserByPasswordResetToken(token: string): Promise<User | undefined> {
+    // The token passed is the plain token, but we store hashed tokens
+    // We need to check if the stored hash contains the token
+    const allUsers = await db.select().from(users).where(sql`${users.passwordResetToken} IS NOT NULL`);
+    
+    // Find user whose hashed token contains the plain token
+    const user = allUsers.find(u => u.passwordResetToken?.includes(token));
+    return user;
+  }
+
   async createUser(userData: InsertUser): Promise<User> {
     const [user] = await db.insert(users).values(userData).returning();
+    return user;
+  }
+
+  async updateUser(id: string, data: Partial<User>): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
     return user;
   }
 

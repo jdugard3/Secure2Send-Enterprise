@@ -12,6 +12,7 @@ import { env } from "./env";
 import { authLimiter } from "./middleware/rateLimiting";
 import { EmailService } from "./services/emailService";
 import { AuditService } from "./services/auditService";
+import { PasswordSecurity } from "./services/passwordSecurity";
 
 declare global {
   namespace Express {
@@ -350,6 +351,118 @@ export async function setupAuth(app: Express) {
       ...userWithoutPassword,
       isImpersonating: false
     });
+  });
+
+  // Password reset request endpoint (public - no auth required)
+  app.post("/api/forgot-password", authLimiter, async (req, res) => {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      // Find user by email
+      const user = await storage.getUserByEmail(email);
+      
+      // Always return success even if user doesn't exist (security best practice)
+      // This prevents email enumeration attacks
+      if (!user) {
+        console.log(`Password reset requested for non-existent email: ${email}`);
+        return res.status(200).json({ 
+          message: "If an account with that email exists, a password reset link has been sent." 
+        });
+      }
+
+      // Generate secure reset token using existing passwordSecurity service
+      const { token, hashedToken, expiresAt } = PasswordSecurity.generatePasswordResetToken();
+
+      // Store hashed token in database
+      await storage.updateUser(user.id, {
+        passwordResetToken: hashedToken,
+        passwordResetTokenExpiresAt: expiresAt,
+        passwordResetRequestedAt: new Date(),
+      });
+
+      // Send password reset email
+      await EmailService.sendPasswordResetEmail(user, token, 60);
+
+      // Log audit event - password reset requested
+      await AuditService.logAction(user, 'SENSITIVE_DATA_ACCESS', req, {
+        resourceType: 'user',
+        resourceId: user.id,
+        metadata: { 
+          action: 'password_reset_requested',
+          email: user.email
+        }
+      });
+
+      res.status(200).json({ 
+        message: "If an account with that email exists, a password reset link has been sent." 
+      });
+    } catch (error) {
+      console.error("Password reset request error:", error);
+      res.status(500).json({ message: "Failed to process password reset request" });
+    }
+  });
+
+  // Password reset completion endpoint (public - no auth required)
+  app.post("/api/reset-password", authLimiter, async (req, res) => {
+    try {
+      const { token, newPassword } = req.body;
+
+      if (!token || !newPassword) {
+        return res.status(400).json({ message: "Token and new password are required" });
+      }
+
+      // Validate password strength
+      if (newPassword.length < 8) {
+        return res.status(400).json({ message: "Password must be at least 8 characters long" });
+      }
+
+      // Find user with this token
+      const user = await storage.getUserByPasswordResetToken(token);
+
+      if (!user) {
+        return res.status(400).json({ message: "Invalid or expired password reset token" });
+      }
+
+      // Check if token has expired
+      if (!user.passwordResetTokenExpiresAt || new Date() > user.passwordResetTokenExpiresAt) {
+        return res.status(400).json({ message: "Password reset token has expired" });
+      }
+
+      // Hash the new password
+      const hashedPassword = await hashPassword(newPassword);
+
+      // Update password and clear reset token
+      await storage.updateUser(user.id, {
+        password: hashedPassword,
+        passwordResetToken: null,
+        passwordResetTokenExpiresAt: null,
+        passwordResetRequestedAt: null,
+        updatedAt: new Date(),
+      });
+
+      // Log audit event - password reset completed
+      await AuditService.logAction(user, 'SENSITIVE_DATA_UPDATE', req, {
+        resourceType: 'user',
+        resourceId: user.id,
+        metadata: { 
+          action: 'password_reset_completed',
+          email: user.email
+        }
+      });
+
+      console.log(`✅ Password successfully reset for user: ${user.email}`);
+
+      res.status(200).json({ 
+        message: "Password has been successfully reset. You can now log in with your new password." 
+      });
+    } catch (error) {
+      console.error("Password reset completion error:", error);
+      res.status(500).json({ message: "Failed to reset password" });
+    }
   });
 }
 
