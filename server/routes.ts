@@ -1866,6 +1866,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/merchant-applications/:id/send-for-signature', requireAuth, async (req: any, res: Response) => {
     try {
       const { id } = req.params;
+      const { includeKindTapAgreement } = req.body; // Get checkbox value from request body
       const user = req.user;
 
       // Only admins can send for signature
@@ -1904,17 +1905,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log(`📝 Preparing to send e-signature for application ${id}`);
+      if (includeKindTapAgreement) {
+        console.log(`📋 KindTap agreement will be included in the document package`);
+      }
 
-      // Step 1: Fill PDF with application data
+      // Step 1: Fill PDF with application data (and optionally merge with KindTap agreement)
       const { PdfFillService } = await import('./services/pdfFillService');
-      const filledPdfBuffer = await PdfFillService.fillMerchantApplicationPDF(application);
-      console.log(`✅ PDF filled successfully (${filledPdfBuffer.length} bytes)`);
+      const filledPdfBuffer = await PdfFillService.fillAndMergeMerchantApplicationPDF(
+        application,
+        includeKindTapAgreement || false
+      );
+      console.log(`✅ PDF prepared successfully (${filledPdfBuffer.length} bytes)${includeKindTapAgreement ? ' - includes KindTap agreement' : ''}`);
 
       // Step 2: Upload PDF to SignNow
       const { SignNowService } = await import('./services/signNowService');
+      const documentFilename = includeKindTapAgreement
+        ? `merchant-application-with-kindtap-${application.legalBusinessName || application.dbaBusinessName || id}.pdf`
+        : `merchant-application-${application.legalBusinessName || application.dbaBusinessName || id}.pdf`;
+      
       const documentId = await SignNowService.uploadDocument(
         filledPdfBuffer,
-        `merchant-application-${application.legalBusinessName || application.dbaBusinessName || id}.pdf`
+        documentFilename
       );
       console.log(`✅ Document uploaded to SignNow, document ID: ${documentId}`);
 
@@ -1949,6 +1960,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           action: 'send_for_signature',
           merchantEmail: clientUser.email,
           adminEmail: user.email,
+          includeKindTapAgreement: includeKindTapAgreement || false,
         }
       });
 

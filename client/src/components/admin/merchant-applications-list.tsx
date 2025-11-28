@@ -228,6 +228,7 @@ export default function MerchantApplicationsList() {
   const [reviewAction, setReviewAction] = useState<'APPROVED' | 'REJECTED' | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [sendToKindTap, setSendToKindTap] = useState(false);
+  const [includeKindTapAgreement, setIncludeKindTapAgreement] = useState(false);
   const [pricingModalOpen, setPricingModalOpen] = useState(false);
   const [pendingApprovalAppId, setPendingApprovalAppId] = useState<string | null>(null);
   const { toast} = useToast();
@@ -342,16 +343,19 @@ export default function MerchantApplicationsList() {
 
   // E-Signature mutation - Send for signature
   const sendForSignatureMutation = useMutation({
-    mutationFn: async (applicationId: string) => {
-      const response = await apiRequest('POST', `/api/merchant-applications/${applicationId}/send-for-signature`);
+    mutationFn: async ({ applicationId, includeKindTapAgreement }: { applicationId: string; includeKindTapAgreement: boolean }) => {
+      const response = await apiRequest('POST', `/api/merchant-applications/${applicationId}/send-for-signature`, {
+        includeKindTapAgreement,
+      });
       return response.json();
     },
     onSuccess: (data) => {
       toast({
         title: "E-Signature Request Sent",
-        description: `Signing invitations sent to merchant and admin.`,
+        description: `Signing invitations sent to merchant and admin.${includeKindTapAgreement ? ' KindTap agreement included.' : ''}`,
       });
       queryClient.invalidateQueries({ queryKey: ['/api/merchant-applications'] });
+      setIncludeKindTapAgreement(false); // Reset checkbox after successful send
     },
     onError: (error: Error) => {
       toast({
@@ -689,9 +693,27 @@ export default function MerchantApplicationsList() {
                                 
                                 {/* Send for E-Signature Button */}
                                 {(!selectedApplication.eSignatureStatus || selectedApplication.eSignatureStatus === 'NOT_SENT') && (
-                                  <div>
+                                  <div className="space-y-3">
+                                    {/* KindTap Agreement Checkbox */}
+                                    <div className="flex items-center space-x-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                      <Checkbox
+                                        id="include-kindtap-agreement"
+                                        checked={includeKindTapAgreement}
+                                        onCheckedChange={(checked) => setIncludeKindTapAgreement(checked === true)}
+                                      />
+                                      <Label 
+                                        htmlFor="include-kindtap-agreement"
+                                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                                      >
+                                        Include KindTap Merchant Agreement in e-signature documents
+                                      </Label>
+                                    </div>
+                                    
                                     <Button
-                                      onClick={() => sendForSignatureMutation.mutate(selectedApplication.id)}
+                                      onClick={() => sendForSignatureMutation.mutate({ 
+                                        applicationId: selectedApplication.id,
+                                        includeKindTapAgreement 
+                                      })}
                                       disabled={sendForSignatureMutation.isPending}
                                       className="w-full"
                                     >
@@ -700,6 +722,11 @@ export default function MerchantApplicationsList() {
                                     </Button>
                                     <p className="text-xs text-muted-foreground mt-2">
                                       Send to merchant and admin for electronic signatures (pricing already set during approval).
+                                      {includeKindTapAgreement && (
+                                        <span className="block mt-1 text-blue-600 font-medium">
+                                          ✓ KindTap agreement will be included in the signature package
+                                        </span>
+                                      )}
                                     </p>
                                   </div>
                                 )}

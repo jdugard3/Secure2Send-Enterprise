@@ -14,6 +14,11 @@ export class PdfFillService {
     'templates/NEW CorduroMSA_CRB (combined).pdf'
   );
 
+  private static readonly KINDTAP_AGREEMENT_PATH = path.join(
+    process.cwd(),
+    'uploads/KindTap Merchant Agreement_08012023.pdf'
+  );
+
   /**
    * Fill the merchant application PDF with data
    */
@@ -319,6 +324,86 @@ export class PdfFillService {
       }
     } catch (error) {
       console.warn(`⚠️  Failed to clean up temp PDF: ${filePath}`, error);
+    }
+  }
+
+  /**
+   * Merge the filled merchant application PDF with the KindTap agreement PDF
+   * Returns a buffer of the merged PDF
+   */
+  static async mergePDFWithKindTapAgreement(
+    filledApplicationBuffer: Buffer
+  ): Promise<Buffer> {
+    try {
+      console.log('📑 Starting PDF merge with KindTap agreement...');
+
+      // Check if KindTap agreement exists
+      if (!fs.existsSync(this.KINDTAP_AGREEMENT_PATH)) {
+        throw new Error(`KindTap agreement PDF not found at: ${this.KINDTAP_AGREEMENT_PATH}`);
+      }
+
+      // Load both PDFs
+      const filledPdfDoc = await PDFDocument.load(filledApplicationBuffer);
+      const kindtapPdfBytes = fs.readFileSync(this.KINDTAP_AGREEMENT_PATH);
+      const kindtapPdfDoc = await PDFDocument.load(kindtapPdfBytes);
+
+      console.log(`📄 Filled application pages: ${filledPdfDoc.getPageCount()}`);
+      console.log(`📄 KindTap agreement pages: ${kindtapPdfDoc.getPageCount()}`);
+
+      // Create a new PDF to hold the merged result
+      const mergedPdf = await PDFDocument.create();
+
+      // Copy all pages from the filled application
+      const applicationPages = await mergedPdf.copyPages(
+        filledPdfDoc,
+        filledPdfDoc.getPageIndices()
+      );
+      applicationPages.forEach(page => mergedPdf.addPage(page));
+
+      // Copy all pages from the KindTap agreement
+      const kindtapPages = await mergedPdf.copyPages(
+        kindtapPdfDoc,
+        kindtapPdfDoc.getPageIndices()
+      );
+      kindtapPages.forEach(page => mergedPdf.addPage(page));
+
+      console.log(`✅ Merged PDF created with ${mergedPdf.getPageCount()} total pages`);
+
+      // Save and return the merged PDF
+      const mergedPdfBytes = await mergedPdf.save();
+      return Buffer.from(mergedPdfBytes);
+    } catch (error) {
+      console.error('❌ Error merging PDFs:', error);
+      throw new Error(
+        `Failed to merge PDF with KindTap agreement: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`
+      );
+    }
+  }
+
+  /**
+   * Fill merchant application PDF and optionally merge with KindTap agreement
+   */
+  static async fillAndMergeMerchantApplicationPDF(
+    application: MerchantApplication,
+    includeKindTapAgreement: boolean = false
+  ): Promise<Buffer> {
+    try {
+      // First, fill the merchant application PDF
+      const filledPdfBuffer = await this.fillMerchantApplicationPDF(application);
+
+      // If KindTap agreement should be included, merge it
+      if (includeKindTapAgreement) {
+        console.log('📋 Including KindTap agreement in document package...');
+        return await this.mergePDFWithKindTapAgreement(filledPdfBuffer);
+      }
+
+      // Otherwise, just return the filled application
+      return filledPdfBuffer;
+    } catch (error) {
+      console.error('❌ Error in fillAndMergeMerchantApplicationPDF:', error);
+      throw error;
     }
   }
 }
