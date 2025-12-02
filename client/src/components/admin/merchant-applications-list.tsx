@@ -868,42 +868,52 @@ export default function MerchantApplicationsList() {
                       </DialogContent>
                     </Dialog>
                     
-                    {/* Delete button for draft applications */}
-                    {application.status === 'DRAFT' && (
-                      <AlertDialog key={`delete-dialog-${application.id}`}>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Draft Application</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to delete this draft application? This action cannot be undone.
-                            </AlertDialogDescription>
+                    {/* Delete button - Admins can delete any application */}
+                    <AlertDialog key={`delete-dialog-${application.id}`}>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          title="Delete application"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Merchant Application</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to delete this merchant application? This action cannot be undone and will permanently remove:
+                          </AlertDialogDescription>
+                          <div className="mt-2 space-y-1">
                             {application.legalBusinessName && (
-                              <div className="mt-2 font-medium">
-                                Application: {application.legalBusinessName}
-                              </div>
+                              <div className="font-medium">• Application: {application.legalBusinessName}</div>
                             )}
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => deleteMutation.mutate(application.id)}
-                              className="bg-red-600 hover:bg-red-700"
-                            >
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    )}
+                            <div className="font-medium">• Status: {application.status?.replace('_', ' ')}</div>
+                            <div className="font-medium">• Contact: {application.contactEmail || application.client.user.email}</div>
+                            <div className="font-medium">• All associated application data</div>
+                          </div>
+                          {application.status !== 'DRAFT' && (
+                            <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-md">
+                              <p className="text-sm font-medium text-amber-900">⚠️ Warning</p>
+                              <p className="text-xs text-amber-700 mt-1">
+                                This is a {application.status?.toLowerCase()} application. Deleting it may affect records and should only be done if absolutely necessary.
+                              </p>
+                            </div>
+                          )}
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => deleteMutation.mutate(application.id)}
+                            className="bg-red-600 hover:bg-red-700"
+                          >
+                            Delete Application
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                     </div>
                   </TableCell>
                 </TableRow>

@@ -83,6 +83,7 @@ export interface IStorage {
   getInvitationCodeByCode(code: string): Promise<any | undefined>;
   getAllInvitationCodes(): Promise<any[]>;
   markInvitationCodeAsUsed(code: string, userId: string): Promise<any>;
+  deleteInvitationCode(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -181,11 +182,15 @@ export class DatabaseStorage implements IStorage {
       const client = await this.getClientByUserId(id);
       
       if (client) {
-        // Delete merchant applications for this user's client
+        // IMPORTANT: Delete documents FIRST before deleting merchant applications
+        // because documents have a foreign key reference to merchant_applications
+        await db.delete(documents).where(eq(documents.clientId, client.id));
+        
+        // Now safe to delete merchant applications
         await db.delete(merchantApplications).where(eq(merchantApplications.clientId, client.id));
         
-        // Delete documents for this user's client  
-        await db.delete(documents).where(eq(documents.clientId, client.id));
+        // Delete sensitive data for this client
+        await db.delete(sensitiveData).where(eq(sensitiveData.clientId, client.id));
         
         // Delete client record (this removes the foreign key reference)
         await db.delete(clients).where(eq(clients.id, client.id));
@@ -196,7 +201,7 @@ export class DatabaseStorage implements IStorage {
         .set({ reviewedBy: null })
         .where(eq(merchantApplications.reviewedBy, id));
       
-      // Delete sensitive data for this user
+      // Delete sensitive data for this user (if any not tied to client)
       await db.delete(sensitiveData).where(eq(sensitiveData.userId, id));
       
       // Delete audit logs for this user
@@ -848,6 +853,17 @@ export class DatabaseStorage implements IStorage {
       .where(eq(invitationCodes.code, code))
       .returning();
     return invitationCode;
+  }
+
+  async deleteInvitationCode(id: string): Promise<void> {
+    try {
+      await db
+        .delete(invitationCodes)
+        .where(eq(invitationCodes.id, id));
+    } catch (error) {
+      console.error("Error in deleteInvitationCode:", error);
+      throw new Error("Failed to delete invitation code");
+    }
   }
 }
 

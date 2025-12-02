@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Copy, Plus, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { Copy, Plus, CheckCircle2, Clock, XCircle, Trash2 } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -23,6 +23,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface InvitationCode {
   id: string;
@@ -139,6 +150,36 @@ export function InvitationCodesManager() {
         variant: "destructive",
         title: "Error",
         description: "Failed to copy to clipboard",
+      });
+    }
+  };
+
+  const handleDeleteCode = async (codeId: string, codeValue: string) => {
+    try {
+      const response = await fetch(`/api/admin/invitation-codes/${codeId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        setCodes(codes.filter(code => code.id !== codeId));
+        toast({
+          title: "Code Deleted",
+          description: `Invitation code ${codeValue} has been deleted`,
+        });
+      } else {
+        const error = await response.json();
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: error.message || "Failed to delete invitation code",
+        });
+      }
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to delete invitation code",
       });
     }
   };
@@ -267,14 +308,51 @@ export function InvitationCodesManager() {
                       {formatDate(code.usedAt)}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => copyToClipboard(code.code)}
-                        disabled={code.status !== 'ACTIVE'}
-                      >
-                        <Copy className="w-4 h-4" />
-                      </Button>
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => copyToClipboard(code.code)}
+                          disabled={code.status !== 'ACTIVE'}
+                          title="Copy code"
+                        >
+                          <Copy className="w-4 h-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              title="Delete code"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Invitation Code</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete this invitation code? This action cannot be undone.
+                              </AlertDialogDescription>
+                              <div className="mt-2 space-y-1">
+                                <div className="font-medium">Code: {code.code}</div>
+                                <div className="font-medium">For: {code.label}</div>
+                                <div className="font-medium">Status: {code.status}</div>
+                              </div>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDeleteCode(code.id, code.code)}
+                                className="bg-red-600 hover:bg-red-700"
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

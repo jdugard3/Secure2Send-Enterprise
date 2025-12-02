@@ -1614,6 +1614,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: "Cannot delete submitted application" });
         }
       }
+      // Admins can delete any application (no status restriction)
+
+      // Audit log for admin deletions
+      if (user.role === 'ADMIN') {
+        await AuditService.logAction(user, 'MERCHANT_APPLICATION_DELETE' as any, req, {
+          resourceType: 'merchant_application',
+          resourceId: id,
+          metadata: { 
+            applicationStatus: application.status,
+            legalBusinessName: application.legalBusinessName,
+            clientId: application.clientId
+          }
+        });
+      }
 
       await storage.deleteMerchantApplication(id);
       res.json({ message: "Merchant application deleted successfully" });
@@ -2886,6 +2900,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching invitation codes:", error);
       res.status(500).json({ message: "Failed to fetch invitation codes" });
+    }
+  });
+
+  // Delete invitation code (admin only)
+  app.delete('/api/admin/invitation-codes/:id', requireAdmin, async (req: any, res: Response) => {
+    try {
+      const { id } = req.params;
+      const adminId = req.user.id;
+      const admin = await storage.getUser(adminId);
+
+      if (!admin || admin.role !== 'ADMIN') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      // Get the code before deletion for audit log
+      const allCodes = await storage.getAllInvitationCodes();
+      const codeToDelete = allCodes.find(c => c.id === id);
+
+      if (!codeToDelete) {
+        return res.status(404).json({ message: "Invitation code not found" });
+      }
+
+      await storage.deleteInvitationCode(id);
+
+      // Audit log
+      await AuditService.logAction(admin, 'INVITATION_CODE_DELETED' as any, req, {
+        resourceType: 'invitation_code',
+        resourceId: id,
+        metadata: { code: codeToDelete.code, label: codeToDelete.label, status: codeToDelete.status }
+      });
+
+      res.json({ message: "Invitation code deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting invitation code:", error);
+      res.status(500).json({ message: "Failed to delete invitation code" });
     }
   });
 

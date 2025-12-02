@@ -67,6 +67,7 @@ export const auditLogEnum = pgEnum('audit_action', [
   'MERCHANT_APPLICATION_UPDATE',
   'MERCHANT_APPLICATION_SUBMIT',
   'MERCHANT_APPLICATION_REVIEW',
+  'MERCHANT_APPLICATION_DELETE',
   'MFA_ENABLED',
   'MFA_DISABLED',
   'MFA_BACKUP_CODE_USED',
@@ -81,7 +82,8 @@ export const auditLogEnum = pgEnum('audit_action', [
   'MFA_EMAIL_RATE_LIMIT_EXCEEDED',
   'MFA_METHOD_SWITCHED',
   'INVITATION_CODE_CREATED',
-  'INVITATION_CODE_USED'
+  'INVITATION_CODE_USED',
+  'INVITATION_CODE_DELETED'
 ]);
 export const invitationCodeStatusEnum = pgEnum('invitation_code_status', ['ACTIVE', 'USED', 'EXPIRED']);
 

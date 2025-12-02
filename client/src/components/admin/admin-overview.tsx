@@ -136,7 +136,10 @@ export default function AdminOverview() {
         title: "User Deleted",
         description: "The user has been successfully deleted.",
       });
+      // Invalidate both overview and merchant applications queries
+      // because deleting a user also deletes their applications
       queryClient.invalidateQueries({ queryKey: ["/api/admin/overview"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/merchant-applications"] });
     },
     onError: (error: Error) => {
       toast({
