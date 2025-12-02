@@ -124,3 +124,4 @@ If you need to:
 - Full technical details: See `ADMIN_DELETE_FUNCTIONALITY.md`
 - Database migration: See `migrations/014_add_delete_audit_actions.sql`
 - Audit logs: Access via Admin Dashboard → Audit Logs section
+

@@ -262,3 +262,4 @@ The admin delete functionality is now fully implemented across all three areas:
 - ✅ Merchant Applications (enhanced to allow admin deletion of any status)
 
 All implementations follow security best practices, include audit logging, and provide excellent user experience with clear confirmations and feedback.
+
