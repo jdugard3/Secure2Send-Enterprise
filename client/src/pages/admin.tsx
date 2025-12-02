@@ -60,7 +60,7 @@ export default function Admin() {
         />
         
         <main className="flex-1 overflow-auto p-6 lg:p-8 bg-gray-50/50">
-          <div className="max-w-7xl mx-auto">
+          <div className={location === '/admin/documents' ? 'px-2' : 'max-w-7xl mx-auto'}>
             {location === '/admin/documents' ? (
               <ReviewQueue />
             ) : (
