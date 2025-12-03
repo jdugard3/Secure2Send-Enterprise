@@ -267,38 +267,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/documents', requireAuth, async (req: any, res: Response) => {
     try {
       const user = req.user;
-      let targetUserId = user.id;
       
-      // If admin is impersonating, use the impersonated user's data
-      if (user.role === 'ADMIN' && req.session.isImpersonating && req.session.impersonatedUserId) {
-        targetUserId = req.session.impersonatedUserId;
-        console.log('Admin impersonating, fetching documents for user:', targetUserId);
-      } else {
-        console.log('Fetching documents for user:', targetUserId);
-      }
+      console.log('Fetching documents for user:', user.id);
       
-      const targetUser = await storage.getUser(targetUserId);
-      
-      if (!targetUser) {
-        console.log('Target user not found:', targetUserId);
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      console.log('Target user found:', { id: targetUser.id, role: targetUser.role });
-
-      // If the original user is admin and NOT impersonating, show all documents for review
-      if (user.role === 'ADMIN' && !req.session.isImpersonating) {
+      // If user is admin, show all documents for review
+      if (user.role === 'ADMIN') {
         const documents = await storage.getAllDocumentsForReview();
         console.log('Admin fetched all documents:', documents.length);
         res.json(documents);
       } else {
-        // Show specific client's documents (either real client or impersonated client)
-        let client = await storage.getClientByUserId(targetUserId);
+        // Show specific client's documents
+        let client = await storage.getClientByUserId(user.id);
         if (!client) {
-          console.log('Client profile not found for user, creating one:', targetUserId);
+          console.log('Client profile not found for user, creating one:', user.id);
           // Create client record for existing user (migration fix)
           client = await storage.createClient({
-            userId: targetUserId,
+            userId: user.id,
             status: 'PENDING',
           });
           console.log('Created client record:', client.id);
@@ -624,77 +608,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin impersonation routes
-  app.post('/api/admin/impersonate', requireAdmin, async (req: any, res: Response) => {
-    try {
-      const { userId } = req.body;
-      const adminId = req.user.id;
-      const admin = await storage.getUser(adminId);
-
-      if (!admin || admin.role !== 'ADMIN') {
-        return res.status(403).json({ message: "Admin access required" });
-      }
-
-      const targetUser = await storage.getUser(userId);
-      if (!targetUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      if (targetUser.role !== 'CLIENT') {
-        return res.status(400).json({ message: "Can only impersonate client users" });
-      }
-
-      // Audit log impersonation start
-      await AuditService.logImpersonationStart(admin, req, userId, targetUser.email);
-
-      // Store impersonation data in session (keep admin logged in)
-      req.session.isImpersonating = true;
-      req.session.impersonatedUserId = userId;
-
-      // Return the admin user with impersonation context
-      const adminWithImpersonation = {
-        ...admin,
-        isImpersonating: true,
-        impersonatedUser: targetUser
-      };
-
-      res.json(adminWithImpersonation);
-    } catch (error) {
-      console.error("Error impersonating user:", error);
-      res.status(500).json({ message: "Failed to impersonate user" });
-    }
-  });
-
-  app.post('/api/admin/stop-impersonate', requireAuth, async (req: any, res: Response) => {
-    try {
-      if (!req.session.isImpersonating || !req.session.impersonatedUserId) {
-        return res.status(400).json({ message: "Not currently impersonating" });
-      }
-
-      const admin = req.user; // Admin is still the logged-in user
-      if (!admin || admin.role !== 'ADMIN') {
-        return res.status(403).json({ message: "Admin access required" });
-      }
-
-      const impersonatedUserId = req.session.impersonatedUserId;
-      const impersonatedUser = await storage.getUser(impersonatedUserId);
-
-      if (impersonatedUser) {
-        // Audit log impersonation end
-        await AuditService.logImpersonationEnd(admin, req, impersonatedUser.id, impersonatedUser.email);
-      }
-
-      // Clear impersonation session data
-      req.session.impersonatedUserId = undefined;
-      req.session.isImpersonating = false;
-
-      // Return the admin user without impersonation context
-      res.json(admin);
-    } catch (error) {
-      console.error("Error stopping impersonation:", error);
-      res.status(500).json({ message: "Failed to stop impersonation" });
-    }
-  });
+  // Admin impersonation routes removed for security
 
   // Security dashboard endpoint for admin
   app.get('/api/admin/security/dashboard', requireAdmin, async (req: any, res: Response) => {
@@ -1064,30 +978,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/merchant-applications', requireAuth, async (req: any, res: Response) => {
     try {
       const user = req.user;
-      let targetUserId = user.id;
       
-      // If admin is impersonating, use the impersonated user's data
-      if (user.role === 'ADMIN' && req.session.isImpersonating && req.session.impersonatedUserId) {
-        targetUserId = req.session.impersonatedUserId;
-      }
-      
-      const targetUser = await storage.getUser(targetUserId);
-      if (!targetUser) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      // If the original user is admin and NOT impersonating, show all applications for review
-      if (user.role === 'ADMIN' && !req.session.isImpersonating) {
+      // If user is admin, show all applications for review
+      if (user.role === 'ADMIN') {
         const applications = await storage.getAllMerchantApplicationsForReview();
         res.json(applications);
       } else {
         // Show specific client's applications
-        let client = await storage.getClientByUserId(targetUserId);
+        let client = await storage.getClientByUserId(user.id);
         if (!client) {
-          console.log('Client profile not found for user, creating one:', targetUserId);
+          console.log('Client profile not found for user, creating one:', user.id);
           // Create client record for existing user (migration fix)
           client = await storage.createClient({
-            userId: targetUserId,
+            userId: user.id,
             status: 'PENDING',
           });
           console.log('Created client record:', client.id);
