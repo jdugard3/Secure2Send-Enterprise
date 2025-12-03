@@ -26,6 +26,7 @@ export default function Login() {
     mfaTotp?: boolean;
     mfaEmail?: boolean;
   } | null>(null);
+  const [loginError, setLoginError] = useState<string>("");
   const { toast } = useToast();
 
   const form = useForm<LoginData>({
@@ -38,10 +39,38 @@ export default function Login() {
 
   const loginMutation = useMutation({
     mutationFn: async (data: LoginData) => {
-      const response = await apiRequest("POST", "/api/login", data);
-      return response.json();
+      // Handle login requests directly to avoid response body consumption issues
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+        credentials: "include",
+      });
+
+      if (!res.ok) {
+        let errorMessage = res.statusText;
+        try {
+          const errorData = await res.json();
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        } catch {
+          // If JSON parsing fails, try text
+          try {
+            const text = await res.text();
+            if (text) errorMessage = text;
+          } catch {
+            // Keep default error message
+          }
+        }
+        throw new Error(errorMessage);
+      }
+
+      return await res.json();
     },
     onSuccess: (data) => {
+      // Clear any previous login errors on success
+      setLoginError("");
       if (data.mfaRequired) {
         // MFA challenge required
         setMfaChallenge({
@@ -81,9 +110,12 @@ export default function Login() {
       }
     },
     onError: (error: Error) => {
+      console.error("Login error:", error);
+      const errorMessage = error.message || "An unexpected error occurred. Please try again.";
+      setLoginError(errorMessage);
       toast({
         title: "Login Failed",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     },
@@ -117,6 +149,23 @@ export default function Login() {
   const onSubmit = (data: LoginData) => {
     loginMutation.mutate(data);
   };
+
+  // Clear login error when user starts typing
+  useEffect(() => {
+    const subscription = form.watch(() => {
+      if (loginError) {
+        setLoginError("");
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [form, loginError]);
+
+  // Clear login error when MFA challenge is shown (successful auth, just needs verification)
+  useEffect(() => {
+    if (mfaChallenge) {
+      setLoginError("");
+    }
+  }, [mfaChallenge]);
 
   const handleMfaSuccess = (userData: any) => {
     queryClient.setQueryData(["/api/auth/user"], userData);
@@ -266,6 +315,21 @@ export default function Login() {
               </div>
 
               <Form {...form}>
+                {loginError && (
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <div className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5">
+                        <svg className="w-full h-full" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-red-900">Login Failed</p>
+                        <p className="text-sm text-red-700 mt-1">{loginError}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
                   <FormField
                     control={form.control}

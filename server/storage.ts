@@ -6,6 +6,7 @@ import {
   sensitiveData,
   auditLogs,
   invitationCodes,
+  loginAttempts,
   type User,
   type InsertUser,
   type Client,
@@ -18,6 +19,8 @@ import {
   type DocumentWithClient,
   type MerchantApplicationWithClient,
   type InvitationCode,
+  type LoginAttempt,
+  type InsertLoginAttempt,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql } from "drizzle-orm";
@@ -28,6 +31,13 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByPasswordResetToken(token: string): Promise<User | undefined>;
+
+  // Login attempt operations
+  getLoginAttempt(email: string, ipAddress: string): Promise<LoginAttempt | undefined>;
+  createOrUpdateLoginAttempt(email: string, ipAddress: string, userId?: string): Promise<LoginAttempt>;
+  resetLoginAttempts(email: string, ipAddress: string): Promise<void>;
+  isAccountLocked(email: string, ipAddress: string): Promise<boolean>;
+  getRemainingAttempts(email: string, ipAddress: string): Promise<number>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, data: Partial<User>): Promise<User>;
   upsertUser(user: any): Promise<User>;
@@ -94,7 +104,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
+    const [user] = await db.select().from(users).where(sql`lower(${users.email}) = ${email.toLowerCase()}`);
     return user;
   }
 
@@ -102,10 +112,84 @@ export class DatabaseStorage implements IStorage {
     // The token passed is the plain token, but we store hashed tokens
     // We need to check if the stored hash contains the token
     const allUsers = await db.select().from(users).where(sql`${users.passwordResetToken} IS NOT NULL`);
-    
+
     // Find user whose hashed token contains the plain token
     const user = allUsers.find(u => u.passwordResetToken?.includes(token));
     return user;
+  }
+
+  // Login attempt operations
+  async getLoginAttempt(email: string, ipAddress: string): Promise<LoginAttempt | undefined> {
+    const [attempt] = await db.select().from(loginAttempts)
+      .where(sql`lower(${loginAttempts.email}) = ${email.toLowerCase()} AND ${loginAttempts.ipAddress} = ${ipAddress}`)
+      .limit(1);
+    return attempt;
+  }
+
+  async createOrUpdateLoginAttempt(email: string, ipAddress: string, userId?: string): Promise<LoginAttempt> {
+    const now = new Date();
+    const existingAttempt = await this.getLoginAttempt(email, ipAddress);
+
+    if (existingAttempt) {
+      // Update existing attempt
+      const newAttemptCount = existingAttempt.attemptCount + 1;
+      let lockoutUntil: Date | undefined;
+
+      // Lock account after 5 failed attempts for 1 hour
+      if (newAttemptCount >= 5) {
+        lockoutUntil = new Date(now.getTime() + 60 * 60 * 1000); // 1 hour
+      }
+
+      const [updated] = await db.update(loginAttempts)
+        .set({
+          attemptCount: newAttemptCount,
+          lastAttemptAt: now,
+          lockoutUntil,
+          userId: userId || existingAttempt.userId,
+          updatedAt: now,
+        })
+        .where(eq(loginAttempts.id, existingAttempt.id))
+        .returning();
+
+      return updated;
+    } else {
+      // Create new attempt
+      const [created] = await db.insert(loginAttempts).values({
+        email: email.toLowerCase(),
+        ipAddress,
+        userId,
+        attemptCount: 1,
+        lastAttemptAt: now,
+      }).returning();
+
+      return created;
+    }
+  }
+
+  async resetLoginAttempts(email: string, ipAddress: string): Promise<void> {
+    await db.delete(loginAttempts)
+      .where(sql`lower(${loginAttempts.email}) = ${email.toLowerCase()} AND ${loginAttempts.ipAddress} = ${ipAddress}`);
+  }
+
+  async isAccountLocked(email: string, ipAddress: string): Promise<boolean> {
+    const attempt = await this.getLoginAttempt(email, ipAddress);
+    if (!attempt || !attempt.lockoutUntil) {
+      return false;
+    }
+    return new Date() < attempt.lockoutUntil;
+  }
+
+  async getRemainingAttempts(email: string, ipAddress: string): Promise<number> {
+    const attempt = await this.getLoginAttempt(email, ipAddress);
+    if (!attempt) {
+      return 5; // Max attempts
+    }
+
+    if (attempt.lockoutUntil && new Date() < attempt.lockoutUntil) {
+      return 0; // Account is locked
+    }
+
+    return Math.max(0, 5 - attempt.attemptCount);
   }
 
   async createUser(userData: InsertUser): Promise<User> {

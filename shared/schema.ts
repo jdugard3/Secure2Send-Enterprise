@@ -87,6 +87,22 @@ export const auditLogEnum = pgEnum('audit_action', [
 ]);
 export const invitationCodeStatusEnum = pgEnum('invitation_code_status', ['ACTIVE', 'USED', 'EXPIRED']);
 
+// Login attempts tracking
+export const loginAttempts = pgTable("login_attempts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: varchar("email").notNull(), // Store email for failed attempts (case-insensitive)
+  ipAddress: varchar("ip_address").notNull(),
+  userId: varchar("user_id").references(() => users.id), // May be null if user doesn't exist
+  attemptCount: integer("attempt_count").notNull().default(1),
+  lastAttemptAt: timestamp("last_attempt_at").defaultNow(),
+  lockoutUntil: timestamp("lockout_until"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("IDX_login_attempts_email_ip").on(table.email, table.ipAddress),
+  index("IDX_login_attempts_lockout").on(table.lockoutUntil),
+]);
+
 // Users table
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -467,7 +483,9 @@ export type SensitiveData = typeof sensitiveData.$inferSelect;
 export type InsertAuditLog = typeof auditLogs.$inferInsert;
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertInvitationCode = typeof invitationCodes.$inferInsert;
-export type InvitationCode = typeof invitationCodes.$inferSelect;
+export type InvitationCode = typeof invitationCodes.$inferInsert;
+export type InsertLoginAttempt = typeof loginAttempts.$inferInsert;
+export type LoginAttempt = typeof loginAttempts.$inferSelect;
 
 // Combined types
 export type ClientWithUser = Client & { user: User };

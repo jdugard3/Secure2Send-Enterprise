@@ -203,12 +203,38 @@ export async function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/login", authLimiter, (req, res, next) => {
+  app.post("/api/login", authLimiter, async (req, res, next) => {
+    const { email } = req.body;
+    const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
+
+    // Check if account is locked
+    const isLocked = await storage.isAccountLocked(email, clientIP);
+    if (isLocked) {
+      const remainingTime = await storage.getRemainingAttempts(email, clientIP);
+      return res.status(429).json({
+        message: "Account is temporarily locked due to too many failed login attempts. Please try again later."
+      });
+    }
+
     passport.authenticate("local", async (err: any, user: User | false, info: any) => {
       if (err) return next(err);
       if (!user) {
-        return res.status(401).json({ message: info?.message || "Invalid credentials" });
+        // Track failed login attempt
+        await storage.createOrUpdateLoginAttempt(email, clientIP);
+        const remainingAttempts = await storage.getRemainingAttempts(email, clientIP);
+
+        let message = "Invalid email or password";
+        if (remainingAttempts > 0 && remainingAttempts < 5) {
+          message += `. You have ${remainingAttempts} attempt${remainingAttempts === 1 ? '' : 's'} remaining before your account is locked for 1 hour.`;
+        } else if (remainingAttempts === 0) {
+          message = "Account is temporarily locked due to too many failed login attempts. Please try again later.";
+        }
+
+        return res.status(401).json({ message });
       }
+
+      // Reset login attempts on successful authentication
+      await storage.resetLoginAttempts(email, clientIP);
 
       // Debug logging for MFA status
       console.log('🔍 Login Debug - User MFA Status:', {
