@@ -483,7 +483,7 @@ export type SensitiveData = typeof sensitiveData.$inferSelect;
 export type InsertAuditLog = typeof auditLogs.$inferInsert;
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertInvitationCode = typeof invitationCodes.$inferInsert;
-export type InvitationCode = typeof invitationCodes.$inferInsert;
+export type InvitationCode = typeof invitationCodes.$inferSelect;
 export type InsertLoginAttempt = typeof loginAttempts.$inferInsert;
 export type LoginAttempt = typeof loginAttempts.$inferSelect;
 
