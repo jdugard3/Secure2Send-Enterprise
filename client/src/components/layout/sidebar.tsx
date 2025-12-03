@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
@@ -29,14 +29,12 @@ import {
   ClipboardCheck,
   LogOut,
   ChevronDown,
-  UserCheck,
   Menu,
   ChevronLeft,
   ChevronRight,
   CreditCard,
   Settings as SettingsIcon
 } from "lucide-react";
-import type { User } from "@shared/schema";
 
 interface SidebarProps {
   isCollapsed?: boolean;
@@ -47,21 +45,6 @@ export default function Sidebar({ isCollapsed = false, onToggle }: SidebarProps)
   const [location, navigate] = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
-
-  // Query to get all users for admin impersonation
-  const { data: allUsers = [] } = useQuery<User[]>({
-    queryKey: ["/api/admin/users"],
-    queryFn: async () => {
-      const response = await fetch("/api/admin/users", {
-        credentials: "include",
-      });
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return response.json();
-    },
-    enabled: user?.role === 'ADMIN' || user?.isImpersonating,
-  });
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
@@ -255,64 +238,6 @@ export default function Sidebar({ isCollapsed = false, onToggle }: SidebarProps)
       
       {/* User Profile */}
       <div className="p-4 border-t border-gray-200">
-        {/* Admin User Switcher - show for admins or when impersonating */}
-        {(user?.role === 'ADMIN' || user?.isImpersonating) && (
-          <div className="mb-3">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                {isCollapsed ? (
-                  <Button variant="outline" size="sm" className="w-full p-2">
-                    <UserCheck className="h-4 w-4" />
-                  </Button>
-                ) : (
-                  <Button variant="outline" className="w-full justify-between text-xs">
-                    <div className="flex items-center">
-                      <UserCheck className="h-3 w-3 mr-2" />
-                      Switch User
-                    </div>
-                    <ChevronDown className="h-3 w-3" />
-                  </Button>
-                )}
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="start">
-                {user?.isImpersonating ? (
-                  // When impersonating, only show return to admin option
-                  <DropdownMenuItem
-                    onClick={() => stopImpersonationMutation.mutate()}
-                    disabled={stopImpersonationMutation.isPending}
-                  >
-                    <Shield className="h-4 w-4 mr-2" />
-                    Return to Admin
-                  </DropdownMenuItem>
-                ) : (
-                  // When admin, show user list and return option
-                  <>
-                    {allUsers.filter(u => u.role === 'CLIENT').map((clientUser) => (
-                      <DropdownMenuItem
-                        key={clientUser.id}
-                        onClick={() => impersonateMutation.mutate(clientUser.id)}
-                        disabled={impersonateMutation.isPending}
-                      >
-                        <div className="flex items-center w-full">
-                          <Avatar className="h-6 w-6 mr-2">
-                            <AvatarFallback className="text-xs">
-                              {getInitials(clientUser.firstName || undefined, clientUser.lastName || undefined)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1">
-                            <p className="text-sm">{clientUser.firstName} {clientUser.lastName}</p>
-                            <p className="text-xs text-muted-foreground">{clientUser.email}</p>
-                          </div>
-                        </div>
-                      </DropdownMenuItem>
-                    ))}
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        )}
-
         <div className={`flex items-center ${isCollapsed ? 'justify-center' : ''}`}>
           <Avatar className={`${isCollapsed ? 'h-8 w-8' : 'h-8 w-8 mr-3'}`}>
             <AvatarFallback className="bg-primary text-white text-sm">
