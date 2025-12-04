@@ -132,7 +132,15 @@ export class DatabaseStorage implements IStorage {
 
     if (existingAttempt) {
       // Update existing attempt
-      const newAttemptCount = existingAttempt.attemptCount + 1;
+      // Check if lockout has expired - if so, reset attempt count
+      let newAttemptCount: number;
+      if (existingAttempt.lockoutUntil && new Date() > existingAttempt.lockoutUntil) {
+        // Lockout has expired, reset to 1 attempt
+        newAttemptCount = 1;
+      } else {
+        // Lockout still active or no lockout, increment attempt count
+        newAttemptCount = existingAttempt.attemptCount + 1;
+      }
       let lockoutUntil: Date | undefined;
 
       // Lock account after 5 failed attempts for 1 hour
