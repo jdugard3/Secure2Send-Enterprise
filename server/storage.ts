@@ -132,13 +132,18 @@ export class DatabaseStorage implements IStorage {
 
     if (existingAttempt) {
       // Update existing attempt
-      // Check if lockout has expired - if so, reset attempt count
+      // Check if lockout has expired OR if enough time has passed since last attempt
+      const hoursSinceLastAttempt = (now.getTime() - new Date(existingAttempt.lastAttemptAt).getTime()) / (1000 * 60 * 60);
       let newAttemptCount: number;
+      
       if (existingAttempt.lockoutUntil && new Date() > existingAttempt.lockoutUntil) {
         // Lockout has expired, reset to 1 attempt
         newAttemptCount = 1;
+      } else if (hoursSinceLastAttempt >= 1) {
+        // More than 1 hour has passed since last attempt, reset counter
+        newAttemptCount = 1;
       } else {
-        // Lockout still active or no lockout, increment attempt count
+        // Recent attempts, increment counter
         newAttemptCount = existingAttempt.attemptCount + 1;
       }
       let lockoutUntil: Date | undefined;
@@ -195,6 +200,12 @@ export class DatabaseStorage implements IStorage {
 
     if (attempt.lockoutUntil && new Date() < attempt.lockoutUntil) {
       return 0; // Account is locked
+    }
+
+    // Check if enough time has passed since last attempt (1 hour)
+    const hoursSinceLastAttempt = (new Date().getTime() - new Date(attempt.lastAttemptAt).getTime()) / (1000 * 60 * 60);
+    if (hoursSinceLastAttempt >= 1) {
+      return 5; // Counter has expired, return fresh attempts
     }
 
     return Math.max(0, 5 - attempt.attemptCount);
