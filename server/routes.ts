@@ -196,9 +196,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error('Failed to send document uploaded email:', error);
       });
 
-      // Send new document notification to admins (async, don't block response)
-      EmailService.sendNewDocumentNotificationEmail(user, document).catch(error => {
-        console.error('Failed to send new document notification email:', error);
+      // Check if all required documents are now uploaded and notify admins (async, don't block response)
+      EmailService.checkAllRequiredDocumentsUploaded(merchantApplicationId).then(allComplete => {
+        if (allComplete) {
+          EmailService.sendAllDocumentsCompletedNotificationEmail(user).catch(error => {
+            console.error('Failed to send all documents completed notification email:', error);
+          });
+        }
+      }).catch(error => {
+        console.error('Failed to check document completion status:', error);
       });
 
       // Sync document to IRIS CRM via Zapier webhook (async, don't block response)
@@ -3097,6 +3103,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
       uptime: process.uptime(),
       version: process.env.npm_package_version || "unknown"
     });
+  });
+
+  // Onboarding step update endpoint
+  app.put('/api/user/onboarding-step', requireAuth, async (req: any, res: Response) => {
+    try {
+      const userId = req.user.id;
+      const { step } = req.body;
+      
+      // Validate step value
+      const validSteps = ['PART1', 'DOCUMENTS', 'PART2', 'REVIEW', 'COMPLETE'];
+      if (!step || !validSteps.includes(step)) {
+        return res.status(400).json({ message: "Invalid onboarding step" });
+      }
+      
+      // Get current user to check progression
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      // Validate step progression (can't skip steps)
+      const currentStepIndex = validSteps.indexOf(user.onboardingStep || 'PART1');
+      const newStepIndex = validSteps.indexOf(step);
+      
+      // Allow moving forward by 1 step or staying on same step
+      if (newStepIndex > currentStepIndex + 1) {
+        return res.status(400).json({ 
+          message: "Cannot skip onboarding steps",
+          currentStep: user.onboardingStep,
+          requestedStep: step
+        });
+      }
+      
+      // Update onboarding step
+      const updatedUser = await storage.updateUserOnboardingStep(userId, step);
+      
+      res.json({ 
+        success: true, 
+        onboardingStep: updatedUser.onboardingStep 
+      });
+    } catch (error) {
+      console.error('Error updating onboarding step:', error);
+      res.status(500).json({ message: "Failed to update onboarding step" });
+    }
   });
 
   const httpServer = createServer(app);

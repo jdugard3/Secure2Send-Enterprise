@@ -35,14 +35,14 @@ Updated the email notification system to send notifications to **ALL administrat
 - Who created the account
 - Account status
 
-### 3. New Document Uploads
-**When:** A merchant uploads a document for review
+### 3. All Required Documents Completed
+**When:** A merchant uploads their final required document, completing the full document set
 **Sent to:** All admin accounts
 **Includes:**
-- Document type and name
-- User/company information
-- Upload date
-- Link to review the document
+- Merchant information (name, email, company)
+- Completion date
+- Confirmation that all required documents are uploaded and ready for review
+- Link to review the complete application
 
 ## Technical Implementation
 
@@ -67,13 +67,22 @@ static async sendNewUserNotificationEmail(user: User): Promise<void>
 - Sends notification to each admin individually
 - Logs how many admins were notified
 
-#### 3. `sendNewDocumentNotificationEmail()` - UPDATED
+#### 3. `sendAllDocumentsCompletedNotificationEmail()` - ACTIVE
 ```typescript
-static async sendNewDocumentNotificationEmail(user: User, document: Document): Promise<void>
+static async sendAllDocumentsCompletedNotificationEmail(user: User): Promise<void>
 ```
 - Fetches all admin emails from database
-- Sends notification to each admin individually
+- Sends completion notification to each admin individually
 - Logs how many admins were notified
+
+#### 5. `checkAllRequiredDocumentsUploaded()` - NEW
+```typescript
+static async checkAllRequiredDocumentsUploaded(merchantApplicationId: string): Promise<boolean>
+```
+- Queries all documents for a merchant application
+- Checks if all required document types are present
+- Returns true if all required documents are uploaded
+- Logs completion status for debugging
 
 ### Files Modified:
 
@@ -81,7 +90,12 @@ static async sendNewDocumentNotificationEmail(user: User, document: Document): P
    - Added database import and Drizzle ORM query
    - Updated `getAdminEmails()` to query database
    - Updated `sendNewUserNotificationEmail()` to send to all admins
-   - Updated `sendNewDocumentNotificationEmail()` to send to all admins
+   - Added `sendAllDocumentsCompletedNotificationEmail()` method
+   - Added `checkAllRequiredDocumentsUploaded()` method
+
+2. **`server/emails/AllDocumentsCompletedNotificationEmail.tsx`** - NEW
+   - Created new email template for completion notifications
+   - Includes merchant info and completion status
 
 2. **`server/routes.ts`**
    - Added notification call in `/api/admin/create-client` endpoint
@@ -130,12 +144,13 @@ The system now provides better visibility:
 
 - [x] Self-registration sends to all admins
 - [x] Admin-created accounts send to all admins
-- [x] Document uploads send to all admins
+- [x] All documents completed notification sends when final document is uploaded
+- [x] Completion notification only sends once when all documents are complete
 - [x] Fallback works when no admins in database
 - [x] Fallback works when database query fails
 - [x] No linter errors
 - [x] Emails don't block registration flow
-- [x] Console logs show correct admin count
+- [x] Console logs show correct admin count and document completion status
 
 ## Benefits
 

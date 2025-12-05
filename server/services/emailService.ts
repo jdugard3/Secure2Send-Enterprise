@@ -10,6 +10,7 @@ import { DocumentRejectedEmail } from '../emails/DocumentRejectedEmail';
 import { AllDocumentsApprovedEmail } from '../emails/AllDocumentsApprovedEmail';
 import { NewUserNotificationEmail } from '../emails/NewUserNotificationEmail';
 import { NewDocumentNotificationEmail } from '../emails/NewDocumentNotificationEmail';
+import { AllDocumentsCompletedNotificationEmail } from '../emails/AllDocumentsCompletedNotificationEmail';
 import { SecurityAlertEmail } from '../emails/SecurityAlertEmail';
 import { MfaEnabledEmail } from '../emails/MfaEnabledEmail';
 import { MfaDisabledEmail } from '../emails/MfaDisabledEmail';
@@ -18,7 +19,7 @@ import { MfaMethodChangedEmail } from '../emails/MfaMethodChangedEmail';
 import { PasswordResetEmail } from '../emails/PasswordResetEmail';
 import type { User, Document, Client } from '@shared/schema';
 import { db } from '../db';
-import { users } from '@shared/schema';
+import { users, documents } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 
 // Initialize Mailgun email provider
@@ -217,7 +218,7 @@ export class EmailService {
   static async sendNewDocumentNotificationEmail(user: User, document: Document): Promise<void> {
     try {
       const adminEmails = await this.getAdminEmails();
-      
+
       const emailHtml = await render(NewDocumentNotificationEmail({
         firstName: user.firstName || 'Unknown',
         lastName: user.lastName || 'User',
@@ -241,6 +242,37 @@ export class EmailService {
       console.log(`✅ New document notification email sent to ${adminEmails.length} admin(s) for ${document.documentType} from ${user.email}`);
     } catch (error) {
       console.error('❌ Failed to send new document notification email:', error);
+    }
+  }
+
+  /**
+   * Send all documents completed notification to ALL admins
+   */
+  static async sendAllDocumentsCompletedNotificationEmail(user: User): Promise<void> {
+    try {
+      const adminEmails = await this.getAdminEmails();
+
+      const emailHtml = await render(AllDocumentsCompletedNotificationEmail({
+        firstName: user.firstName || 'Unknown',
+        lastName: user.lastName || 'User',
+        email: user.email,
+        companyName: user.companyName || 'Not provided',
+        appUrl: env.APP_URL!,
+        completionDate: new Date().toLocaleDateString(),
+      }));
+
+      // Send to all admin emails
+      for (const adminEmail of adminEmails) {
+        await this.sendEmail({
+          to: adminEmail,
+          subject: '🎉 All Required Documents Completed - Secure2Send',
+          html: emailHtml,
+        });
+      }
+
+      console.log(`✅ All documents completed notification email sent to ${adminEmails.length} admin(s) for ${user.email}`);
+    } catch (error) {
+      console.error('❌ Failed to send all documents completed notification email:', error);
     }
   }
 
@@ -459,6 +491,39 @@ export class EmailService {
     } catch (error) {
       console.error('❌ Failed to send password reset email:', error);
       throw error; // Re-throw so caller knows it failed
+    }
+  }
+
+  /**
+   * Check if all required documents are uploaded for a merchant application
+   */
+  static async checkAllRequiredDocumentsUploaded(merchantApplicationId: string): Promise<boolean> {
+    try {
+      const uploadedDocuments = await db
+        .select()
+        .from(documents)
+        .where(eq(documents.merchantApplicationId, merchantApplicationId));
+
+      const requiredDocTypes = [
+        'SS4_EIN_LETTER',
+        'DRIVERS_LICENSE',
+        'BANK_STATEMENTS',
+        'ARTICLES_OF_INCORPORATION',
+        'BUSINESS_LICENSE',
+        'VOIDED_CHECK',
+        'INSURANCE_COVERAGE'
+      ];
+
+      const uploadedDocTypes = new Set(uploadedDocuments.map((doc: any) => doc.documentType));
+      const missingDocs = requiredDocTypes.filter(docType => !uploadedDocTypes.has(docType));
+
+      const allUploaded = missingDocs.length === 0;
+      console.log(`📋 Document check for merchant application ${merchantApplicationId}: ${allUploaded ? '✅ ALL REQUIRED DOCUMENTS UPLOADED' : `❌ Missing: ${missingDocs.join(', ')}`}`);
+
+      return allUploaded;
+    } catch (error) {
+      console.error('❌ Failed to check required documents:', error);
+      return false;
     }
   }
 
