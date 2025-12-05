@@ -197,6 +197,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Check if all required documents are now uploaded and notify admins (async, don't block response)
+      // NOTE: We removed per-document admin notifications - admins only get ONE email when ALL required docs are complete
       EmailService.checkAllRequiredDocumentsUploaded(merchantApplicationId).then(allComplete => {
         if (allComplete) {
           EmailService.sendAllDocumentsCompletedNotificationEmail(user).catch(error => {
