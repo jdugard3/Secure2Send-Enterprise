@@ -1,7 +1,8 @@
 import { useAuth } from "@/hooks/useAuth";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
+import { useLocation } from "wouter";
 import Sidebar from "@/components/layout/sidebar";
 import { MobileSidebar } from "@/components/layout/mobile-sidebar";
 import Header from "@/components/layout/header";
@@ -11,7 +12,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Upload, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { FileText, Upload, Clock, CheckCircle, XCircle, AlertCircle, ArrowRight } from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 
 interface Document {
   id: string;
@@ -28,6 +30,26 @@ export default function DocumentsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [, navigate] = useLocation();
+  const queryClient = useQueryClient();
+  
+  // Check if we're in onboarding mode - either via URL param or user's onboarding step
+  const isOnboardingMode = (() => {
+    const params = new URLSearchParams(window.location.search);
+    const urlParam = params.get('onboardingMode') === 'true';
+    // Also check if user is on DOCUMENTS step in their onboarding journey
+    const userOnDocumentsStep = user?.onboardingStep === 'DOCUMENTS';
+    
+    // Debug logging
+    console.log('📄 Documents Page - Onboarding Check:', {
+      urlParam,
+      userOnboardingStep: user?.onboardingStep,
+      userOnDocumentsStep,
+      isOnboardingMode: urlParam || userOnDocumentsStep
+    });
+    
+    return urlParam || userOnDocumentsStep;
+  })();
   
   const { data: documents = [] } = useQuery<Document[]>({
     queryKey: ["/api/documents", user?.id],
@@ -42,6 +64,33 @@ export default function DocumentsPage() {
     },
     enabled: !!user?.id,
   });
+
+  // Mutation to update onboarding step
+  const updateOnboardingStep = useMutation({
+    mutationFn: async (step: 'PART1' | 'DOCUMENTS' | 'PART2' | 'COMPLETE') => {
+      const response = await apiRequest('PUT', '/api/user/onboarding-step', { step });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      toast({
+        title: "Documents Saved",
+        description: "Proceeding to detailed business information...",
+      });
+      navigate('/merchant-applications?onboardingMode=part2');
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleContinueToPart2 = () => {
+    updateOnboardingStep.mutate('PART2');
+  };
 
 
   // Group documents by status
@@ -154,6 +203,39 @@ export default function DocumentsPage() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Onboarding Mode: Continue Button */}
+          {isOnboardingMode && (
+            <div className="px-6 mb-6">
+              <Card className="border-blue-200 bg-blue-50">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold text-blue-900">
+                        {documents.length > 0 
+                          ? "Documents Uploaded Successfully!" 
+                          : "Upload Your Required Documents"}
+                      </h3>
+                      <p className="text-sm text-blue-700 mt-1">
+                        {documents.length > 0 
+                          ? `You've uploaded ${documents.length} document${documents.length !== 1 ? 's' : ''}. You can continue to the detailed application or upload more documents.`
+                          : "Please upload all required documents before proceeding to the next step."}
+                      </p>
+                    </div>
+                    <Button 
+                      onClick={handleContinueToPart2}
+                      disabled={documents.length === 0 || updateOnboardingStep.isPending}
+                      className="bg-blue-600 hover:bg-blue-700"
+                      size="lg"
+                    >
+                      {updateOnboardingStep.isPending ? 'Saving...' : 'Continue to Detailed Application'}
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
           {/* Main Content */}
           <div className="px-6 flex-1 flex flex-col">

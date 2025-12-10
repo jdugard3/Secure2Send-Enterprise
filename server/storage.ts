@@ -31,6 +31,7 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserByPasswordResetToken(token: string): Promise<User | undefined>;
+  updateUserOnboardingStep(userId: string, step: 'PART1' | 'DOCUMENTS' | 'PART2' | 'REVIEW' | 'COMPLETE'): Promise<User>;
 
   // Login attempt operations
   getLoginAttempt(email: string, ipAddress: string): Promise<LoginAttempt | undefined>;
@@ -115,6 +116,18 @@ export class DatabaseStorage implements IStorage {
 
     // Find user whose hashed token contains the plain token
     const user = allUsers.find(u => u.passwordResetToken?.includes(token));
+    return user;
+  }
+
+  async updateUserOnboardingStep(userId: string, step: 'PART1' | 'DOCUMENTS' | 'PART2' | 'REVIEW' | 'COMPLETE'): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({
+        onboardingStep: step,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning();
     return user;
   }
 

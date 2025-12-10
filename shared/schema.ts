@@ -86,6 +86,7 @@ export const auditLogEnum = pgEnum('audit_action', [
   'INVITATION_CODE_DELETED'
 ]);
 export const invitationCodeStatusEnum = pgEnum('invitation_code_status', ['ACTIVE', 'USED', 'EXPIRED']);
+export const onboardingStepEnum = pgEnum('onboarding_step', ['PART1', 'DOCUMENTS', 'PART2', 'REVIEW', 'COMPLETE']);
 
 // Login attempts tracking
 export const loginAttempts = pgTable("login_attempts", {
@@ -132,6 +133,8 @@ export const users = pgTable("users", {
   passwordResetToken: text("password_reset_token"),
   passwordResetTokenExpiresAt: timestamp("password_reset_token_expires_at"),
   passwordResetRequestedAt: timestamp("password_reset_requested_at"),
+  // Onboarding progress tracking
+  onboardingStep: onboardingStepEnum("onboarding_step").default('PART1'),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -486,6 +489,7 @@ export type InsertInvitationCode = typeof invitationCodes.$inferInsert;
 export type InvitationCode = typeof invitationCodes.$inferSelect;
 export type InsertLoginAttempt = typeof loginAttempts.$inferInsert;
 export type LoginAttempt = typeof loginAttempts.$inferSelect;
+export type OnboardingStep = 'PART1' | 'DOCUMENTS' | 'PART2' | 'REVIEW' | 'COMPLETE';
 
 // Combined types
 export type ClientWithUser = Client & { user: User };

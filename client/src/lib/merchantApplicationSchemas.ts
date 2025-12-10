@@ -469,7 +469,7 @@ export const defaultAdditionalOwner = {
 export const defaultBeneficialOwner: BeneficialOwner = {
   name: "",
   title: "",
-  ownershipPercentage: 25,
+  ownershipPercentage: 0, // User must fill this in - beneficial owners typically need 25%+ to be reported
   residentialAddress: "",
   city: "",
   state: "AL", // Default to first state

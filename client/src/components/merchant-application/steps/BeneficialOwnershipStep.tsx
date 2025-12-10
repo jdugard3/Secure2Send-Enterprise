@@ -2,6 +2,7 @@ import { UseFormReturn, useFieldArray } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -256,11 +257,15 @@ export function BeneficialOwnershipStep({ form }: BeneficialOwnershipStepProps) 
                         <FormControl>
                           <Input
                             type="number"
-                            min="25"
+                            min="0"
                             max="100"
-                            placeholder="25"
-                            {...field}
-                            onChange={(e) => field.onChange(parseFloat(e.target.value) || 25)}
+                            step="1"
+                            placeholder="Enter percentage"
+                            value={field.value ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              field.onChange(val === '' ? 0 : parseFloat(val));
+                            }}
                           />
                         </FormControl>
                         <FormMessage />
@@ -379,7 +384,11 @@ export function BeneficialOwnershipStep({ form }: BeneficialOwnershipStepProps) 
                       <FormItem>
                         <FormLabel>Home Phone *</FormLabel>
                         <FormControl>
-                          <Input placeholder="(555) 123-4567" {...field} />
+                          <PhoneInput 
+                            placeholder="123-456-7890" 
+                            value={field.value}
+                            onChange={field.onChange}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
