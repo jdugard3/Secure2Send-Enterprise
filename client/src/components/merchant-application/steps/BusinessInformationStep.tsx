@@ -2,6 +2,7 @@ import { UseFormReturn, useFieldArray } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -341,10 +342,11 @@ export function BusinessInformationStep({ form }: BusinessInformationStepProps) 
                       Business Phone *
                     </FormLabel>
                     <FormControl>
-                      <Input 
-                        placeholder="Enter business phone" 
+                      <PhoneInput 
+                        placeholder="123-456-7890" 
                         className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
-                        {...field} 
+                        value={field.value}
+                        onChange={field.onChange}
                       />
                     </FormControl>
                     <FormMessage />
@@ -487,10 +489,11 @@ export function BusinessInformationStep({ form }: BusinessInformationStepProps) 
                       Legal Phone *
                     </FormLabel>
                     <FormControl>
-                      <Input 
-                        placeholder="Enter legal phone" 
+                      <PhoneInput 
+                        placeholder="123-456-7890" 
                         className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
-                        {...field} 
+                        value={field.value}
+                        onChange={field.onChange}
                       />
                     </FormControl>
                     <FormMessage />
@@ -887,10 +890,11 @@ export function BusinessInformationStep({ form }: BusinessInformationStepProps) 
                       Bank Officer Phone *
                     </FormLabel>
                     <FormControl>
-                      <Input 
-                        placeholder="Enter bank officer phone" 
+                      <PhoneInput 
+                        placeholder="123-456-7890" 
                         className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
-                        {...field} 
+                        value={field.value}
+                        onChange={field.onChange}
                       />
                     </FormControl>
                     <FormMessage />
@@ -1073,10 +1077,11 @@ export function BusinessInformationStep({ form }: BusinessInformationStepProps) 
                       Mobile Phone *
                     </FormLabel>
                     <FormControl>
-                      <Input 
-                        placeholder="Enter mobile phone" 
+                      <PhoneInput 
+                        placeholder="123-456-7890" 
                         className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
-                        {...field} 
+                        value={field.value}
+                        onChange={field.onChange}
                       />
                     </FormControl>
                     <FormMessage />
@@ -1497,7 +1502,11 @@ export function BusinessInformationStep({ form }: BusinessInformationStepProps) 
                     <FormItem>
                       <FormLabel>Mobile Phone *</FormLabel>
                       <FormControl>
-                        <Input placeholder="Enter mobile phone" {...field} />
+                        <PhoneInput 
+                          placeholder="123-456-7890" 
+                          value={field.value}
+                          onChange={field.onChange}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1971,7 +1980,11 @@ export function BusinessInformationStep({ form }: BusinessInformationStepProps) 
                       <FormItem>
                         <FormLabel>Phone Number *</FormLabel>
                         <FormControl>
-                          <Input placeholder="Enter phone number" {...field} />
+                          <PhoneInput 
+                            placeholder="123-456-7890" 
+                            value={field.value}
+                            onChange={field.onChange}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

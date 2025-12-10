@@ -2,10 +2,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import Sidebar from "@/components/layout/sidebar";
 import { MobileSidebar } from "@/components/layout/mobile-sidebar";
 import Header from "@/components/layout/header";
-import MerchantApplicationWizard from "@/components/merchant-application/MerchantApplicationWizard";
+import MerchantApplicationWizard, { type OnboardingMode } from "@/components/merchant-application/MerchantApplicationWizard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,18 +31,46 @@ interface MerchantApplication {
 export default function MerchantApplicationsPage() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   
   // Use state for URL parameters to make them reactive
   const [applicationId, setApplicationId] = useState<string | null>(null);
   const [isNewApplication, setIsNewApplication] = useState(false);
+  const [urlStep, setUrlStep] = useState<string | null>(null);
   
-  // Update state when URL changes
+  // Determine the actual onboarding mode based on user's database onboarding step
+  // This is the SOURCE OF TRUTH - not URL params
+  const userOnboardingStep = user?.onboardingStep;
+  const isInOnboardingFlow = userOnboardingStep && userOnboardingStep !== 'COMPLETE' && user?.role !== 'ADMIN';
+  
+  // Map the user's onboarding step to the wizard mode
+  const getOnboardingMode = (): OnboardingMode | null => {
+    if (!isInOnboardingFlow) return null; // Use full wizard
+    
+    switch (userOnboardingStep) {
+      case 'PART1':
+        return 'part1';
+      case 'DOCUMENTS':
+        return null; // Should be on documents page, not here
+      case 'PART2':
+        return 'part2';
+      case 'REVIEW':
+        return 'review';
+      default:
+        return null;
+    }
+  };
+  
+  const onboardingMode = getOnboardingMode();
+  
+  // Update state when URL changes (only for applicationId)
   useEffect(() => {
     const updateFromUrl = () => {
       const urlParams = new URLSearchParams(window.location.search);
       setApplicationId(urlParams.get('id'));
       setIsNewApplication(urlParams.get('new') === 'true');
+      setUrlStep(urlParams.get('step'));
     };
     
     // Update on mount
@@ -142,6 +171,52 @@ export default function MerchantApplicationsPage() {
     window.dispatchEvent(new Event('urlchange'));
   };
 
+  // Mutation to update onboarding step
+  const updateOnboardingStepMutation = useMutation({
+    mutationFn: async (step: string) => {
+      const response = await apiRequest("PUT", "/api/user/onboarding-step", { step });
+      return response.json();
+    },
+    onSuccess: () => {
+      // Invalidate user query to refresh onboarding state
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+    },
+  });
+
+  // Handle onboarding step completion
+  const handleOnboardingStepComplete = async (completedStep: 'PART1' | 'PART2' | 'REVIEW') => {
+    try {
+      // Determine the next step
+      const nextStepMap: Record<string, { step: string; redirect: string }> = {
+        'PART1': { step: 'DOCUMENTS', redirect: '/documents' },
+        'PART2': { step: 'REVIEW', redirect: '/merchant-applications?step=review' },
+        'REVIEW': { step: 'COMPLETE', redirect: '/' },
+      };
+      
+      const next = nextStepMap[completedStep];
+      if (next) {
+        await updateOnboardingStepMutation.mutateAsync(next.step);
+        
+        toast({
+          title: "Step Complete! ✓",
+          description: completedStep === 'REVIEW' 
+            ? "Your application has been submitted successfully!" 
+            : "Great progress! Moving to the next step.",
+        });
+        
+        // Navigate to next step
+        navigate(next.redirect);
+      }
+    } catch (error) {
+      console.error('Failed to update onboarding step:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save progress. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Group applications by status
   const applicationsByStatus = {
     draft: merchantApplications.filter(app => app.status === 'DRAFT'),
@@ -171,22 +246,27 @@ export default function MerchantApplicationsPage() {
         />
         
         <main className="flex-1 overflow-auto p-6">
-          {/* Show wizard when editing/creating */}
-          {(applicationId || isNewApplication) ? (
+          {/* Show wizard when editing/creating or in onboarding mode */}
+          {(applicationId || isNewApplication || onboardingMode) ? (
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <Button
-                  variant="outline"
-                  onClick={handleBackToList}
-                  className="flex items-center gap-2"
-                >
-                  ← Back to Applications
-                </Button>
-              </div>
+              {/* Only show back button when NOT in onboarding mode */}
+              {!isInOnboardingFlow && (
+                <div className="flex items-center justify-between">
+                  <Button
+                    variant="outline"
+                    onClick={handleBackToList}
+                    className="flex items-center gap-2"
+                  >
+                    ← Back to Applications
+                  </Button>
+                </div>
+              )}
               
               <MerchantApplicationWizard 
-                applicationId={applicationId || undefined}
-                onComplete={handleBackToList}
+                applicationId={applicationId || (isInOnboardingFlow ? merchantApplications[0]?.id : undefined)}
+                onComplete={isInOnboardingFlow ? undefined : handleBackToList}
+                onboardingMode={onboardingMode || 'full'}
+                onOnboardingStepComplete={isInOnboardingFlow ? handleOnboardingStepComplete : undefined}
               />
             </div>
           ) : (

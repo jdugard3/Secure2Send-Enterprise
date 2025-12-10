@@ -36,13 +36,21 @@ import { BusinessInformationStep } from "./steps/BusinessInformationStep";
 import { CertificationStep } from "./steps/CertificationStep";
 import { BeneficialOwnershipStep } from "./steps/BeneficialOwnershipStep";
 import { RepresentativesContactsStep } from "./steps/RepresentativesContactsStep";
+import { BasicBusinessInfoStep } from "./steps/BasicBusinessInfoStep";
+import { DetailedBusinessInfoStep } from "./steps/DetailedBusinessInfoStep";
+
+// Onboarding mode steps (simplified flow)
+export type OnboardingMode = 'part1' | 'part2' | 'review' | 'full';
 
 interface MerchantApplicationWizardProps {
   applicationId?: string;
   onComplete?: () => void;
+  onboardingMode?: OnboardingMode;
+  onOnboardingStepComplete?: (completedStep: 'PART1' | 'PART2' | 'REVIEW') => void;
 }
 
-const STEPS = [
+// Full wizard steps (original 4-step flow)
+const FULL_STEPS = [
   {
     id: 1,
     title: "Business Information",
@@ -69,15 +77,71 @@ const STEPS = [
   },
 ] as const;
 
+// Onboarding mode - Part 1 (Basic Info only)
+const PART1_STEPS = [
+  {
+    id: 1,
+    title: "Basic Business Info",
+    description: "DBA and corporate details",
+    icon: Building,
+  },
+] as const;
+
+// Onboarding mode - Part 2 (Detailed Info)
+const PART2_STEPS = [
+  {
+    id: 1,
+    title: "Detailed Business Info",
+    description: "Banking, transactions, and ownership",
+    icon: Building,
+  },
+  {
+    id: 2,
+    title: "Beneficial Ownership",
+    description: "Details of beneficial owners (25%+ ownership)",
+    icon: Users,
+  },
+  {
+    id: 3,
+    title: "Representatives & Contacts",
+    description: "Financial representative and authorized contacts",
+    icon: Users,
+  },
+] as const;
+
+// Onboarding mode - Review (Final Review & Submit)
+const REVIEW_STEPS = [
+  {
+    id: 1,
+    title: "Certification & Agreement",
+    description: "Corporate resolution and signatures",
+    icon: Shield,
+  },
+] as const;
+
+// Legacy export for backward compatibility
+const STEPS = FULL_STEPS;
+
 export default function MerchantApplicationWizard({ 
   applicationId: initialApplicationId, 
-  onComplete 
+  onComplete,
+  onboardingMode = 'full',
+  onOnboardingStepComplete
 }: MerchantApplicationWizardProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [applicationId, setApplicationId] = useState(initialApplicationId);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Determine which steps to use based on onboarding mode
+  const activeSteps = onboardingMode === 'part1' 
+    ? PART1_STEPS 
+    : onboardingMode === 'part2' 
+    ? PART2_STEPS 
+    : onboardingMode === 'review' 
+    ? REVIEW_STEPS 
+    : FULL_STEPS;
 
   // Load existing application if editing
   const { data: existingApplication, isLoading } = useQuery({
@@ -296,10 +360,12 @@ export default function MerchantApplicationWizard({
       if (!applicationId && data.id) {
         setApplicationId(data.id);
         // Update URL without navigation to keep user in the wizard
+        // IMPORTANT: Preserve onboardingMode in URL if present
+        const onboardingParam = onboardingMode !== 'full' ? `&onboardingMode=${onboardingMode}` : '';
         window.history.replaceState(
           null, 
           '', 
-          `/merchant-applications?id=${data.id}`
+          `/merchant-applications?id=${data.id}${onboardingParam}`
         );
         // Dispatch custom event so parent component updates
         window.dispatchEvent(new Event('urlchange'));
@@ -370,7 +436,13 @@ export default function MerchantApplicationWizard({
         variant: "default",
       });
       queryClient.invalidateQueries({ queryKey: ['/api/merchant-applications'] });
-      onComplete?.();
+      
+      // If in onboarding mode, update the onboarding step to COMPLETE
+      if (onboardingMode !== 'full' && onOnboardingStepComplete) {
+        onOnboardingStepComplete('REVIEW');
+      } else {
+        onComplete?.();
+      }
     },
     onError: (error: Error) => {
       toast({
@@ -407,29 +479,45 @@ export default function MerchantApplicationWizard({
       }
     });
     
-    // Additional custom validation for complex fields
-    if (currentStep === 1) {
-      // Check processing categories (must have at least one)
-      if (!formData.processingCategories || formData.processingCategories.length === 0) {
-        errors.push("Processing Categories: Please select at least one processing category");
+    // Additional custom validation for complex fields (only in full mode)
+    if (onboardingMode === 'full') {
+      if (currentStep === 1) {
+        // Check processing categories (must have at least one)
+        if (!formData.processingCategories || formData.processingCategories.length === 0) {
+          errors.push("Processing Categories: Please select at least one processing category");
+        }
+      }
+      
+      if (currentStep === 4) {
+        // Check beneficial owners (must have at least one with required fields)
+        if (!formData.beneficialOwners || formData.beneficialOwners.length === 0) {
+          errors.push("Beneficial Owners: At least one beneficial owner is required");
+        } else {
+          formData.beneficialOwners.forEach((owner, index) => {
+            if (!owner.name || !owner.ssn || !owner.dob) {
+              errors.push(`Beneficial Owner ${index + 1}: Name, SSN, and Date of Birth are required`);
+            }
+          });
+        }
+      }
+      
+      if (currentStep === 5) {
+        // Check financial representative
+        if (!formData.financialRepresentative?.firstName || !formData.financialRepresentative?.lastName) {
+          errors.push("Financial Representative: First Name and Last Name are required");
+        }
       }
     }
     
-    if (currentStep === 4) {
-      // Check beneficial owners (must have at least one with required fields)
+    // Part 2 mode: Custom validation for beneficial owners step
+    if (onboardingMode === 'part2' && currentStep === 2) {
       if (!formData.beneficialOwners || formData.beneficialOwners.length === 0) {
         errors.push("Beneficial Owners: At least one beneficial owner is required");
-      } else {
-        formData.beneficialOwners.forEach((owner, index) => {
-          if (!owner.name || !owner.ssn || !owner.dob) {
-            errors.push(`Beneficial Owner ${index + 1}: Name, SSN, and Date of Birth are required`);
-          }
-        });
       }
     }
     
-    if (currentStep === 5) {
-      // Check financial representative
+    // Part 2 mode: Custom validation for representatives step
+    if (onboardingMode === 'part2' && currentStep === 3) {
       if (!formData.financialRepresentative?.firstName || !formData.financialRepresentative?.lastName) {
         errors.push("Financial Representative: First Name and Last Name are required");
       }
@@ -530,13 +618,61 @@ export default function MerchantApplicationWizard({
       duration: 2000,
     });
     
-    if (currentStep < STEPS.length) {
+    if (currentStep < activeSteps.length) {
       setCurrentStep(currentStep + 1);
+    } else if (onboardingMode !== 'full' && onOnboardingStepComplete) {
+      // Completed all steps in onboarding mode - notify parent
+      const completedStep = onboardingMode === 'part1' ? 'PART1' 
+        : onboardingMode === 'part2' ? 'PART2' 
+        : 'REVIEW';
+      onOnboardingStepComplete(completedStep);
     }
   };
 
-  // Helper function to get field names for each step
+  // Helper function to get field names for each step (mode-aware)
   const getStepFields = (step: number): (keyof MerchantApplicationForm)[] => {
+    // Part 1 mode: Only basic business info fields (no validation of Part 2 fields)
+    if (onboardingMode === 'part1') {
+      return [
+        // DBA Information  
+        'dbaBusinessName', 'locationAddress',
+        'city', 'state', 'zip', 'businessPhone', 'contactEmail',
+        // Corporate Information
+        'legalBusinessName', 'billingAddress', 'legalContactName', 'legalPhone', 'legalEmail',
+        'ownershipType', 'federalTaxIdNumber', 'incorporationState', 'entityStartDate',
+      ];
+    }
+
+    // Part 2 mode: Different steps have different field requirements
+    if (onboardingMode === 'part2') {
+      switch (step) {
+        case 1: // Detailed Business Info
+          return [
+            // Transaction and Volume
+            'averageTicket', 'highTicket', 'monthlySalesVolume',
+            // Enhanced Banking Information
+            'accountOwnerFirstName', 'accountOwnerLastName', 'nameOnBankAccount',
+            'bankName', 'abaRoutingNumber', 'ddaNumber',
+            // Business Operations
+            'businessType',
+          ];
+        case 2: // Beneficial Ownership
+          return ['beneficialOwners'];
+        case 3: // Representatives & Contacts
+          return ['financialRepresentative', 'authorizedContacts'];
+        default:
+          return [];
+      }
+    }
+
+    // Review mode: Certification fields only
+    if (onboardingMode === 'review') {
+      return [
+        'corporateResolution', 'merchantName', 'merchantTitle', 'merchantDate', 'agreementAccepted'
+      ];
+    }
+
+    // Full mode: Original step fields
     switch (step) {
       case 1: // Business Information Step
         return [
@@ -775,6 +911,31 @@ export default function MerchantApplicationWizard({
   };
 
   const getStepComponent = () => {
+    // Onboarding mode: Part 1 (Basic Business Info only)
+    if (onboardingMode === 'part1') {
+      return <BasicBusinessInfoStep form={form} />;
+    }
+
+    // Onboarding mode: Part 2 (Detailed info steps)
+    if (onboardingMode === 'part2') {
+      switch (currentStep) {
+        case 1:
+          return <DetailedBusinessInfoStep form={form} />;
+        case 2:
+          return <BeneficialOwnershipStep form={form} />;
+        case 3:
+          return <RepresentativesContactsStep form={form} />;
+        default:
+          return null;
+      }
+    }
+
+    // Onboarding mode: Review (Certification & Submit only)
+    if (onboardingMode === 'review') {
+      return <CertificationStep form={form} />;
+    }
+
+    // Full mode (original 4-step wizard)
     switch (currentStep) {
       case 1:
         return <BusinessInformationStep form={form} />;
@@ -789,17 +950,19 @@ export default function MerchantApplicationWizard({
     }
   };
 
-  const progress = (currentStep / STEPS.length) * 100;
-  const currentStepInfo = STEPS[currentStep - 1];
-  const Icon = currentStepInfo.icon;
-
-  if (isLoading) {
+  const progress = (currentStep / activeSteps.length) * 100;
+  const currentStepInfo = activeSteps[currentStep - 1];
+  
+  // Handle loading state and invalid step index
+  if (isLoading || !currentStepInfo) {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
+  
+  const Icon = currentStepInfo.icon;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -819,7 +982,7 @@ export default function MerchantApplicationWizard({
               </div>
             </div>
             <Badge variant="outline">
-              Step {currentStep} of {STEPS.length}
+              Step {currentStep} of {activeSteps.length}
             </Badge>
           </div>
           
@@ -833,7 +996,7 @@ export default function MerchantApplicationWizard({
 
           {/* Step Navigation */}
           <div className="flex justify-between mt-4">
-            {STEPS.map((step, index) => {
+            {activeSteps.map((step, index) => {
               const StepIcon = step.icon;
               const isActive = currentStep === step.id;
               const isCompleted = currentStep > step.id;
@@ -908,9 +1071,17 @@ export default function MerchantApplicationWizard({
             </div>
 
             <div className="flex gap-2">
-              {currentStep < STEPS.length ? (
+              {currentStep < activeSteps.length ? (
                 <Button onClick={handleNext}>
                   Next
+                  <ChevronRight className="h-4 w-4 ml-2" />
+                </Button>
+              ) : onboardingMode === 'part1' || onboardingMode === 'part2' ? (
+                <Button
+                  onClick={handleNext}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  Save & Continue
                   <ChevronRight className="h-4 w-4 ml-2" />
                 </Button>
               ) : (

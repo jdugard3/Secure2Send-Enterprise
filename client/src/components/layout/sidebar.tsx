@@ -35,6 +35,7 @@ import {
   CreditCard,
   Settings as SettingsIcon
 } from "lucide-react";
+import { OnboardingProgress } from "./onboarding-progress";
 
 interface SidebarProps {
   isCollapsed?: boolean;
@@ -182,6 +183,11 @@ export default function Sidebar({ isCollapsed = false, onToggle }: SidebarProps)
           )}
         </div>
       </div>
+
+      {/* Onboarding Progress - Only shown for client users who haven't completed onboarding */}
+      {user?.role === 'CLIENT' && user?.onboardingStep !== 'COMPLETE' && (
+        <OnboardingProgress isCollapsed={isCollapsed} />
+      )}
       
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-2">

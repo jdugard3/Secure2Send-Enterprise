@@ -16,11 +16,16 @@ export const requireMfaSetup = (req: any, res: Response, next: NextFunction) => 
     
     // MFA setup routes (TOTP)
     '/api/mfa/status',
-    '/api/mfa/setup/generate', 
+    '/api/mfa/setup/generate',
     '/api/mfa/setup/verify',
     '/api/mfa/verify',
+    '/api/mfa/disable',
+    '/api/mfa/backup-codes/regenerate',
     
     // MFA setup routes (Email)
+    '/api/mfa/email/enable',
+    '/api/mfa/email/verify-and-activate',
+    '/api/mfa/email/disable',
     '/api/mfa/email/send-setup-otp',
     '/api/mfa/email/verify-setup-otp',
     
@@ -70,7 +75,7 @@ export const requireMfaSetup = (req: any, res: Response, next: NextFunction) => 
  */
 export const mfaExemptRoutes = [
   '/api/login',
-  '/api/register', 
+  '/api/register',
   '/api/logout',
   '/api/auth/user',
   '/api/login/mfa',
@@ -78,6 +83,11 @@ export const mfaExemptRoutes = [
   '/api/mfa/setup/generate',
   '/api/mfa/setup/verify',
   '/api/mfa/verify',
+  '/api/mfa/disable',
+  '/api/mfa/backup-codes/regenerate',
+  '/api/mfa/email/enable',
+  '/api/mfa/email/verify-and-activate',
+  '/api/mfa/email/disable',
   '/api/mfa/email/send-setup-otp',
   '/api/mfa/email/verify-setup-otp',
   '/api/mfa/email/send-login-otp',
