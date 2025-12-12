@@ -3127,7 +3127,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const currentStepIndex = validSteps.indexOf(user.onboardingStep || 'PART1');
       const newStepIndex = validSteps.indexOf(step);
       
+      // Allow resetting to PART1 when starting a new application (going backwards is allowed)
       // Allow moving forward by 1 step or staying on same step
+      // Going backwards (e.g., from COMPLETE to PART1) is allowed for starting fresh
       if (newStepIndex > currentStepIndex + 1) {
         return res.status(400).json({ 
           message: "Cannot skip onboarding steps",
