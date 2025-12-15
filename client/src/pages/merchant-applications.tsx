@@ -159,10 +159,23 @@ export default function MerchantApplicationsPage() {
     window.dispatchEvent(new Event('urlchange'));
   };
 
-  const handleNewApplication = () => {
-    // Use pushState for better navigation without full page reload
-    window.history.pushState({}, '', '/merchant-applications?new=true');
-    window.dispatchEvent(new Event('urlchange'));
+  const handleNewApplication = async () => {
+    try {
+      // Reset onboarding step to PART1 when starting a new application
+      // This ensures the progress bar functionality is active every time
+      if (user?.onboardingStep !== 'PART1') {
+        await updateOnboardingStepMutation.mutateAsync('PART1');
+      }
+      
+      // Use pushState for better navigation without full page reload
+      window.history.pushState({}, '', '/merchant-applications?new=true&step=part1');
+      window.dispatchEvent(new Event('urlchange'));
+    } catch (error) {
+      console.error('Failed to reset onboarding step:', error);
+      // Still navigate even if step update fails
+      window.history.pushState({}, '', '/merchant-applications?new=true&step=part1');
+      window.dispatchEvent(new Event('urlchange'));
+    }
   };
 
   const handleBackToList = () => {
@@ -263,7 +276,7 @@ export default function MerchantApplicationsPage() {
               )}
               
               <MerchantApplicationWizard 
-                applicationId={applicationId || (isInOnboardingFlow ? merchantApplications[0]?.id : undefined)}
+                applicationId={isNewApplication ? undefined : (applicationId || (isInOnboardingFlow ? merchantApplications[0]?.id : undefined))}
                 onComplete={isInOnboardingFlow ? undefined : handleBackToList}
                 onboardingMode={onboardingMode || 'full'}
                 onOnboardingStepComplete={isInOnboardingFlow ? handleOnboardingStepComplete : undefined}
