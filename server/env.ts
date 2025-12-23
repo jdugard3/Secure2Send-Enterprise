@@ -57,6 +57,19 @@ const envSchema = z.object({
   
   // Webhook Security - Secret token for authenticating webhook requests
   ZAPIER_WEBHOOK_SECRET: z.string().min(32).optional(),
+  
+  // OpenAI OCR Configuration
+  OPENAI_API_KEY_OCR_ONLY: z.string().optional(),
+  OPENAI_ORG_ID: z.string().optional(),
+  
+  // OCR Feature Flags & Limits
+  ENABLE_OCR_AUTOFILL: z.string().transform(val => val === 'true').optional().default('false'),
+  OCR_RATE_LIMIT_MAX: z.string().regex(/^\d+$/).transform(Number).optional().default('10'),
+  OCR_RATE_LIMIT_WINDOW_MS: z.string().regex(/^\d+$/).transform(Number).optional().default('900000'), // 15 minutes
+  EXTRACTED_DATA_EXPIRY_DAYS: z.string().regex(/^\d+$/).transform(Number).optional().default('30'),
+  
+  // Field Encryption (separate from document encryption)
+  FIELD_ENCRYPTION_KEY: z.string().min(64, "FIELD_ENCRYPTION_KEY must be at least 64 characters").optional(),
 });
 
 // Parse and validate environment variables
@@ -117,3 +130,6 @@ console.log(`   - SIGNNOW_OWNER_EMAIL: ${env.SIGNNOW_OWNER_EMAIL || "✗ Missing
 console.log(`   - CLOUDFLARE_TEAM_DOMAIN: ${env.CLOUDFLARE_TEAM_DOMAIN || "✗ Missing"}`);
 console.log(`   - CLOUDFLARE_ACCESS_AUD: ${env.CLOUDFLARE_ACCESS_AUD ? "✓ Set" : "✗ Missing"}`);
 console.log(`   - CLOUDFLARE_ACCESS_ISSUER: ${env.CLOUDFLARE_ACCESS_ISSUER || "✗ Missing"}`);
+console.log(`   - OPENAI_API_KEY_OCR_ONLY: ${env.OPENAI_API_KEY_OCR_ONLY ? "✓ Set" : "✗ Missing"}`);
+console.log(`   - ENABLE_OCR_AUTOFILL: ${env.ENABLE_OCR_AUTOFILL ? "Enabled" : "Disabled"}`);
+console.log(`   - FIELD_ENCRYPTION_KEY: ${env.FIELD_ENCRYPTION_KEY ? "✓ Set" : "✗ Missing"}`);

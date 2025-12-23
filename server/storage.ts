@@ -7,6 +7,7 @@ import {
   auditLogs,
   invitationCodes,
   loginAttempts,
+  extractedDocumentData,
   type User,
   type InsertUser,
   type Client,
@@ -21,6 +22,8 @@ import {
   type InvitationCode,
   type LoginAttempt,
   type InsertLoginAttempt,
+  type InsertExtractedDocumentData,
+  type ExtractedDocumentData,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql } from "drizzle-orm";
@@ -95,6 +98,16 @@ export interface IStorage {
   getAllInvitationCodes(): Promise<any[]>;
   markInvitationCodeAsUsed(code: string, userId: string): Promise<any>;
   deleteInvitationCode(id: string): Promise<void>;
+  
+  // Extracted document data operations
+  createExtractedDocumentData(data: InsertExtractedDocumentData): Promise<ExtractedDocumentData>;
+  getExtractedDocumentDataById(id: string): Promise<ExtractedDocumentData | undefined>;
+  getExtractedDocumentDataByDocumentId(documentId: string): Promise<ExtractedDocumentData | undefined>;
+  getExtractedDocumentDataByMerchantApplicationId(merchantApplicationId: string): Promise<ExtractedDocumentData[]>;
+  getExtractedDocumentDataByUserId(userId: string): Promise<ExtractedDocumentData[]>;
+  updateExtractedDocumentDataReviewed(id: string, reviewed: boolean): Promise<ExtractedDocumentData>;
+  updateExtractedDocumentDataApplied(id: string, applied: boolean): Promise<ExtractedDocumentData>;
+  deleteExpiredExtractedDocumentData(): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -980,6 +993,86 @@ export class DatabaseStorage implements IStorage {
       console.error("Error in deleteInvitationCode:", error);
       throw new Error("Failed to delete invitation code");
     }
+  }
+
+  // Extracted document data operations
+  async createExtractedDocumentData(data: InsertExtractedDocumentData): Promise<ExtractedDocumentData> {
+    const [result] = await db
+      .insert(extractedDocumentData)
+      .values(data)
+      .returning();
+    return result;
+  }
+
+  async getExtractedDocumentDataById(id: string): Promise<ExtractedDocumentData | undefined> {
+    const [result] = await db
+      .select()
+      .from(extractedDocumentData)
+      .where(eq(extractedDocumentData.id, id));
+    return result;
+  }
+
+  async getExtractedDocumentDataByDocumentId(documentId: string): Promise<ExtractedDocumentData | undefined> {
+    const [result] = await db
+      .select()
+      .from(extractedDocumentData)
+      .where(eq(extractedDocumentData.documentId, documentId))
+      .orderBy(desc(extractedDocumentData.extractionTimestamp))
+      .limit(1);
+    return result;
+  }
+
+  async getExtractedDocumentDataByMerchantApplicationId(merchantApplicationId: string): Promise<ExtractedDocumentData[]> {
+    return await db
+      .select()
+      .from(extractedDocumentData)
+      .where(eq(extractedDocumentData.merchantApplicationId, merchantApplicationId))
+      .orderBy(desc(extractedDocumentData.extractionTimestamp));
+  }
+
+  async getExtractedDocumentDataByUserId(userId: string): Promise<ExtractedDocumentData[]> {
+    return await db
+      .select()
+      .from(extractedDocumentData)
+      .where(eq(extractedDocumentData.userId, userId))
+      .orderBy(desc(extractedDocumentData.extractionTimestamp));
+  }
+
+  async updateExtractedDocumentDataReviewed(id: string, reviewed: boolean): Promise<ExtractedDocumentData> {
+    const [result] = await db
+      .update(extractedDocumentData)
+      .set({
+        userReviewed: reviewed,
+        reviewedAt: reviewed ? new Date() : null,
+      })
+      .where(eq(extractedDocumentData.id, id))
+      .returning();
+    return result;
+  }
+
+  async updateExtractedDocumentDataApplied(id: string, applied: boolean): Promise<ExtractedDocumentData> {
+    const [result] = await db
+      .update(extractedDocumentData)
+      .set({
+        appliedToApplication: applied,
+        appliedAt: applied ? new Date() : null,
+      })
+      .where(eq(extractedDocumentData.id, id))
+      .returning();
+    return result;
+  }
+
+  async deleteExpiredExtractedDocumentData(): Promise<number> {
+    const result = await db
+      .delete(extractedDocumentData)
+      .where(
+        and(
+          sql`${extractedDocumentData.expiresAt} < NOW()`,
+          eq(extractedDocumentData.userReviewed, false),
+          eq(extractedDocumentData.appliedToApplication, false)
+        )
+      );
+    return result.rowCount || 0;
   }
 }
 

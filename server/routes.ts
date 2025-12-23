@@ -2,12 +2,12 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, requireAuth, requireAdmin, hashPassword } from "./auth";
-import { insertDocumentSchema } from "@shared/schema";
+import { insertDocumentSchema, type InsertMerchantApplication } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { uploadLimiter, adminLimiter } from "./middleware/rateLimiting";
+import { uploadLimiter, adminLimiter, ocrLimiter } from "./middleware/rateLimiting";
 import { secureUpload, FileValidator } from "./middleware/fileValidation";
 import { EmailService } from "./services/emailService";
 import { env } from "./env";
@@ -16,6 +16,9 @@ import { AuditService } from "./services/auditService";
 import { IrisCrmService } from "./services/irisCrmService";
 import { requireMfaSetup } from "./middleware/mfaRequired";
 import { LogSanitizer, safeLog } from "./utils/logSanitizer";
+import { SecureDocumentProcessingService } from "./services/documentProcessingService";
+import { PIIProtectionService } from "./services/piiProtectionService";
+import { triggerBackgroundOcrProcessing } from "./services/backgroundOcrProcessor";
 
 // File upload configuration is now handled in fileValidation middleware
 
@@ -264,6 +267,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.warn('⚠️ No IRIS lead ID found for merchant application, skipping document sync');
       }
 
+      // Trigger background OCR processing (fire-and-forget, doesn't block response)
+      if (env.ENABLE_OCR_AUTOFILL) {
+        triggerBackgroundOcrProcessing({
+          documentId: document.id,
+          userId: user.id,
+          merchantApplicationId: merchantApplicationId,
+          documentType: documentType,
+          req,
+        });
+        console.log(`🔄 Triggered background OCR processing for document: ${document.id}`);
+      }
+
       res.json(document);
     } catch (error) {
       console.error("Error uploading document:", error);
@@ -488,6 +503,423 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting document:", error);
       res.status(500).json({ message: "Failed to delete document" });
+    }
+  });
+
+  // ========================================================================
+  // OCR / EXTRACTED DATA ROUTES
+  // ========================================================================
+
+  /**
+   * POST /api/documents/:id/process
+   * Manually trigger OCR processing for a document
+   * Requires: Auth + MFA + Rate limit (10 per 15 min per user)
+   */
+  app.post('/api/documents/:id/process', ocrLimiter, requireAuth, async (req: any, res: Response) => {
+    try {
+      if (!env.ENABLE_OCR_AUTOFILL) {
+        return res.status(503).json({ 
+          message: 'OCR autofill is disabled',
+          error: 'OCR_FEATURE_DISABLED'
+        });
+      }
+
+      const { id } = req.params;
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Verify MFA is enabled
+      if (!user.mfaEnabled && !user.mfaEmailEnabled) {
+        return res.status(403).json({ 
+          message: "MFA must be enabled to process documents",
+          mfaRequired: true
+        });
+      }
+
+      // Get document
+      const document = await storage.getDocumentById(id);
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+
+      // Verify document ownership
+      if (user.role === 'CLIENT') {
+        const client = await storage.getClientByUserId(userId);
+        if (!client || document.clientId !== client.id) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      // Check if extracted data already exists for this document
+      const existingData = await storage.getExtractedDocumentDataByDocumentId(id);
+      if (existingData) {
+        return res.json({
+          success: true,
+          message: 'Extracted data already exists for this document',
+          documentId: document.id,
+          extractedDataId: existingData.id,
+          status: 'complete',
+        });
+      }
+
+      // Trigger background OCR processing (fire-and-forget)
+      triggerBackgroundOcrProcessing({
+        documentId: document.id,
+        userId: user.id,
+        merchantApplicationId: document.merchantApplicationId || undefined,
+        documentType: document.documentType,
+        req,
+      });
+
+      res.json({
+        success: true,
+        message: 'OCR processing started',
+        documentId: document.id,
+        status: 'processing',
+      });
+
+    } catch (error) {
+      console.error("Error starting OCR processing:", error);
+      
+      // Log OCR failure
+      try {
+        const user = await storage.getUser(req.user?.id);
+        if (user) {
+          await AuditService.logAction(user, 'OCR_EXTRACTION_FAILED', req, {
+            resourceType: 'document',
+            resourceId: req.params.id,
+            metadata: { error: error instanceof Error ? error.message : 'Unknown error' },
+          });
+        }
+      } catch (auditError) {
+        console.error("Failed to log OCR failure:", auditError);
+      }
+
+      res.status(500).json({ 
+        message: "Failed to start OCR processing",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  /**
+   * GET /api/documents/:id/ocr-status
+   * Get OCR processing status for a document (for polling)
+   * Requires: Auth
+   */
+  app.get('/api/documents/:id/ocr-status', requireAuth, async (req: any, res: Response) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Get document
+      const document = await storage.getDocumentById(id);
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+
+      // Verify document ownership
+      if (user.role === 'CLIENT') {
+        const client = await storage.getClientByUserId(userId);
+        if (!client || document.clientId !== client.id) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      // Check for extracted data
+      const extractedData = await storage.getExtractedDocumentDataByDocumentId(id);
+
+      if (extractedData) {
+        res.json({
+          status: 'complete',
+          extractedDataId: extractedData.id,
+          confidenceScore: extractedData.confidenceScore ? parseFloat(extractedData.confidenceScore) : undefined,
+          userReviewed: extractedData.userReviewed,
+          appliedToApplication: extractedData.appliedToApplication,
+          extractionTimestamp: extractedData.extractionTimestamp,
+        });
+      } else {
+        // No extracted data found - status is processing or not started
+        res.json({
+          status: 'processing', // or 'not_started' - frontend can check if process was triggered
+          extractedDataId: null,
+        });
+      }
+
+    } catch (error) {
+      console.error("Error checking OCR status:", error);
+      res.status(500).json({ 
+        message: "Failed to check OCR status",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  /**
+   * GET /api/merchant-applications/:id/extracted-data
+   * Get extracted data for review (with decrypted sensitive fields if authorized)
+   * Requires: Auth + MFA
+   */
+  app.get('/api/merchant-applications/:id/extracted-data', requireAuth, async (req: any, res: Response) => {
+    try {
+      const { id } = req.params;
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Verify MFA is enabled
+      if (!user.mfaEnabled && !user.mfaEmailEnabled) {
+        return res.status(403).json({ 
+          message: "MFA must be enabled to view extracted data",
+          mfaRequired: true
+        });
+      }
+
+      // Verify merchant application ownership
+      if (user.role === 'CLIENT') {
+        const isOwner = await storage.validateMerchantApplicationOwnership(id, userId);
+        if (!isOwner) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      // Get all extracted data for this merchant application
+      const extractedDataList = await storage.getExtractedDocumentDataByMerchantApplicationId(id);
+
+      // Check if user wants to view sensitive fields (query param)
+      const includeSensitive = req.query.includeSensitive === 'true';
+
+      // Process each extracted data entry
+      const processedData = await Promise.all(
+        extractedDataList.map(async (extractedData) => {
+          const publicData = extractedData.extractedDataPublic as Record<string, any>;
+          const encryptedFields = extractedData.encryptedFields as Record<string, string>;
+
+          let fullData = publicData;
+
+          // Decrypt sensitive fields if requested and user is authorized
+          if (includeSensitive && Object.keys(encryptedFields).length > 0) {
+            try {
+              fullData = PIIProtectionService.decryptAndMerge(publicData, encryptedFields);
+
+              // Audit log sensitive data access
+              await AuditService.logAction(user, 'OCR_DATA_DECRYPTED', req, {
+                resourceType: 'extracted_document_data',
+                resourceId: extractedData.id,
+                metadata: {
+                  merchantApplicationId: id,
+                  documentId: extractedData.documentId,
+                },
+              });
+            } catch (decryptError) {
+              console.error('Failed to decrypt sensitive fields:', decryptError);
+              // Return public data only if decryption fails
+            }
+          }
+
+          return {
+            id: extractedData.id,
+            documentId: extractedData.documentId,
+            data: includeSensitive ? fullData : publicData,
+            confidenceScore: extractedData.confidenceScore ? parseFloat(extractedData.confidenceScore) : undefined,
+            userReviewed: extractedData.userReviewed,
+            reviewedAt: extractedData.reviewedAt,
+            appliedToApplication: extractedData.appliedToApplication,
+            appliedAt: extractedData.appliedAt,
+            extractionTimestamp: extractedData.extractionTimestamp,
+            hasSensitiveFields: Object.keys(encryptedFields).length > 0,
+          };
+        })
+      );
+
+      // Audit log data access
+      await AuditService.logAction(user, 'OCR_DATA_REVIEWED', req, {
+        resourceType: 'merchant_application',
+        resourceId: id,
+        metadata: {
+          extractedDataCount: extractedDataList.length,
+          includeSensitive,
+        },
+      });
+
+      res.json({
+        success: true,
+        extractedData: processedData,
+        count: processedData.length,
+      });
+
+    } catch (error) {
+      console.error("Error fetching extracted data:", error);
+      res.status(500).json({ 
+        message: "Failed to fetch extracted data",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  });
+
+  /**
+   * POST /api/merchant-applications/:id/apply-extracted-data
+   * Apply reviewed extracted data to merchant application
+   * Requires: Auth + MFA
+   */
+  app.post('/api/merchant-applications/:id/apply-extracted-data', requireAuth, async (req: any, res: Response) => {
+    try {
+      const { id } = req.params;
+      const { extractedDataId, reviewedFields } = req.body;
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Verify MFA is enabled
+      if (!user.mfaEnabled && !user.mfaEmailEnabled) {
+        return res.status(403).json({ 
+          message: "MFA must be enabled to apply extracted data",
+          mfaRequired: true
+        });
+      }
+
+      // Validate input
+      if (!extractedDataId) {
+        return res.status(400).json({ message: "extractedDataId is required" });
+      }
+
+      if (!reviewedFields || typeof reviewedFields !== 'object') {
+        return res.status(400).json({ message: "reviewedFields must be an object" });
+      }
+
+      // Verify merchant application ownership
+      if (user.role === 'CLIENT') {
+        const isOwner = await storage.validateMerchantApplicationOwnership(id, userId);
+        if (!isOwner) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      // Get merchant application
+      const merchantApplication = await storage.getMerchantApplicationById(id);
+      if (!merchantApplication) {
+        return res.status(404).json({ message: "Merchant application not found" });
+      }
+
+      // Get extracted data
+      const extractedData = await storage.getExtractedDocumentDataById(extractedDataId);
+      if (!extractedData) {
+        return res.status(404).json({ message: "Extracted data not found" });
+      }
+
+      // Verify extracted data belongs to this merchant application
+      if (extractedData.merchantApplicationId !== id) {
+        return res.status(400).json({ message: "Extracted data does not belong to this merchant application" });
+      }
+
+      // Decrypt sensitive fields to get full data
+      const publicData = extractedData.extractedDataPublic as Record<string, any>;
+      const encryptedFields = extractedData.encryptedFields as Record<string, string>;
+      const fullData = PIIProtectionService.decryptAndMerge(publicData, encryptedFields);
+
+      // Map reviewed fields to merchant application fields
+      // Only update fields that user confirmed in reviewedFields
+      const updateData: Partial<InsertMerchantApplication> = {};
+
+      // Map common fields from reviewedFields to merchant application schema
+      if (reviewedFields.legalBusinessName !== undefined) {
+        updateData.legalBusinessName = reviewedFields.legalBusinessName || null;
+      }
+      if (reviewedFields.dbaBusinessName !== undefined) {
+        updateData.dbaBusinessName = reviewedFields.dbaBusinessName || null;
+      }
+      if (reviewedFields.businessAddress !== undefined || reviewedFields.locationAddress !== undefined) {
+        updateData.billingAddress = reviewedFields.businessAddress || reviewedFields.locationAddress || null;
+        updateData.locationAddress = reviewedFields.locationAddress || reviewedFields.businessAddress || null;
+      }
+      if (reviewedFields.city !== undefined) {
+        updateData.city = reviewedFields.city || null;
+      }
+      if (reviewedFields.state !== undefined) {
+        updateData.state = reviewedFields.state || null;
+      }
+      if (reviewedFields.zip !== undefined) {
+        updateData.zip = reviewedFields.zip || null;
+      }
+      if (reviewedFields.federalTaxIdNumber !== undefined) {
+        updateData.federalTaxIdNumber = reviewedFields.federalTaxIdNumber || null;
+      }
+      if (reviewedFields.bankName !== undefined) {
+        updateData.bankName = reviewedFields.bankName || null;
+      }
+      if (reviewedFields.routingNumber !== undefined) {
+        updateData.abaRoutingNumber = reviewedFields.routingNumber || null;
+      }
+      if (reviewedFields.accountNumber !== undefined) {
+        updateData.ddaNumber = reviewedFields.accountNumber || null;
+      }
+      if (reviewedFields.accountHolderName !== undefined || reviewedFields.accountName !== undefined) {
+        updateData.accountName = reviewedFields.accountHolderName || reviewedFields.accountName || null;
+        updateData.nameOnBankAccount = reviewedFields.accountHolderName || reviewedFields.accountName || null;
+      }
+      if (reviewedFields.monthlySalesVolume !== undefined) {
+        updateData.monthlySalesVolume = reviewedFields.monthlySalesVolume?.toString() || null;
+      }
+      if (reviewedFields.averageTicket !== undefined) {
+        updateData.averageTicket = reviewedFields.averageTicket?.toString() || null;
+      }
+      if (reviewedFields.highTicket !== undefined) {
+        updateData.highTicket = reviewedFields.highTicket?.toString() || null;
+      }
+      if (reviewedFields.incorporationState !== undefined) {
+        updateData.incorporationState = reviewedFields.incorporationState || null;
+      }
+      if (reviewedFields.incorporationDate !== undefined) {
+        updateData.entityStartDate = reviewedFields.incorporationDate ? new Date(reviewedFields.incorporationDate) : null;
+      }
+      if (reviewedFields.ownershipType !== undefined) {
+        updateData.ownershipType = reviewedFields.ownershipType || null;
+      }
+
+      // Update merchant application with reviewed fields only
+      await storage.updateMerchantApplication(id, updateData);
+
+      // Mark extracted data as reviewed and applied
+      await storage.updateExtractedDocumentDataReviewed(extractedDataId, true);
+      await storage.updateExtractedDocumentDataApplied(extractedDataId, true);
+
+      // Audit log application
+      await AuditService.logAction(user, 'OCR_DATA_APPLIED', req, {
+        resourceType: 'merchant_application',
+        resourceId: id,
+        metadata: {
+          extractedDataId,
+          fieldsApplied: Object.keys(reviewedFields),
+        },
+      });
+
+      res.json({
+        success: true,
+        message: 'Extracted data applied to merchant application',
+        appliedFields: Object.keys(reviewedFields),
+      });
+
+    } catch (error) {
+      console.error("Error applying extracted data:", error);
+      res.status(500).json({ 
+        message: "Failed to apply extracted data",
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
     }
   });
 

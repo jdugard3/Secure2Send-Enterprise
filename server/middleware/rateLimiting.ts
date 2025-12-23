@@ -1,4 +1,4 @@
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { env } from "../env";
 
 // General API rate limiter
@@ -71,12 +71,41 @@ export const adminLimiter = rateLimit({
   },
 });
 
+// OCR processing rate limiter (per user, not per IP)
+export const ocrLimiter = rateLimit({
+  windowMs: (typeof env.OCR_RATE_LIMIT_WINDOW_MS === 'number' ? env.OCR_RATE_LIMIT_WINDOW_MS : 15 * 60 * 1000), // 15 minutes default
+  max: (typeof env.OCR_RATE_LIMIT_MAX === 'number' ? env.OCR_RATE_LIMIT_MAX : 10), // 10 requests per window default
+  message: {
+    error: "Too many OCR processing requests, please try again later.",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req: any) => {
+    // Rate limit per user ID if authenticated, otherwise per IP (with IPv6 support)
+    if (req.user?.id) {
+      return req.user.id;
+    }
+    // Use ipKeyGenerator helper for proper IPv6 handling
+    return ipKeyGenerator(req) || 'unknown';
+  },
+  skip: (req) => {
+    if (env.NODE_ENV === "development" && req.ip === "127.0.0.1") {
+      return true;
+    }
+    return false;
+  },
+});
+
 // Export rate limiting info for logging
 export const rateLimitConfig = {
   general: { windowMs: 15, max: env.NODE_ENV === "production" ? 100 : 1000 },
   auth: { windowMs: 15, max: env.NODE_ENV === "production" ? 5 : 50 },
   upload: { windowMs: 60, max: env.NODE_ENV === "production" ? 20 : 100 },
   admin: { windowMs: 15, max: env.NODE_ENV === "production" ? 200 : 1000 },
+  ocr: { 
+    windowMs: (typeof env.OCR_RATE_LIMIT_WINDOW_MS === 'number' ? env.OCR_RATE_LIMIT_WINDOW_MS / 60000 : 15), 
+    max: (typeof env.OCR_RATE_LIMIT_MAX === 'number' ? env.OCR_RATE_LIMIT_MAX : 10) 
+  },
 };
 
 console.log("✅ Rate limiting configured:");
@@ -85,3 +114,4 @@ console.log(`   - General API: ${rateLimitConfig.general.max} requests per ${rat
 console.log(`   - Authentication: ${rateLimitConfig.auth.max} attempts per ${rateLimitConfig.auth.windowMs}min`);
 console.log(`   - File uploads: ${rateLimitConfig.upload.max} uploads per ${rateLimitConfig.upload.windowMs}min`);
 console.log(`   - Admin operations: ${rateLimitConfig.admin.max} requests per ${rateLimitConfig.admin.windowMs}min`);
+console.log(`   - OCR processing: ${rateLimitConfig.ocr.max} requests per ${rateLimitConfig.ocr.windowMs}min per user`);

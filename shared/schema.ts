@@ -83,7 +83,13 @@ export const auditLogEnum = pgEnum('audit_action', [
   'MFA_METHOD_SWITCHED',
   'INVITATION_CODE_CREATED',
   'INVITATION_CODE_USED',
-  'INVITATION_CODE_DELETED'
+  'INVITATION_CODE_DELETED',
+  'OCR_EXTRACTION_STARTED',
+  'OCR_EXTRACTION_COMPLETED',
+  'OCR_EXTRACTION_FAILED',
+  'OCR_DATA_REVIEWED',
+  'OCR_DATA_APPLIED',
+  'OCR_DATA_DECRYPTED'
 ]);
 export const invitationCodeStatusEnum = pgEnum('invitation_code_status', ['ACTIVE', 'USED', 'EXPIRED']);
 export const onboardingStepEnum = pgEnum('onboarding_step', ['PART1', 'DOCUMENTS', 'PART2', 'REVIEW', 'COMPLETE']);
@@ -339,6 +345,48 @@ export const sensitiveData = pgTable("sensitive_data", {
   lastAccessed: timestamp("last_accessed").defaultNow(),
 });
 
+// Extracted document data table for OCR results
+export const extractedDocumentData = pgTable("extracted_document_data", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  
+  // Foreign keys
+  documentId: varchar("document_id").references(() => documents.id, { onDelete: 'cascade' }),
+  merchantApplicationId: varchar("merchant_application_id").references(() => merchantApplications.id, { onDelete: 'cascade' }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  
+  // Public (masked) data for UI display
+  extractedDataPublic: jsonb("extracted_data_public").notNull(),
+  
+  // Encrypted sensitive fields (JSONB object with encrypted values)
+  encryptedFields: jsonb("encrypted_fields").notNull(), // Stores encrypted sensitive fields as key-value pairs
+  
+  // Document tracking
+  documentHash: varchar("document_hash", { length: 64 }).notNull(), // SHA-256 hash for duplicate detection
+  extractionTimestamp: timestamp("extraction_timestamp").defaultNow().notNull(),
+  confidenceScore: varchar("confidence_score"), // Stored as string to preserve precision (0.00-1.00)
+  
+  // User review tracking
+  userReviewed: boolean("user_reviewed").default(false),
+  reviewedAt: timestamp("reviewed_at"),
+  appliedToApplication: boolean("applied_to_application").default(false),
+  appliedAt: timestamp("applied_at"),
+  
+  // Auto-expiry (30 days default)
+  expiresAt: timestamp("expires_at").default(sql`NOW() + INTERVAL '30 days'`),
+  
+  // Audit fields for compliance
+  processingIpAddress: varchar("processing_ip_address", { length: 45 }), // IPv6 support
+  processingUserAgent: text("processing_user_agent"),
+}, (table) => [
+  index("IDX_extracted_document_data_document_id").on(table.documentId),
+  index("IDX_extracted_document_data_merchant_app_id").on(table.merchantApplicationId),
+  index("IDX_extracted_document_data_user_id").on(table.userId),
+  index("IDX_extracted_document_data_document_hash").on(table.documentHash),
+  index("IDX_extracted_document_data_expires_at").on(table.expiresAt),
+  index("IDX_extracted_document_data_user_reviewed").on(table.userReviewed),
+  index("IDX_extracted_document_data_applied").on(table.appliedToApplication),
+]);
+
 // Audit logs table
 export const auditLogs = pgTable("audit_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -369,6 +417,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   clients: many(clients),
   sensitiveData: many(sensitiveData),
   auditLogs: many(auditLogs),
+  extractedDocumentData: many(extractedDocumentData),
 }));
 
 export const clientsRelations = relations(clients, ({ one, many }) => ({
@@ -381,7 +430,7 @@ export const clientsRelations = relations(clients, ({ one, many }) => ({
   merchantApplications: many(merchantApplications),
 }));
 
-export const documentsRelations = relations(documents, ({ one }) => ({
+export const documentsRelations = relations(documents, ({ one, many }) => ({
   client: one(clients, {
     fields: [documents.clientId],
     references: [clients.id],
@@ -390,6 +439,7 @@ export const documentsRelations = relations(documents, ({ one }) => ({
     fields: [documents.merchantApplicationId],
     references: [merchantApplications.id],
   }),
+  extractedData: many(extractedDocumentData),
 }));
 
 export const merchantApplicationsRelations = relations(merchantApplications, ({ one, many }) => ({
@@ -402,6 +452,7 @@ export const merchantApplicationsRelations = relations(merchantApplications, ({ 
     references: [users.id],
   }),
   documents: many(documents),
+  extractedData: many(extractedDocumentData),
 }));
 
 export const sensitiveDataRelations = relations(sensitiveData, ({ one }) => ({
@@ -429,6 +480,21 @@ export const invitationCodesRelations = relations(invitationCodes, ({ one }) => 
   }),
   usedByUser: one(users, {
     fields: [invitationCodes.usedBy],
+    references: [users.id],
+  }),
+}));
+
+export const extractedDocumentDataRelations = relations(extractedDocumentData, ({ one }) => ({
+  document: one(documents, {
+    fields: [extractedDocumentData.documentId],
+    references: [documents.id],
+  }),
+  merchantApplication: one(merchantApplications, {
+    fields: [extractedDocumentData.merchantApplicationId],
+    references: [merchantApplications.id],
+  }),
+  user: one(users, {
+    fields: [extractedDocumentData.userId],
     references: [users.id],
   }),
 }));
@@ -489,6 +555,8 @@ export type InsertInvitationCode = typeof invitationCodes.$inferInsert;
 export type InvitationCode = typeof invitationCodes.$inferSelect;
 export type InsertLoginAttempt = typeof loginAttempts.$inferInsert;
 export type LoginAttempt = typeof loginAttempts.$inferSelect;
+export type InsertExtractedDocumentData = typeof extractedDocumentData.$inferInsert;
+export type ExtractedDocumentData = typeof extractedDocumentData.$inferSelect;
 export type OnboardingStep = 'PART1' | 'DOCUMENTS' | 'PART2' | 'REVIEW' | 'COMPLETE';
 
 // Combined types

@@ -11,6 +11,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
 import { DOCUMENT_TYPES } from "@/lib/constants";
+import OcrProcessingIndicator from "./OcrProcessingIndicator";
+import ExtractedDataReviewModal from "./ExtractedDataReviewModal";
 
 interface DocumentUploadZoneProps {
   documentType: string;
@@ -24,6 +26,7 @@ interface DocumentUploadZoneProps {
   onRemoveStagedFile: (index: number, documentType: string) => void;
   onUploadStaged: (documentType: string) => void;
   merchantAppMap: Record<string, string>;
+  onReviewExtractedData?: (documentId: string, merchantApplicationId: string) => void;
 }
 
 function DocumentUploadZone({ 
@@ -37,7 +40,8 @@ function DocumentUploadZone({
   onStageFiles,
   onRemoveStagedFile,
   onUploadStaged,
-  merchantAppMap
+  merchantAppMap,
+  onReviewExtractedData
 }: DocumentUploadZoneProps) {
   const { toast } = useToast();
 
@@ -205,6 +209,30 @@ function DocumentUploadZone({
                           </span>
                         </div>
                       )}
+                      {/* OCR Processing Indicator */}
+                      {doc.merchantApplicationId && (
+                        <div className="mt-2">
+                          <OcrProcessingIndicator
+                            documentId={doc.id}
+                            onReviewClick={() => {
+                              console.log('onReviewClick called from OcrProcessingIndicator', { 
+                                documentId: doc.id, 
+                                merchantApplicationId: doc.merchantApplicationId,
+                                hasHandler: !!onReviewExtractedData
+                              });
+                              if (onReviewExtractedData && doc.merchantApplicationId) {
+                                onReviewExtractedData(doc.id, doc.merchantApplicationId);
+                              } else {
+                                console.error('Missing handler or merchantApplicationId', { 
+                                  hasHandler: !!onReviewExtractedData,
+                                  merchantApplicationId: doc.merchantApplicationId
+                                });
+                              }
+                            }}
+                            className="text-xs"
+                          />
+                        </div>
+                      )}
                     </div>
                     {getStatusBadge(doc.status)}
                   </div>
@@ -265,6 +293,9 @@ export default function DocumentUpload() {
   const [uploadingTypes, setUploadingTypes] = useState<Set<string>>(new Set());
   const [stagedFilesByType, setStagedFilesByType] = useState<Record<string, File[]>>({});
   const [selectedMerchantApplicationId, setSelectedMerchantApplicationId] = useState<string>("");
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [reviewDocumentId, setReviewDocumentId] = useState<string>("");
+  const [reviewMerchantApplicationId, setReviewMerchantApplicationId] = useState<string>("");
 
   // Fetch merchant applications for the dropdown
   const { data: merchantApplications = [], isLoading: isLoadingApplications } = useQuery<any[]>({
@@ -414,6 +445,14 @@ export default function DocumentUpload() {
     deleteMutation.mutate(documentId);
   };
 
+  const handleReviewExtractedData = (documentId: string, merchantApplicationId: string) => {
+    console.log('handleReviewExtractedData called', { documentId, merchantApplicationId });
+    setReviewDocumentId(documentId);
+    setReviewMerchantApplicationId(merchantApplicationId);
+    setReviewModalOpen(true);
+    console.log('Modal state set to open');
+  };
+
   // Group documents by type
   const documentsByType = documents.reduce((acc, doc) => {
     if (!acc[doc.documentType]) {
@@ -561,6 +600,7 @@ export default function DocumentUpload() {
                     onRemoveStagedFile={handleRemoveStagedFile}
                     onUploadStaged={handleUploadStaged}
                     merchantAppMap={merchantAppMap}
+                    onReviewExtractedData={handleReviewExtractedData}
                   />
                 ))}
             </div>
@@ -589,11 +629,26 @@ export default function DocumentUpload() {
                     onRemoveStagedFile={handleRemoveStagedFile}
                     onUploadStaged={handleUploadStaged}
                     merchantAppMap={merchantAppMap}
+                    onReviewExtractedData={handleReviewExtractedData}
                   />
                 ))}
             </div>
           </div>
         </div>
+
+        {/* Extracted Data Review Modal */}
+        {reviewMerchantApplicationId && (
+          <ExtractedDataReviewModal
+            isOpen={reviewModalOpen}
+            onClose={() => {
+              setReviewModalOpen(false);
+              setReviewDocumentId("");
+              setReviewMerchantApplicationId("");
+            }}
+            merchantApplicationId={reviewMerchantApplicationId}
+            documentId={reviewDocumentId}
+          />
+        )}
 
         {documents.length > 0 && (() => {
           // Calculate required document sections
