@@ -156,11 +156,6 @@ export async function processDocumentInBackground(
       .update(fileBuffer)
       .digest('hex');
 
-    // Extract confidence score from result data
-    const confidenceScore = result.data.confidence 
-      ? result.data.confidence.toFixed(2)
-      : result.confidenceScore?.toFixed(2) || undefined;
-
     // Store extracted data in database
     const extractedData = await storage.createExtractedDocumentData({
       documentId,
@@ -169,7 +164,6 @@ export async function processDocumentInBackground(
       extractedDataPublic: publicData,
       encryptedFields,
       documentHash,
-      confidenceScore,
       processingIpAddress: req?.ip || req?.socket?.remoteAddress || undefined,
       processingUserAgent: req?.get('user-agent') || undefined,
     });
@@ -185,21 +179,18 @@ export async function processDocumentInBackground(
           documentType: document.documentType,
           filename: document.originalName,
           extractedDataId: extractedData.id,
-          confidenceScore: confidenceScore ? parseFloat(confidenceScore) : undefined,
         },
       });
     }
 
-    // Auto-apply extracted data if confidence is high enough (>= 95%)
-    const confidence = confidenceScore ? parseFloat(confidenceScore) : undefined;
-    if (confidence && confidence >= 0.95 && merchantApplicationId) {
+    // Auto-apply extracted data immediately after extraction
+    if (merchantApplicationId) {
       try {
         const { autoApplyExtractedData } = await import('./autoApplyExtractedData');
         const autoApplied = await autoApplyExtractedData(
           extractedData.id,
           merchantApplicationId,
           userId,
-          confidence,
           req
         );
         if (autoApplied) {
@@ -209,8 +200,6 @@ export async function processDocumentInBackground(
         console.error('Failed to auto-apply extracted data:', autoApplyError);
         // Don't fail the OCR processing if auto-apply fails
       }
-    } else if (confidence && confidence < 0.95) {
-      console.log(`⏭️  Skipping auto-apply: confidence score ${confidence} is below 95% threshold (requires manual review)`);
     }
 
     // Clear file buffer from memory

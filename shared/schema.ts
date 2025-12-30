@@ -25,7 +25,7 @@ export const sessions = pgTable(
 );
 
 // Enums
-export const userRoleEnum = pgEnum('user_role', ['ADMIN', 'CLIENT']);
+export const userRoleEnum = pgEnum('user_role', ['ADMIN', 'CLIENT', 'AGENT']);
 export const clientStatusEnum = pgEnum('client_status', ['PENDING', 'APPROVED', 'REJECTED', 'INCOMPLETE']);
 export const documentTypeEnum = pgEnum('document_type', [
   'SS4_EIN_LETTER',
@@ -363,7 +363,6 @@ export const extractedDocumentData = pgTable("extracted_document_data", {
   // Document tracking
   documentHash: varchar("document_hash", { length: 64 }).notNull(), // SHA-256 hash for duplicate detection
   extractionTimestamp: timestamp("extraction_timestamp").defaultNow().notNull(),
-  confidenceScore: varchar("confidence_score"), // Stored as string to preserve precision (0.00-1.00)
   
   // User review tracking
   userReviewed: boolean("user_reviewed").default(false),

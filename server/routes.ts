@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, requireAuth, requireAdmin, hashPassword } from "./auth";
+import { setupAuth, requireAuth, requireAdmin, requireAgent, hashPassword } from "./auth";
 import { insertDocumentSchema, type InsertMerchantApplication } from "@shared/schema";
 import { z } from "zod";
 import multer from "multer";
@@ -642,7 +642,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json({
           status: 'complete',
           extractedDataId: extractedData.id,
-          confidenceScore: extractedData.confidenceScore ? parseFloat(extractedData.confidenceScore) : undefined,
           userReviewed: extractedData.userReviewed,
           appliedToApplication: extractedData.appliedToApplication,
           extractionTimestamp: extractedData.extractionTimestamp,
@@ -733,7 +732,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             id: extractedData.id,
             documentId: extractedData.documentId,
             data: includeSensitive ? fullData : publicData,
-            confidenceScore: extractedData.confidenceScore ? parseFloat(extractedData.confidenceScore) : undefined,
             userReviewed: extractedData.userReviewed,
             reviewedAt: extractedData.reviewedAt,
             appliedToApplication: extractedData.appliedToApplication,
@@ -1184,6 +1182,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating admin user:", error);
       res.status(500).json({ message: "Failed to create admin user" });
+    }
+  });
+
+  // Admin create agent endpoint
+  app.post('/api/admin/create-agent', requireAdmin, async (req: any, res: Response) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+
+      if (!user || user.role !== 'ADMIN') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { email, password, firstName, lastName } = req.body;
+
+      // Validate required fields
+      if (!email || !password || !firstName || !lastName) {
+        return res.status(400).json({ message: "All fields are required" });
+      }
+
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "User already exists with this email" });
+      }
+
+      // Hash password and create agent user
+      const hashedPassword = await hashPassword(password);
+      const newAgent = await storage.createUser({
+        email,
+        password: hashedPassword,
+        firstName,
+        lastName,
+        role: "AGENT",
+        mfaRequired: true, // Agents also require MFA
+      });
+
+      // Send welcome email to new agent
+      EmailService.sendWelcomeEmail(newAgent).catch(error => {
+        console.error('Failed to send welcome email to new agent:', error);
+      });
+
+      res.status(201).json({
+        message: "Agent user created successfully",
+        user: {
+          id: newAgent.id,
+          email: newAgent.email,
+          firstName: newAgent.firstName,
+          lastName: newAgent.lastName,
+          role: newAgent.role,
+        },
+      });
+    } catch (error) {
+      console.error("Error creating agent user:", error);
+      res.status(500).json({ message: "Failed to create agent user" });
     }
   });
 
@@ -3581,6 +3634,111 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error updating onboarding step:', error);
       res.status(500).json({ message: "Failed to update onboarding step" });
+    }
+  });
+
+  // Agent routes - Merchant onboarding assistance
+  app.get('/api/agent/onboarding-merchants', requireAgent, async (req: any, res: Response) => {
+    try {
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+
+      if (!user || user.role !== 'AGENT') {
+        return res.status(403).json({ message: "Agent access required" });
+      }
+
+      // Get all clients with their users (already includes user data)
+      const clients = await storage.getAllClients();
+      
+      // Get merchant applications for all clients
+      const onboardingMerchants = await Promise.all(
+        clients.map(async (client) => {
+          // Get merchant application if exists
+          const merchantApplications = await storage.getMerchantApplicationsByClientId(client.id);
+          const latestApplication = merchantApplications.length > 0 
+            ? merchantApplications[merchantApplications.length - 1]
+            : null;
+
+          return {
+            id: client.user.id,
+            userId: client.user.id,
+            clientId: client.id,
+            email: client.user.email,
+            firstName: client.user.firstName,
+            lastName: client.user.lastName,
+            companyName: client.user.companyName,
+            onboardingStep: client.user.onboardingStep || 'PART1',
+            status: client.status || 'PENDING',
+            createdAt: client.user.createdAt?.toISOString() || new Date().toISOString(),
+            merchantApplicationStatus: latestApplication?.status || null,
+          };
+        })
+      );
+
+      res.json(onboardingMerchants);
+    } catch (error) {
+      console.error("Error fetching onboarding merchants:", error);
+      res.status(500).json({ message: "Failed to fetch onboarding merchants" });
+    }
+  });
+
+  // Get specific merchant details for agent view
+  app.get('/api/agent/merchants/:merchantId', requireAgent, async (req: any, res: Response) => {
+    try {
+      const { merchantId } = req.params;
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+
+      if (!user || user.role !== 'AGENT') {
+        return res.status(403).json({ message: "Agent access required" });
+      }
+
+      // Get merchant user
+      const merchantUser = await storage.getUser(merchantId);
+      if (!merchantUser) {
+        return res.status(404).json({ message: "Merchant not found" });
+      }
+
+      // Get client record
+      const client = await storage.getClientByUserId(merchantId);
+      if (!client) {
+        return res.status(404).json({ message: "Client record not found" });
+      }
+
+      // Get merchant applications
+      const merchantApplications = await storage.getMerchantApplicationsByClientId(client.id);
+      
+      // Get documents
+      const documents = await storage.getDocumentsByClientId(client.id);
+
+      res.json({
+        user: {
+          id: merchantUser.id,
+          email: merchantUser.email,
+          firstName: merchantUser.firstName,
+          lastName: merchantUser.lastName,
+          companyName: merchantUser.companyName,
+          onboardingStep: merchantUser.onboardingStep,
+          createdAt: merchantUser.createdAt,
+        },
+        client: {
+          id: client.id,
+          status: client.status,
+          createdAt: client.createdAt,
+        },
+        merchantApplications,
+        documents: documents.map(doc => ({
+          id: doc.id,
+          filename: doc.filename,
+          originalName: doc.originalName,
+          documentType: doc.documentType,
+          status: doc.status,
+          uploadedAt: doc.uploadedAt,
+        })),
+      });
+    } catch (error) {
+      console.error("Error fetching merchant details:", error);
+      res.status(500).json({ message: "Failed to fetch merchant details" });
     }
   });
 
