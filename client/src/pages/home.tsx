@@ -58,9 +58,21 @@ export default function Home() {
         authFailureCount.current = 0;
       }
       
+      // Check if MFA setup is required first (before any role-based redirects)
+      if (user?.mfaRequired && !user?.mfaEnabled && !user?.mfaEmailEnabled) {
+        navigate("/mfa-setup");
+        return;
+      }
+      
       // Redirect admins to the admin dashboard (unless they're impersonating)
       if (user?.role === 'ADMIN' && !user?.isImpersonating) {
         navigate("/admin");
+        return;
+      }
+      
+      // Redirect agents to the agent portal (only if MFA is set up)
+      if (user?.role === 'AGENT') {
+        navigate("/agent");
         return;
       }
     }

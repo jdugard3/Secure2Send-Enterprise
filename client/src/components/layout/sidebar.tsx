@@ -137,11 +137,19 @@ export default function Sidebar({ isCollapsed = false, onToggle }: SidebarProps)
     { href: "/admin/settings", icon: SettingsIcon, label: "Admin Settings", roles: ["ADMIN"] },
   ];
 
+  const agentItems = [
+    { href: "/agent", icon: Users, label: "Onboarding Dashboard", roles: ["AGENT"] },
+  ];
+
   const filteredNavItems = navItems.filter(item => 
     item.roles.includes(user?.role || "CLIENT")
   );
 
   const filteredAdminItems = adminItems.filter(item => 
+    item.roles.includes(user?.role || "CLIENT")
+  );
+
+  const filteredAgentItems = agentItems.filter(item => 
     item.roles.includes(user?.role || "CLIENT")
   );
 
@@ -220,6 +228,36 @@ export default function Sidebar({ isCollapsed = false, onToggle }: SidebarProps)
               </p>
             )}
             {filteredAdminItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link key={item.href} href={item.href}>
+                  <Button
+                    variant={isActive(item.href) ? "default" : "ghost"}
+                    className={`w-full ${isCollapsed ? 'justify-center px-2' : 'justify-start'} ${
+                      isActive(item.href) 
+                        ? "bg-blue-50 text-primary border-r-2 border-primary" 
+                        : "text-gray-700 hover:bg-gray-100"
+                    }`}
+                    title={isCollapsed ? item.label : undefined}
+                  >
+                    <Icon className={`h-4 w-4 ${!isCollapsed ? 'mr-3' : ''}`} />
+                    {!isCollapsed && item.label}
+                  </Button>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Agent Section */}
+        {filteredAgentItems.length > 0 && (
+          <div className="pt-4 border-t border-gray-200 mt-4">
+            {!isCollapsed && (
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2 px-3">
+                Agent Portal
+              </p>
+            )}
+            {filteredAgentItems.map((item) => {
               const Icon = item.icon;
               return (
                 <Link key={item.href} href={item.href}>

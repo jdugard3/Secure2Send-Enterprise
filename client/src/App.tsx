@@ -13,6 +13,7 @@ import ResetPassword from "@/pages/reset-password";
 import Home from "@/pages/home";
 import Admin from "@/pages/admin";
 import AdminSettings from "@/pages/admin-settings";
+import Agent from "@/pages/agent";
 import Documents from "@/pages/documents";
 import MerchantApplications from "@/pages/merchant-applications";
 import Activity from "@/pages/activity";
@@ -57,6 +58,11 @@ function Router() {
               <Route path="/admin" component={Admin} />
               <Route path="/admin/documents" component={Admin} />
               <Route path="/admin/settings" component={AdminSettings} />
+            </>
+          )}
+          {user?.role === 'AGENT' && (
+            <>
+              <Route path="/agent" component={Agent} />
             </>
           )}
         </>

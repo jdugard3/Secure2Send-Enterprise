@@ -6,10 +6,11 @@ import { MobileSidebar } from "@/components/layout/mobile-sidebar";
 import Header from "@/components/layout/header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Shield, Users, UserPlus, Settings as SettingsIcon, Key, Mail, Smartphone } from "lucide-react";
+import { Shield, Users, UserPlus, Settings as SettingsIcon, Key, Mail, Smartphone, UserCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { MfaSettings } from "@/components/MfaSettings";
 import AddAdminForm from "@/components/admin/add-admin-form";
+import AddAgentForm from "@/components/admin/add-agent-form";
 import { apiRequest } from "@/lib/queryClient";
 
 interface User {
@@ -27,6 +28,7 @@ export default function AdminSettingsPage() {
   const { user, isLoading: authLoading } = useAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showAddAdminForm, setShowAddAdminForm] = useState(false);
+  const [showAddAgentForm, setShowAddAgentForm] = useState(false);
 
   // Fetch all users to show admin accounts
   const { data: users, isLoading: usersLoading } = useQuery<User[]>({
@@ -39,6 +41,7 @@ export default function AdminSettingsPage() {
   });
 
   const adminUsers = users?.filter(u => u.role === 'ADMIN') || [];
+  const agentUsers = users?.filter(u => u.role === 'AGENT') || [];
 
   if (authLoading || usersLoading) {
     return (
@@ -217,6 +220,101 @@ export default function AdminSettingsPage() {
               </CardContent>
             </Card>
 
+            {/* Agent Management */}
+            <Card className="bg-white border border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-md transition-all">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-green-500/10 rounded-lg flex items-center justify-center">
+                      <UserCheck className="h-5 w-5 text-green-600" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg font-semibold">Agent Accounts</CardTitle>
+                      <CardDescription className="text-sm text-gray-500">
+                        Manage agent accounts for merchant onboarding assistance
+                      </CardDescription>
+                    </div>
+                  </div>
+                  <Button 
+                    onClick={() => setShowAddAgentForm(true)}
+                    className="bg-green-600 hover:bg-green-700 text-white shadow-sm"
+                  >
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Add Agent
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="text-sm text-muted-foreground mb-4">
+                    <p>Total Agents: {agentUsers.length}</p>
+                  </div>
+                  
+                  {agentUsers.length === 0 ? (
+                    <div className="text-center py-8 border border-gray-200 rounded-lg bg-gray-50/50">
+                      <UserCheck className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-sm text-gray-500 mb-2">No agents have been created yet</p>
+                      <p className="text-xs text-gray-400">Click "Add Agent" to create your first agent account</p>
+                    </div>
+                  ) : (
+                    <div className="border border-gray-200 rounded-lg divide-y divide-gray-200/50">
+                      {agentUsers.map((agent) => (
+                        <div 
+                          key={agent.id} 
+                          className="p-4 flex items-center justify-between hover:bg-gray-50/50 transition-colors"
+                        >
+                          <div className="flex items-center gap-3 flex-1">
+                            <div className="h-10 w-10 rounded-lg bg-green-500/10 flex items-center justify-center">
+                              <UserCheck className="h-5 w-5 text-green-600" />
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-medium text-gray-900">
+                                {agent.firstName} {agent.lastName}
+                              </p>
+                              <p className="text-sm text-gray-500">{agent.email}</p>
+                              <div className="flex items-center gap-2 mt-2">
+                                <span className="text-xs text-gray-500 font-medium">MFA:</span>
+                                {agent.mfaEnabled && (
+                                  <Badge variant="outline" className="text-xs gap-1">
+                                    <Smartphone className="h-3 w-3" />
+                                    Authenticator
+                                  </Badge>
+                                )}
+                                {agent.mfaEmailEnabled && (
+                                  <Badge variant="outline" className="text-xs gap-1">
+                                    <Mail className="h-3 w-3" />
+                                    Email
+                                  </Badge>
+                                )}
+                                {!agent.mfaEnabled && !agent.mfaEmailEnabled && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    Not Set Up
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-right text-sm text-gray-500 font-medium">
+                            <p>Added {new Date(agent.createdAt).toLocaleDateString()}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 mt-4">
+                    <div className="flex gap-3">
+                      <UserCheck className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-gray-700">
+                        <p className="font-semibold mb-1 text-gray-900">Agent Portal Access</p>
+                        <p>Agents can access the Agent Portal to assist merchants with onboarding. Agents will be required to set up MFA on their first login for security.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Account Activity */}
             <Card className="bg-white border border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-md transition-all">
               <CardHeader>
@@ -258,6 +356,12 @@ export default function AdminSettingsPage() {
       <AddAdminForm 
         open={showAddAdminForm} 
         onOpenChange={setShowAddAdminForm} 
+      />
+
+      {/* Add Agent Form Dialog */}
+      <AddAgentForm 
+        open={showAddAgentForm} 
+        onOpenChange={setShowAddAgentForm} 
       />
     </div>
   );

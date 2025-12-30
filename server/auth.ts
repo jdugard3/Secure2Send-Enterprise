@@ -23,7 +23,7 @@ declare global {
       firstName: string | null;
       lastName: string | null;
       companyName: string | null;
-      role: 'ADMIN' | 'CLIENT' | null;
+      role: 'ADMIN' | 'CLIENT' | 'AGENT' | null;
       emailVerified: boolean | null;
       createdAt: Date | null;
       updatedAt: Date | null;
@@ -502,6 +502,13 @@ export const requireAuth = (req: any, res: any, next: any) => {
 export const requireAdmin = (req: any, res: any, next: any) => {
   if (!req.isAuthenticated() || req.user?.role !== 'ADMIN') {
     return res.status(403).json({ message: "Admin access required" });
+  }
+  next();
+};
+
+export const requireAgent = (req: any, res: any, next: any) => {
+  if (!req.isAuthenticated() || req.user?.role !== 'AGENT') {
+    return res.status(403).json({ message: "Agent access required" });
   }
   next();
 };
