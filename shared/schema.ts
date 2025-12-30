@@ -25,7 +25,7 @@ export const sessions = pgTable(
 );
 
 // Enums
-export const userRoleEnum = pgEnum('user_role', ['ADMIN', 'CLIENT']);
+export const userRoleEnum = pgEnum('user_role', ['ADMIN', 'CLIENT', 'AGENT']);
 export const clientStatusEnum = pgEnum('client_status', ['PENDING', 'APPROVED', 'REJECTED', 'INCOMPLETE']);
 export const documentTypeEnum = pgEnum('document_type', [
   'SS4_EIN_LETTER',
