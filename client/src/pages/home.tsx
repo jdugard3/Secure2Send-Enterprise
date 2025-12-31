@@ -78,6 +78,19 @@ export default function Home() {
     }
   }, [isAuthenticated, isLoading, user, toast, navigate]);
 
+  // Check if MFA setup is required - redirect immediately without rendering
+  if (user?.mfaRequired && !user?.mfaEnabled && !user?.mfaEmailEnabled) {
+    navigate("/mfa-setup");
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-2 border-[#2563EB] border-t-transparent mx-auto mb-4"></div>
+          <p className="text-sm text-gray-500 font-medium">Redirecting to MFA setup...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (isLoading || !isAuthenticated || (user?.role === 'ADMIN' && !user?.isImpersonating)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">

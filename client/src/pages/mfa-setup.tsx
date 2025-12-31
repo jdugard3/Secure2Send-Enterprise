@@ -51,12 +51,29 @@ export default function MfaSetupPage() {
     // Refresh user data to get updated MFA status
     await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
     
+    // Get updated user data to check role
+    const updatedUser = await queryClient.fetchQuery({
+      queryKey: ["/api/auth/user"],
+      queryFn: async () => {
+        const res = await fetch("/api/auth/user", { credentials: "include" });
+        if (!res.ok) throw new Error("Failed to fetch user");
+        return res.json();
+      },
+    });
+    
     toast({
       title: "MFA Setup Complete!",
       description: "Your account is now secured with multi-factor authentication.",
     });
     
-    navigate("/");
+    // Redirect based on user role after MFA setup
+    if (updatedUser?.role === 'ADMIN') {
+      navigate("/admin");
+    } else if (updatedUser?.role === 'AGENT') {
+      navigate("/agent");
+    } else {
+      navigate("/");
+    }
   };
 
   const handleCancel = () => {

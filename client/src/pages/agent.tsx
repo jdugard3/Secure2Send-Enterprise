@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
+import { useLocation, useRoute } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import Sidebar from "@/components/layout/sidebar";
@@ -27,7 +27,7 @@ interface MerchantOnboarding {
 }
 
 export default function Agent() {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const { toast } = useToast();
   const { isAuthenticated, isLoading, user } = useAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -44,9 +44,15 @@ export default function Agent() {
       }, 500);
       return;
     }
-  }, [isAuthenticated, isLoading, user, toast]);
+    
+    // Check if MFA setup is required
+    if (user?.mfaRequired && !user?.mfaEnabled && !user?.mfaEmailEnabled) {
+      navigate("/mfa-setup");
+      return;
+    }
+  }, [isAuthenticated, isLoading, user, toast, navigate]);
 
-  // Fetch merchants in onboarding
+  // Fetch merchants in onboarding (only if MFA is set up)
   const { data: onboardingMerchants, isLoading: merchantsLoading } = useQuery({
     queryKey: ["/api/agent/onboarding-merchants"],
     queryFn: async () => {
@@ -56,8 +62,21 @@ export default function Agent() {
       }
       return response.json() as Promise<MerchantOnboarding[]>;
     },
-    enabled: isAuthenticated && user?.role === 'AGENT',
+    enabled: isAuthenticated && user?.role === 'AGENT' && !!(user?.mfaEnabled || user?.mfaEmailEnabled),
   });
+
+  // Check if MFA setup is required - redirect immediately
+  if (user?.mfaRequired && !user?.mfaEnabled && !user?.mfaEmailEnabled) {
+    navigate("/mfa-setup");
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-2 border-[#2563EB] border-t-transparent mx-auto mb-4"></div>
+          <p className="text-sm text-gray-500 font-medium">Redirecting to MFA setup...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading || !isAuthenticated || user?.role !== 'AGENT') {
     return (
@@ -218,11 +237,7 @@ export default function Agent() {
                           variant="outline"
                           size="sm"
                           onClick={() => {
-                            // TODO: Navigate to merchant detail view
-                            toast({
-                              title: "Merchant Details",
-                              description: `Viewing details for ${merchant.companyName || merchant.email}`,
-                            });
+                            navigate(`/agent/merchants/${merchant.id}`);
                           }}
                         >
                           View Details
