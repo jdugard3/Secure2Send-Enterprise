@@ -61,6 +61,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Document routes
   app.post('/api/documents', uploadLimiter, requireAuth, secureUpload.single('file'), async (req: any, res: Response) => {
+    // Agents cannot upload documents
+    if (req.user?.role === 'AGENT') {
+      return res.status(403).json({ message: "Agents cannot upload documents" });
+    }
     try {
       const userId = req.user.id;
       const user = await storage.getUser(userId);
@@ -329,6 +333,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get('/api/documents/:id/download', requireAuth, async (req: any, res: Response) => {
+    // Agents cannot download documents - they can only see status
+    if (req.user?.role === 'AGENT') {
+      return res.status(403).json({ message: "Agents cannot download documents" });
+    }
     try {
       const { id } = req.params;
       const userId = req.user.id;
@@ -459,6 +467,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.delete('/api/documents/:id', requireAuth, async (req: any, res: Response) => {
+    // Agents cannot delete documents
+    if (req.user?.role === 'AGENT') {
+      return res.status(403).json({ message: "Agents cannot delete documents" });
+    }
     try {
       const { id } = req.params;
       const userId = req.user.id;
@@ -516,6 +528,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
    * Requires: Auth + MFA + Rate limit (10 per 15 min per user)
    */
   app.post('/api/documents/:id/process', ocrLimiter, requireAuth, async (req: any, res: Response) => {
+    // Agents cannot process documents
+    if (req.user?.role === 'AGENT') {
+      return res.status(403).json({ message: "Agents cannot process documents" });
+    }
     try {
       if (!env.ENABLE_OCR_AUTOFILL) {
         return res.status(503).json({ 
@@ -1375,6 +1391,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Merchant Application routes
   app.post('/api/merchant-applications', requireAuth, async (req: any, res: Response) => {
+    // Agents cannot create merchant applications
+    if (req.user?.role === 'AGENT') {
+      return res.status(403).json({ message: "Agents cannot create merchant applications" });
+    }
     try {
       const userId = req.user.id;
       const user = await storage.getUser(userId);
@@ -1525,6 +1545,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.put('/api/merchant-applications/:id', requireAuth, async (req: any, res: Response) => {
+    // Agents cannot edit merchant applications
+    if (req.user?.role === 'AGENT') {
+      return res.status(403).json({ message: "Agents cannot edit merchant applications" });
+    }
     try {
       const { id } = req.params;
       const user = req.user;
@@ -1636,6 +1660,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.put('/api/merchant-applications/:id/status', requireAuth, async (req: any, res: Response) => {
+    // Agents cannot change application status
+    if (req.user?.role === 'AGENT') {
+      return res.status(403).json({ message: "Agents cannot change application status" });
+    }
     try {
       const { id } = req.params;
       const { status, rejectionReason, sendToKindTap } = req.body;
@@ -1990,6 +2018,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.delete('/api/merchant-applications/:id', requireAuth, async (req: any, res: Response) => {
+    // Agents cannot delete merchant applications
+    if (req.user?.role === 'AGENT') {
+      return res.status(403).json({ message: "Agents cannot delete merchant applications" });
+    }
     try {
       const { id } = req.params;
       const user = req.user;
@@ -3335,6 +3367,181 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Agent-specific invitation code creation
+  app.post('/api/agent/invitation-codes', requireAgent, async (req: any, res: Response) => {
+    try {
+      const { label } = req.body;
+      const agentId = req.user.id;
+      const agent = await storage.getUser(agentId);
+
+      if (!agent || agent.role !== 'AGENT') {
+        return res.status(403).json({ message: "Agent access required" });
+      }
+
+      if (!label || label.trim().length === 0) {
+        return res.status(400).json({ message: "Label is required (who this code is for)" });
+      }
+
+      // Generate a unique, readable invitation code (format: AGT-XXXXXX)
+      const generateCode = () => {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Removed ambiguous characters
+        let code = 'AGT-';
+        for (let i = 0; i < 6; i++) {
+          code += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        return code;
+      };
+
+      // Ensure code is unique
+      let code = generateCode();
+      let existingCode = await storage.getInvitationCodeByCode(code);
+      while (existingCode) {
+        code = generateCode();
+        existingCode = await storage.getInvitationCodeByCode(code);
+      }
+
+      const invitationCode = await storage.createInvitationCode(code, label.trim(), agentId);
+
+      // Audit log
+      await AuditService.logAction(agent, 'INVITATION_CODE_CREATED', req, {
+        resourceType: 'invitation_code',
+        resourceId: invitationCode.id,
+        metadata: { code: invitationCode.code, label: invitationCode.label, createdBy: 'AGENT' }
+      });
+
+      res.status(201).json(invitationCode);
+    } catch (error) {
+      console.error("Error creating invitation code:", error);
+      res.status(500).json({ message: "Failed to create invitation code" });
+    }
+  });
+
+  // Get agent's invitation codes
+  app.get('/api/agent/invitation-codes', requireAgent, async (req: any, res: Response) => {
+    try {
+      const agentId = req.user.id;
+      const agent = await storage.getUser(agentId);
+
+      if (!agent || agent.role !== 'AGENT') {
+        return res.status(403).json({ message: "Agent access required" });
+      }
+
+      // Get all invitation codes and filter for this agent
+      const allCodes = await storage.getAllInvitationCodes();
+      const agentCodes = allCodes.filter(code => code.createdBy === agentId);
+
+      res.json(agentCodes);
+    } catch (error) {
+      console.error("Error fetching invitation codes:", error);
+      res.status(500).json({ message: "Failed to fetch invitation codes" });
+    }
+  });
+
+  // Agent user creation (CLIENT role only, no agents or admins)
+  app.post('/api/agent/create-user', requireAgent, async (req: any, res: Response) => {
+    try {
+      const agentId = req.user.id;
+      const agent = await storage.getUser(agentId);
+
+      if (!agent || agent.role !== 'AGENT') {
+        return res.status(403).json({ message: "Agent access required" });
+      }
+
+      const { email, password, firstName, lastName, companyName } = req.body;
+
+      // Validation
+      if (!email || !password) {
+        return res.status(400).json({ message: "Email and password are required" });
+      }
+
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "User already exists with this email" });
+      }
+
+      // Hash password
+      const hashedPassword = await hashPassword(password);
+
+      // Create user with CLIENT role only (agents cannot create agents or admins)
+      const user = await storage.createUser({
+        email,
+        password: hashedPassword,
+        firstName: firstName || null,
+        lastName: lastName || null,
+        companyName: companyName || null,
+        role: "CLIENT", // Always CLIENT, agents cannot create other roles
+        mfaRequired: true,
+      });
+
+      // Create client record and associate with this agent
+      await storage.createClient({
+        userId: user.id,
+        status: "PENDING",
+        agentId: agentId, // Associate with the agent who created them
+      });
+
+      // Audit log
+      await AuditService.logAction(agent, 'USER_CREATED', req, {
+        resourceType: 'user',
+        resourceId: user.id,
+        metadata: { 
+          email: user.email, 
+          role: user.role,
+          createdBy: 'AGENT',
+          agentId: agentId
+        }
+      });
+
+      res.status(201).json({ 
+        message: "User created successfully",
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          companyName: user.companyName,
+          role: user.role,
+        }
+      });
+    } catch (error) {
+      console.error("Error creating user:", error);
+      res.status(500).json({ message: "Failed to create user" });
+    }
+  });
+
+  // Get users created by this agent
+  app.get('/api/agent/users', requireAgent, async (req: any, res: Response) => {
+    try {
+      const agentId = req.user.id;
+      const agent = await storage.getUser(agentId);
+
+      if (!agent || agent.role !== 'AGENT') {
+        return res.status(403).json({ message: "Agent access required" });
+      }
+
+      // Get all clients associated with this agent
+      const clients = await storage.getClientsByAgentId(agentId);
+      
+      // Map to user data
+      const users = clients.map(client => ({
+        id: client.user.id,
+        email: client.user.email,
+        firstName: client.user.firstName,
+        lastName: client.user.lastName,
+        companyName: client.user.companyName,
+        role: client.user.role,
+        createdAt: client.user.createdAt,
+        clientStatus: client.status,
+      }));
+
+      res.json(users);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
   // Validate invitation code (public endpoint - used during signup)
   app.post('/api/invitation-codes/validate', async (req: Request, res: Response) => {
     try {
@@ -3640,19 +3847,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Agent routes - Merchant onboarding assistance
+  // Get only merchants brought in by this agent
   app.get('/api/agent/onboarding-merchants', requireAgent, async (req: any, res: Response) => {
     try {
-      const userId = req.user.id;
-      const user = await storage.getUser(userId);
+      const agentId = req.user.id;
+      const user = await storage.getUser(agentId);
 
       if (!user || user.role !== 'AGENT') {
         return res.status(403).json({ message: "Agent access required" });
       }
 
-      // Get all clients with their users (already includes user data)
-      const clients = await storage.getAllClients();
+      // Get only clients associated with this agent
+      const clients = await storage.getClientsByAgentId(agentId);
       
-      // Get merchant applications for all clients
+      // Get merchant applications for agent's clients
       const onboardingMerchants = await Promise.all(
         clients.map(async (client) => {
           // Get merchant application if exists
@@ -3660,6 +3868,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const latestApplication = merchantApplications.length > 0 
             ? merchantApplications[merchantApplications.length - 1]
             : null;
+
+          // Get documents to check status
+          const documents = await storage.getDocumentsByClientId(client.id);
+          const documentStatuses = documents.map(doc => ({
+            type: doc.documentType,
+            status: doc.status,
+          }));
 
           return {
             id: client.user.id,
@@ -3673,6 +3888,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             status: client.status || 'PENDING',
             createdAt: client.user.createdAt?.toISOString() || new Date().toISOString(),
             merchantApplicationStatus: latestApplication?.status || null,
+            documentStatuses, // Document statuses (not the documents themselves)
           };
         })
       );
@@ -3684,12 +3900,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get specific merchant details for agent view
+  // Get specific merchant details for agent view (only if merchant belongs to this agent)
   app.get('/api/agent/merchants/:merchantId', requireAgent, async (req: any, res: Response) => {
     try {
       const { merchantId } = req.params;
-      const userId = req.user.id;
-      const user = await storage.getUser(userId);
+      const agentId = req.user.id;
+      const user = await storage.getUser(agentId);
 
       if (!user || user.role !== 'AGENT') {
         return res.status(403).json({ message: "Agent access required" });
@@ -3707,10 +3923,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Client record not found" });
       }
 
+      // Verify this merchant belongs to this agent
+      if (client.agentId !== agentId) {
+        return res.status(403).json({ message: "You can only view merchants you brought in" });
+      }
+
       // Get merchant applications
       const merchantApplications = await storage.getMerchantApplicationsByClientId(client.id);
       
-      // Get documents
+      // Get documents (status only, not the actual documents)
       const documents = await storage.getDocumentsByClientId(client.id);
 
       res.json({
@@ -3728,14 +3949,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status: client.status,
           createdAt: client.createdAt,
         },
-        merchantApplications,
+        merchantApplications: merchantApplications.map(app => ({
+          id: app.id,
+          status: app.status,
+          legalBusinessName: app.legalBusinessName,
+          dbaBusinessName: app.dbaBusinessName,
+          createdAt: app.createdAt,
+          submittedAt: app.submittedAt,
+          reviewedAt: app.reviewedAt,
+        })),
         documents: documents.map(doc => ({
           id: doc.id,
-          filename: doc.filename,
-          originalName: doc.originalName,
           documentType: doc.documentType,
           status: doc.status,
+          originalName: doc.originalName,
           uploadedAt: doc.uploadedAt,
+          // Note: We don't include file paths or actual document content for agents
         })),
       });
     } catch (error) {

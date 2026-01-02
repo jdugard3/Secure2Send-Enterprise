@@ -151,9 +151,12 @@ export const clients = pgTable("clients", {
   userId: varchar("user_id").notNull().references(() => users.id),
   status: clientStatusEnum("status").default('PENDING'),
   irisLeadId: varchar("iris_lead_id"), // IRIS CRM lead ID for integration
+  agentId: varchar("agent_id").references(() => users.id), // Agent who brought in this merchant
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (table) => [
+  index("IDX_clients_agent_id").on(table.agentId),
+]);
 
 // Documents table
 export const documents = pgTable("documents", {

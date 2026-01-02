@@ -171,10 +171,16 @@ export async function setupAuth(app: Express) {
         }
       });
 
+      // Check if invitation code was created by an agent
+      const invitationCreator = await storage.getUser(invitation.createdBy);
+      const isAgentInvitation = invitationCreator?.role === 'AGENT';
+      
       // Also create a client record for this user
+      // If invitation was created by an agent, associate the merchant with that agent
       await storage.createClient({
         userId: user.id,
         status: "PENDING",
+        agentId: isAgentInvitation ? invitation.createdBy : undefined,
       });
 
       // Note: IRIS CRM lead will be created when user creates their first merchant application

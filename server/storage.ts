@@ -52,6 +52,7 @@ export interface IStorage {
   getClientByUserId(userId: string): Promise<Client | undefined>;
   getClientById(clientId: string): Promise<Client | undefined>;
   createClient(client: InsertClient): Promise<Client>;
+  getClientsByAgentId(agentId: string): Promise<ClientWithUser[]>;
   getAllClients(): Promise<ClientWithUser[]>;
   updateClientStatus(clientId: string, status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'INCOMPLETE'): Promise<Client>;
   updateClientIrisLeadId(clientId: string, irisLeadId: string): Promise<Client>;
@@ -358,6 +359,22 @@ export class DatabaseStorage implements IStorage {
   async createClient(clientData: InsertClient): Promise<Client> {
     const [client] = await db.insert(clients).values(clientData).returning();
     return client;
+  }
+
+  async getClientsByAgentId(agentId: string): Promise<ClientWithUser[]> {
+    return await db
+      .select()
+      .from(clients)
+      .leftJoin(users, eq(clients.userId, users.id))
+      .where(eq(clients.agentId, agentId))
+      .then(rows => 
+        rows
+          .filter(row => row.users) // Filter out clients without users
+          .map(row => ({
+            ...row.clients,
+            user: row.users!,
+          }))
+      );
   }
 
   async getAllClients(): Promise<ClientWithUser[]> {

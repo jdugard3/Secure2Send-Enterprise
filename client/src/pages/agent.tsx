@@ -8,9 +8,11 @@ import Header from "@/components/layout/header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Users, FileText, Clock, CheckCircle, AlertCircle, ArrowRight } from "lucide-react";
+import { Users, FileText, Clock, CheckCircle, AlertCircle, ArrowRight, Plus, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import CreateInvitationCodeForm from "@/components/agent/create-invitation-code-form";
+import CreateUserForm from "@/components/agent/create-user-form";
 
 interface MerchantOnboarding {
   id: string;
@@ -24,6 +26,16 @@ interface MerchantOnboarding {
   status: string;
   createdAt: string;
   merchantApplicationStatus?: string;
+  documentStatuses?: Array<{ type: string; status: string }>;
+}
+
+interface InvitationCode {
+  id: string;
+  code: string;
+  label: string;
+  status: string;
+  createdAt: string;
+  usedAt?: string;
 }
 
 export default function Agent() {
@@ -31,6 +43,8 @@ export default function Agent() {
   const { toast } = useToast();
   const { isAuthenticated, isLoading, user } = useAuth();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [showCreateInvitationCode, setShowCreateInvitationCode] = useState(false);
+  const [showCreateUser, setShowCreateUser] = useState(false);
 
   useEffect(() => {
     if (!isLoading && (!isAuthenticated || user?.role !== 'AGENT')) {
@@ -61,6 +75,19 @@ export default function Agent() {
         throw new Error("Failed to fetch onboarding merchants");
       }
       return response.json() as Promise<MerchantOnboarding[]>;
+    },
+    enabled: isAuthenticated && user?.role === 'AGENT' && !!(user?.mfaEnabled || user?.mfaEmailEnabled),
+  });
+
+  // Fetch invitation codes created by this agent
+  const { data: invitationCodes, isLoading: codesLoading } = useQuery({
+    queryKey: ["/api/agent/invitation-codes"],
+    queryFn: async () => {
+      const response = await apiRequest("GET", "/api/agent/invitation-codes");
+      if (!response.ok) {
+        throw new Error("Failed to fetch invitation codes");
+      }
+      return response.json() as Promise<InvitationCode[]>;
     },
     enabled: isAuthenticated && user?.role === 'AGENT' && !!(user?.mfaEnabled || user?.mfaEmailEnabled),
   });
@@ -139,6 +166,18 @@ export default function Agent() {
         
         <main className="flex-1 overflow-auto p-6 lg:p-8 bg-gray-50/50">
           <div className="max-w-7xl mx-auto space-y-6">
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+              <Button onClick={() => setShowCreateInvitationCode(true)}>
+                <KeyRound className="h-4 w-4 mr-2" />
+                Create Invitation Code
+              </Button>
+              <Button variant="outline" onClick={() => setShowCreateUser(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create Merchant User
+              </Button>
+            </div>
+
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <Card>
@@ -229,6 +268,15 @@ export default function Agent() {
                               </span>
                             )}
                           </div>
+                          {merchant.documentStatuses && merchant.documentStatuses.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-2">
+                              {merchant.documentStatuses.map((doc, idx) => (
+                                <Badge key={idx} variant="outline" className="text-xs">
+                                  {doc.type}: {doc.status}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
                           <p className="text-xs text-gray-500 mt-1">
                             Started: {new Date(merchant.createdAt).toLocaleDateString()}
                           </p>
@@ -249,9 +297,69 @@ export default function Agent() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Invitation Codes */}
+            <Card>
+              <CardHeader>
+                <CardTitle>My Invitation Codes</CardTitle>
+                <CardDescription>
+                  Invitation codes you've created for merchants
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {codesLoading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent mx-auto mb-4"></div>
+                    <p className="text-sm text-gray-500">Loading invitation codes...</p>
+                  </div>
+                ) : !invitationCodes || invitationCodes.length === 0 ? (
+                  <div className="text-center py-8">
+                    <KeyRound className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-sm text-gray-500 mb-4">No invitation codes created yet</p>
+                    <Button onClick={() => setShowCreateInvitationCode(true)} variant="outline">
+                      <KeyRound className="h-4 w-4 mr-2" />
+                      Create Your First Code
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {invitationCodes.map((code) => (
+                      <div
+                        key={code.id}
+                        className="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <code className="font-mono font-semibold text-lg">{code.code}</code>
+                            <Badge variant={code.status === 'USED' ? 'secondary' : code.status === 'EXPIRED' ? 'destructive' : 'default'}>
+                              {code.status}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-gray-600">{code.label}</p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Created: {new Date(code.createdAt).toLocaleDateString()}
+                            {code.usedAt && ` • Used: ${new Date(code.usedAt).toLocaleDateString()}`}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
         </main>
       </div>
+
+      {/* Dialogs */}
+      <CreateInvitationCodeForm 
+        open={showCreateInvitationCode} 
+        onOpenChange={setShowCreateInvitationCode} 
+      />
+      <CreateUserForm 
+        open={showCreateUser} 
+        onOpenChange={setShowCreateUser} 
+      />
     </div>
   );
 }
