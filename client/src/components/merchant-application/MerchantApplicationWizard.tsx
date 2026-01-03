@@ -18,7 +18,8 @@ import {
   Send,
   Download,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  ClipboardList
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -38,6 +39,10 @@ import { BeneficialOwnershipStep } from "./steps/BeneficialOwnershipStep";
 import { RepresentativesContactsStep } from "./steps/RepresentativesContactsStep";
 import { BasicBusinessInfoStep } from "./steps/BasicBusinessInfoStep";
 import { DetailedBusinessInfoStep } from "./steps/DetailedBusinessInfoStep";
+import { SimplifiedBasicInfoStep } from "./steps/SimplifiedBasicInfoStep";
+import { DocumentUploadStep } from "./steps/DocumentUploadStep";
+import { ApplicationReviewStep } from "./steps/ApplicationReviewStep";
+import { SubmitStep } from "./steps/SubmitStep";
 
 // Onboarding mode steps (simplified flow)
 export type OnboardingMode = 'part1' | 'part2' | 'review' | 'full';
@@ -131,11 +136,42 @@ export default function MerchantApplicationWizard({
   const [currentStep, setCurrentStep] = useState(1);
   const [applicationId, setApplicationId] = useState(initialApplicationId);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [useNewFlow, setUseNewFlow] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Determine which steps to use based on onboarding mode
-  const activeSteps = onboardingMode === 'part1' 
+  // New 4-step flow steps
+  const NEW_FLOW_STEPS = [
+    {
+      id: 1,
+      title: "Basic Business Info",
+      description: "Enter your business name and website",
+      icon: Building,
+    },
+    {
+      id: 2,
+      title: "Upload Documents",
+      description: "Upload all required documents",
+      icon: FileText,
+    },
+    {
+      id: 3,
+      title: "Review Application",
+      description: "Review and edit all application details",
+      icon: ClipboardList,
+    },
+    {
+      id: 4,
+      title: "Submit",
+      description: "Submit your application for review",
+      icon: Send,
+    },
+  ] as const;
+
+  // Determine which steps to use based on onboarding mode or new flow
+  const activeSteps = useNewFlow
+    ? NEW_FLOW_STEPS
+    : onboardingMode === 'part1' 
     ? PART1_STEPS 
     : onboardingMode === 'part2' 
     ? PART2_STEPS 
@@ -153,6 +189,14 @@ export default function MerchantApplicationWizard({
     },
     enabled: !!applicationId,
   });
+
+  // Detect if we should use the new 4-step flow
+  useEffect(() => {
+    if (existingApplication?.currentStep) {
+      setUseNewFlow(true);
+      setCurrentStep(existingApplication.currentStep);
+    }
+  }, [existingApplication]);
 
   const form = useForm<MerchantApplicationForm>({
     resolver: zodResolver(merchantApplicationSchema),
@@ -412,22 +456,35 @@ export default function MerchantApplicationWizard({
   // Submit application mutation
   const submitMutation = useMutation({
     mutationFn: async (data: MerchantApplicationForm) => {
+      console.log("📝 submitMutation.mutationFn - Starting submission");
+      console.log("📝 Application ID:", applicationId);
+      console.log("📝 Use new flow:", useNewFlow);
+      
       // First save/update the application
       const saveEndpoint = applicationId 
         ? `/api/merchant-applications/${applicationId}`
         : '/api/merchant-applications';
       
       const saveMethod = applicationId ? 'PUT' : 'POST';
-      const saveResponse = await apiRequest(saveMethod, saveEndpoint, data);
+      console.log(`📝 Saving application: ${saveMethod} ${saveEndpoint}`);
+      
+      const saveResponse = await apiRequest(saveMethod, saveEndpoint, {
+        ...data,
+        currentStep: useNewFlow ? 5 : undefined, // Mark as complete for new flow
+      });
       const savedApp = await saveResponse.json();
+      console.log("✅ Application saved:", savedApp.id, savedApp.status);
 
       // Then submit it
+      console.log(`📤 Submitting application: PUT /api/merchant-applications/${savedApp.id}/status`);
       const submitResponse = await apiRequest(
         'PUT', 
         `/api/merchant-applications/${savedApp.id}/status`,
         { status: 'SUBMITTED' }
       );
-      return submitResponse.json();
+      const result = await submitResponse.json();
+      console.log("✅ Application submitted:", result);
+      return result;
     },
     onSuccess: () => {
       toast({
@@ -580,7 +637,174 @@ export default function MerchantApplicationWizard({
     return labels[fieldName] || fieldName.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
   };
 
+  // Handle step completion for new flow
+  const handleStepComplete = async (step: number, stepData?: any) => {
+    if (!applicationId) return;
+
+    try {
+      const updateData: any = {
+        currentStep: step + 1,
+      };
+
+      // Step 1: Rename application to business name and save all Step 1 data
+      if (step === 1) {
+        const formData = form.getValues();
+        
+        // Determine the business name to use for renaming
+        // Priority: dbaBusinessName (if it's not the default date-based name), then legalBusinessName
+        let businessNameToUse = formData.dbaBusinessName;
+        if (!businessNameToUse || businessNameToUse.startsWith('Application -')) {
+          // If dbaBusinessName is empty or still the default, check legalBusinessName
+          if (formData.legalBusinessName && !formData.legalBusinessName.startsWith('Application -')) {
+            businessNameToUse = formData.legalBusinessName;
+          }
+        }
+        
+        // Rename application if we have a valid business name
+        if (businessNameToUse && !businessNameToUse.startsWith('Application -')) {
+          updateData.dbaBusinessName = businessNameToUse;
+        }
+        
+        // Save all Step 1 fields
+        if (formData.dbaWebsite) {
+          updateData.dbaWebsite = formData.dbaWebsite;
+        }
+        if (formData.legalBusinessName) {
+          updateData.legalBusinessName = formData.legalBusinessName;
+        }
+      }
+
+      // Step 2: Just advance step (documents already uploaded)
+      // Step 3: Save all form data
+      if (step === 3) {
+        const formData = form.getValues();
+        Object.assign(updateData, formData);
+      }
+
+      await apiRequest("PUT", `/api/merchant-applications/${applicationId}`, updateData);
+      queryClient.invalidateQueries({ queryKey: [`/api/merchant-applications/${applicationId}`] });
+      
+      if (step < 4) {
+        setCurrentStep(step + 1);
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to save step progress",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleNext = async () => {
+    // New flow: Handle step completion differently
+    if (useNewFlow) {
+      if (currentStep === 1) {
+        // Step 1: Validate and save business name, then rename application
+        const isValid = await form.trigger(['dbaBusinessName', 'dbaWebsite']);
+        if (!isValid) {
+          toast({
+            title: "Validation Error",
+            description: "Please fill in all required fields",
+            variant: "destructive",
+          });
+          return;
+        }
+        const stepData = form.getValues();
+        await handleStepComplete(1, stepData);
+        return;
+      } else if (currentStep === 2) {
+        // Step 2: Documents - handled by DocumentUploadStep component
+        await handleStepComplete(2);
+        return;
+      } else if (currentStep === 3) {
+        // Step 3: Review - only validate required fields, not all fields
+        const requiredFields = [
+          'dbaBusinessName',
+          'dbaWebsite',
+          'legalBusinessName',
+          'federalTaxIdNumber',
+          'bankName',
+          'abaRoutingNumber',
+          'ddaNumber',
+        ];
+        
+        // Helper to check if a value is empty (handles masked values, placeholders, etc.)
+        const isEmpty = (value: any): boolean => {
+          if (value === null || value === undefined) return true;
+          if (typeof value === 'string') {
+            const trimmed = value.trim();
+            // Check for placeholder values
+            if (trimmed === '' || trimmed === '[EMPTY]' || trimmed === 'N/A') return true;
+            // Masked values (like ****1916 or **********) are considered to have content
+            // Only reject if it's ALL stars with no actual content visible (4 or fewer stars)
+            if (trimmed.match(/^\*+$/) && trimmed.length <= 4) return true;
+            return false;
+          }
+          if (typeof value === 'number') return value === 0;
+          if (Array.isArray(value)) return value.length === 0;
+          if (typeof value === 'object') return Object.keys(value).length === 0;
+          return !value;
+        };
+        
+        // Check if required fields are filled (simple check, not full validation)
+        const missingFields = requiredFields.filter(field => {
+          const value = form.getValues(field as any);
+          return isEmpty(value);
+        });
+        
+        if (missingFields.length > 0) {
+          const fieldLabels: Record<string, string> = {
+            'dbaBusinessName': 'Business Name (DBA)',
+            'dbaWebsite': 'Website',
+            'legalBusinessName': 'Legal Business Name',
+            'federalTaxIdNumber': 'Federal Tax ID (EIN)',
+            'bankName': 'Bank Name',
+            'abaRoutingNumber': 'ABA Routing Number',
+            'ddaNumber': 'Account Number (DDA)',
+          };
+          const missingLabels = missingFields.map(f => fieldLabels[f] || f);
+          
+          toast({
+            title: "Missing Required Fields",
+            description: `Please fill in: ${missingLabels.join(', ')}`,
+            variant: "destructive",
+            duration: 5000,
+          });
+          return;
+        }
+        
+        // Only validate required fields, not all fields
+        const isValid = await form.trigger(requiredFields as any);
+        if (!isValid) {
+          const errors = form.formState.errors;
+          const errorFields = requiredFields.filter(field => errors[field]);
+          const fieldLabels: Record<string, string> = {
+            'dbaBusinessName': 'Business Name (DBA)',
+            'dbaWebsite': 'Website',
+            'legalBusinessName': 'Legal Business Name',
+            'federalTaxIdNumber': 'Federal Tax ID (EIN)',
+            'bankName': 'Bank Name',
+            'abaRoutingNumber': 'ABA Routing Number',
+            'ddaNumber': 'Account Number (DDA)',
+          };
+          const errorLabels = errorFields.map(f => fieldLabels[f] || f);
+          
+          toast({
+            title: "Validation Error",
+            description: `Please fix errors in: ${errorLabels.join(', ')}`,
+            variant: "destructive",
+            duration: 5000,
+          });
+          return;
+        }
+        
+        await handleStepComplete(3);
+        return;
+      }
+    }
+
+    // Old flow: Original validation logic
     const validation = await validateCurrentStep();
     
     if (!validation.isValid) {
@@ -735,26 +959,34 @@ export default function MerchantApplicationWizard({
   };
 
   const handleSubmit = async () => {
+    console.log("🚀 handleSubmit called - starting submission process");
     setIsSubmitting(true);
     try {
       // CRITICAL: Check if all required documents are uploaded before submission
       if (!applicationId) {
+        console.error("❌ No applicationId - cannot submit");
         toast({
           title: "Cannot Submit Application",
           description: "Application must be saved before checking documents. Please save as draft first.",
           variant: "destructive",
         });
+        setIsSubmitting(false);
         return;
       }
+      
+      console.log("✅ Application ID found:", applicationId);
 
       // Fetch documents for this application
+      console.log("📄 Fetching documents for application:", applicationId);
       const documentsResponse = await apiRequest('GET', '/api/documents');
       const allDocuments = await documentsResponse.json();
+      console.log("📄 All documents:", allDocuments);
       
       // Filter documents for this specific application
       const applicationDocuments = allDocuments.filter(
         (doc: any) => doc.merchantApplicationId === applicationId
       );
+      console.log("📄 Application documents:", applicationDocuments);
 
       // Check which required documents are missing
       const requiredDocTypes = [
@@ -769,6 +1001,8 @@ export default function MerchantApplicationWizard({
 
       const uploadedDocTypes = new Set(applicationDocuments.map((doc: any) => doc.documentType));
       const missingDocs = requiredDocTypes.filter(docType => !uploadedDocTypes.has(docType));
+      console.log("📄 Uploaded doc types:", Array.from(uploadedDocTypes));
+      console.log("📄 Missing docs:", missingDocs);
 
       if (missingDocs.length > 0) {
         // Map document types to readable names
@@ -784,14 +1018,18 @@ export default function MerchantApplicationWizard({
 
         const missingDocNames = missingDocs.map(type => docNames[type] || type).join('\n• ');
         
+        console.error("❌ Missing required documents:", missingDocs);
         toast({
           title: "Missing Required Documents",
           description: `You must upload all required documents before submitting your application. Missing:\n\n• ${missingDocNames}`,
           variant: "destructive",
           duration: 10000,
         });
+        setIsSubmitting(false);
         return;
       }
+      
+      console.log("✅ All required documents are uploaded");
       
       // Get form data and clean null values that cause validation errors
       let formData = form.getValues();
@@ -858,13 +1096,25 @@ export default function MerchantApplicationWizard({
       console.log("Submit - Has agreementAccepted key:", 'agreementAccepted' in formData);
       
       // BYPASS ZOD VALIDATION - Submit directly to server
-      console.log("BYPASSING Zod validation - submitting directly to server");
-      // await merchantApplicationSchema.parseAsync(formData); // DISABLED
+      console.log("✅ Bypassing Zod validation - submitting directly to server");
+      console.log("📤 Submitting form data:", {
+        id: formData.id,
+        status: formData.status,
+        agreementAccepted: formData.agreementAccepted,
+        dbaBusinessName: formData.dbaBusinessName,
+        legalBusinessName: formData.legalBusinessName,
+      });
       
       // Submit the application directly without client-side validation
-      await submitMutation.mutateAsync(formData);
+      const result = await submitMutation.mutateAsync(formData);
+      console.log("✅ Submission successful! Result:", result);
     } catch (error) {
-      console.error("Submit error:", error);
+      console.error("❌ Submit error:", error);
+      console.error("❌ Error details:", {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        name: error instanceof Error ? error.name : undefined,
+      });
       
       // Handle Zod validation errors with specific messages
       if (error instanceof Error && 'issues' in error) {
@@ -888,6 +1138,7 @@ export default function MerchantApplicationWizard({
         });
       }
     } finally {
+      console.log("🏁 handleSubmit finally block - setting isSubmitting to false");
       setIsSubmitting(false);
     }
   };
@@ -911,6 +1162,47 @@ export default function MerchantApplicationWizard({
   };
 
   const getStepComponent = () => {
+    // New 4-step flow
+    if (useNewFlow) {
+      switch (currentStep) {
+        case 1:
+          return (
+            <SimplifiedBasicInfoStep
+              form={form}
+              onContinue={() => handleNext()}
+              isSubmitting={isSubmitting}
+            />
+          );
+        case 2:
+          return applicationId ? (
+            <DocumentUploadStep
+              applicationId={applicationId}
+              onContinue={() => handleNext()}
+              isSubmitting={isSubmitting}
+            />
+          ) : null;
+        case 3:
+          return applicationId ? (
+            <ApplicationReviewStep
+              form={form}
+              applicationId={applicationId}
+              onContinue={() => handleNext()}
+              isSubmitting={isSubmitting}
+            />
+          ) : null;
+        case 4:
+          return (
+            <SubmitStep
+              form={form}
+              onSubmit={handleSubmit}
+              isSubmitting={isSubmitting || submitMutation.isPending}
+            />
+          );
+        default:
+          return null;
+      }
+    }
+
     // Onboarding mode: Part 1 (Basic Business Info only)
     if (onboardingMode === 'part1') {
       return <BasicBusinessInfoStep form={form} />;
@@ -1000,6 +1292,7 @@ export default function MerchantApplicationWizard({
               const StepIcon = step.icon;
               const isActive = currentStep === step.id;
               const isCompleted = currentStep > step.id;
+              const isLocked = useNewFlow && currentStep < step.id; // Lock future steps in new flow
               
               return (
                 <div
@@ -1009,8 +1302,12 @@ export default function MerchantApplicationWizard({
                       ? 'bg-primary text-primary-foreground'
                       : isCompleted
                       ? 'bg-green-100 text-green-700'
+                      : isLocked
+                      ? 'bg-gray-100 text-gray-400 opacity-50 cursor-not-allowed'
                       : 'bg-muted text-muted-foreground'
                   }`}
+                  onClick={() => !isLocked && currentStep !== step.id && setCurrentStep(step.id)}
+                  style={{ cursor: isLocked ? 'not-allowed' : 'pointer' }}
                 >
                   <StepIcon className="h-4 w-4" />
                   <span className="text-xs font-medium hidden sm:inline">
@@ -1038,66 +1335,68 @@ export default function MerchantApplicationWizard({
         getFieldLabel={getFieldLabel}
       /> */}
 
-      {/* Navigation Footer */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                onClick={handlePrevious}
-                disabled={currentStep === 1}
-              >
-                <ChevronLeft className="h-4 w-4 mr-2" />
-                Previous
-              </Button>
-              
-              <Button
-                variant="outline"
-                onClick={handleSave}
-                disabled={autoSaveMutation.isPending}
-              >
-                <Save className="h-4 w-4 mr-2" />
-                {autoSaveMutation.isPending ? 'Saving...' : 'Save Draft'}
-              </Button>
-              
-              <Button
-                variant="outline"
-                onClick={handleDownloadPDF}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Download PDF
-              </Button>
-            </div>
+      {/* Navigation Footer - Only show for old flow */}
+      {!useNewFlow && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={handlePrevious}
+                  disabled={currentStep === 1}
+                >
+                  <ChevronLeft className="h-4 w-4 mr-2" />
+                  Previous
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  onClick={handleSave}
+                  disabled={autoSaveMutation.isPending}
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {autoSaveMutation.isPending ? 'Saving...' : 'Save Draft'}
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  onClick={handleDownloadPDF}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download PDF
+                </Button>
+              </div>
 
-            <div className="flex gap-2">
-              {currentStep < activeSteps.length ? (
-                <Button onClick={handleNext}>
-                  Next
-                  <ChevronRight className="h-4 w-4 ml-2" />
-                </Button>
-              ) : onboardingMode === 'part1' || onboardingMode === 'part2' ? (
-                <Button
-                  onClick={handleNext}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  Save & Continue
-                  <ChevronRight className="h-4 w-4 ml-2" />
-                </Button>
-              ) : (
-                <Button
-                  onClick={handleSubmit}
-                  disabled={isSubmitting || submitMutation.isPending}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  <Send className="h-4 w-4 mr-2" />
-                  {isSubmitting ? 'Submitting...' : 'Submit Application'}
-                </Button>
-              )}
+              <div className="flex gap-2">
+                {currentStep < activeSteps.length ? (
+                  <Button onClick={handleNext}>
+                    Next
+                    <ChevronRight className="h-4 w-4 ml-2" />
+                  </Button>
+                ) : onboardingMode === 'part1' || onboardingMode === 'part2' ? (
+                  <Button
+                    onClick={handleNext}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    Save & Continue
+                    <ChevronRight className="h-4 w-4 ml-2" />
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={isSubmitting || submitMutation.isPending}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    <Send className="h-4 w-4 mr-2" />
+                    {isSubmitting ? 'Submitting...' : 'Submit Application'}
+                  </Button>
+                )}
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

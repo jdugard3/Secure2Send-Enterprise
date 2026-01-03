@@ -255,6 +255,138 @@ export function DetailedBusinessInfoStep({ form }: DetailedBusinessInfoStepProps
           </CardContent>
         </Card>
 
+        {/* Corporate Information */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Briefcase className="h-5 w-5 text-primary" />
+              <CardTitle>Corporate Information</CardTitle>
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">
+              Legal business details and tax identification
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="legalBusinessName"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Legal Business Name *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="Legal name as registered" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="federalTaxIdNumber"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Federal Tax ID (EIN) *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="XX-XXXXXXX" 
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <FormField
+                control={form.control}
+                name="ownershipType"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Ownership Type *
+                    </FormLabel>
+                    <FormControl>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <SelectTrigger className={fieldState.error ? "border-destructive" : ""}>
+                          <SelectValue placeholder="Select ownership type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="SOLE_PROPRIETORSHIP">Sole Proprietorship</SelectItem>
+                          <SelectItem value="PARTNERSHIP">Partnership</SelectItem>
+                          <SelectItem value="LLC">LLC</SelectItem>
+                          <SelectItem value="CORPORATION">Corporation</SelectItem>
+                          <SelectItem value="S_CORP">S-Corp</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="incorporationState"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      State of Incorporation *
+                    </FormLabel>
+                    <FormControl>
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <SelectTrigger className={fieldState.error ? "border-destructive" : ""}>
+                          <SelectValue placeholder="Select state" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {US_STATES.map((state) => (
+                            <SelectItem key={state} value={state}>
+                              {state}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="entityStartDate"
+                render={({ field, fieldState }) => (
+                  <FormItem>
+                    <FormLabel className={fieldState.error ? "text-destructive" : ""}>
+                      Entity Start Date *
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="date"
+                        className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Banking Information */}
         <Card>
           <CardHeader>
