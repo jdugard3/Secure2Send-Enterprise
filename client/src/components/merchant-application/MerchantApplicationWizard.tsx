@@ -191,12 +191,18 @@ export default function MerchantApplicationWizard({
   });
 
   // Detect if we should use the new 4-step flow
+  // Only set currentStep from existingApplication on initial load, not on every update
+  const [hasInitialized, setHasInitialized] = useState(false);
   useEffect(() => {
-    if (existingApplication?.currentStep) {
+    if (existingApplication?.currentStep && !hasInitialized) {
+      console.log("🔧 Initializing wizard with currentStep from DB:", existingApplication.currentStep);
       setUseNewFlow(true);
       setCurrentStep(existingApplication.currentStep);
+      setHasInitialized(true);
+    } else if (existingApplication?.currentStep) {
+      console.log("⏭️ Ignoring currentStep update from DB (already initialized). DB step:", existingApplication.currentStep, "Current step:", currentStep);
     }
-  }, [existingApplication]);
+  }, [existingApplication, hasInitialized, currentStep]);
 
   const form = useForm<MerchantApplicationForm>({
     resolver: zodResolver(merchantApplicationSchema),
@@ -470,7 +476,7 @@ export default function MerchantApplicationWizard({
       
       const saveResponse = await apiRequest(saveMethod, saveEndpoint, {
         ...data,
-        currentStep: useNewFlow ? 5 : undefined, // Mark as complete for new flow
+        currentStep: useNewFlow ? 4 : undefined, // Keep at step 4 (final step) for new flow
       });
       const savedApp = await saveResponse.json();
       console.log("✅ Application saved:", savedApp.id, savedApp.status);
@@ -643,7 +649,8 @@ export default function MerchantApplicationWizard({
 
     try {
       const updateData: any = {
-        currentStep: step + 1,
+        // Don't increment past step 4 (max step in new flow)
+        currentStep: step < 4 ? step + 1 : 4,
       };
 
       // Step 1: Rename application to business name and save all Step 1 data
@@ -684,6 +691,7 @@ export default function MerchantApplicationWizard({
       await apiRequest("PUT", `/api/merchant-applications/${applicationId}`, updateData);
       queryClient.invalidateQueries({ queryKey: [`/api/merchant-applications/${applicationId}`] });
       
+      console.log(`✅ Step ${step} complete. Moving to step ${step + 1}`);
       if (step < 4) {
         setCurrentStep(step + 1);
       }

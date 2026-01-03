@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { UseFormReturn } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -96,6 +97,39 @@ export function SubmitStep({ form, onSubmit, isSubmitting = false }: SubmitStepP
     console.log("✅ SubmitStep - All required fields are complete!");
   }
 
+  // Log button state
+  const buttonDisabled = !allFieldsComplete || isSubmitting;
+  console.log("🔘 SubmitStep - Button state:", {
+    allFieldsComplete,
+    isSubmitting,
+    buttonDisabled,
+    onSubmit: typeof onSubmit,
+  });
+
+  // Wrapper to log when button is clicked - use useCallback to ensure stable reference
+  const handleSubmitClick = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    console.log("🖱️ SubmitStep - Submit button clicked!");
+    console.log("🖱️ SubmitStep - Button was disabled?", buttonDisabled);
+    console.log("🖱️ SubmitStep - isSubmitting:", isSubmitting);
+    console.log("🖱️ SubmitStep - allFieldsComplete:", allFieldsComplete);
+    console.log("🖱️ SubmitStep - Calling onSubmit prop");
+    console.log("🖱️ SubmitStep - onSubmit type:", typeof onSubmit);
+    try {
+      onSubmit();
+      console.log("🖱️ SubmitStep - onSubmit called successfully");
+    } catch (error) {
+      console.error("🖱️ SubmitStep - Error calling onSubmit:", error);
+    }
+  }, [onSubmit, buttonDisabled, isSubmitting, allFieldsComplete]);
+
+  // Also log mouse down to see if button receives any events
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    console.log("🖱️ SubmitStep - Button mouse down event!");
+    console.log("🖱️ SubmitStep - Button disabled?", buttonDisabled);
+  }, [buttonDisabled]);
+
   return (
     <div className="space-y-6">
       {/* Instructions */}
@@ -147,11 +181,19 @@ export function SubmitStep({ form, onSubmit, isSubmitting = false }: SubmitStepP
             Please complete all required fields above to submit
           </div>
         )}
+        {console.log("🔘 SubmitStep - Rendering button with:", { buttonDisabled, allFieldsComplete, isSubmitting, hasOnSubmit: !!onSubmit })}
         <Button
+          type="button"
           size="lg"
-          onClick={onSubmit}
-          disabled={!allFieldsComplete || isSubmitting}
+          onClick={handleSubmitClick}
+          onMouseDown={handleMouseDown}
+          onFocus={() => console.log("🔘 SubmitStep - Button received focus")}
+          disabled={buttonDisabled}
           className="bg-green-600 hover:bg-green-700"
+          style={{ 
+            pointerEvents: buttonDisabled ? 'none' : 'auto',
+            cursor: buttonDisabled ? 'not-allowed' : 'pointer'
+          }}
         >
           {isSubmitting ? (
             <>
