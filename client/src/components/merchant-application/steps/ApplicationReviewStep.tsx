@@ -3,7 +3,6 @@ import { UseFormReturn } from "react-hook-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form } from "@/components/ui/form";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { ClipboardList, CheckCircle, AlertCircle, Save } from "lucide-react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -13,6 +12,8 @@ import { BeneficialOwnershipStep } from "./BeneficialOwnershipStep";
 import { RepresentativesContactsStep } from "./RepresentativesContactsStep";
 import { CertificationStep } from "./CertificationStep";
 import { useToast } from "@/hooks/use-toast";
+import { isEmpty } from "@/lib/formUtils";
+import { formatDateForInput } from "@/lib/dateUtils";
 
 interface ApplicationReviewStepProps {
   form: UseFormReturn<MerchantApplicationForm>;
@@ -20,22 +21,6 @@ interface ApplicationReviewStepProps {
   onContinue: () => void;
   isSubmitting?: boolean;
 }
-
-// Helper function to convert ISO date to yyyy-MM-dd format
-const formatDateForInput = (isoDate: string | null | undefined): string => {
-  if (!isoDate) return "";
-  try {
-    let cleanDate = String(isoDate).trim();
-    cleanDate = cleanDate.replace(/^[^\d]*(\d{4})/, '$1');
-    const date = new Date(cleanDate);
-    if (isNaN(date.getTime())) return "";
-    const year = date.getFullYear();
-    if (year < 1900 || year > 2100) return "";
-    return date.toISOString().split('T')[0];
-  } catch {
-    return "";
-  }
-};
 
 export function ApplicationReviewStep({ form, applicationId, onContinue, isSubmitting = false }: ApplicationReviewStepProps) {
   const queryClient = useQueryClient();
@@ -57,32 +42,14 @@ export function ApplicationReviewStep({ form, applicationId, onContinue, isSubmi
     queryKey: ["/api/merchant-applications", applicationId, "extracted-data"],
     queryFn: async () => {
       const response = await apiRequest("GET", `/api/merchant-applications/${applicationId}/extracted-data?includeSensitive=true`);
-      const data = await response.json();
-      console.log("📥 Extracted data API response:", data);
-      return data;
+      return response.json();
     },
     enabled: !!applicationId,
   });
 
   // Load application data into form when it's available
-  // Always load fresh data when entering Step 3 to ensure we have the latest OCR data
   useEffect(() => {
     if (applicationData && !dataLoaded) {
-      console.log("🔄 Loading application data into review form:", applicationData);
-      console.log("📊 Application data keys:", Object.keys(applicationData));
-      console.log("📋 Sample fields:", {
-        billingAddress: applicationData.billingAddress,
-        city: applicationData.city,
-        state: applicationData.state,
-        zip: applicationData.zip,
-        ownershipType: applicationData.ownershipType,
-        incorporationState: applicationData.incorporationState,
-        entityStartDate: applicationData.entityStartDate,
-        bankName: applicationData.bankName,
-        ddaNumber: applicationData.ddaNumber,
-        accountName: applicationData.accountName,
-      });
-      
       const formData = {
         ...applicationData,
         // Convert ISO dates to yyyy-MM-dd format for HTML date inputs
@@ -113,38 +80,7 @@ export function ApplicationReviewStep({ form, applicationId, onContinue, isSubmi
         agreementAccepted: applicationData.agreementAccepted === true ? true : false,
       };
       
-      console.log("📝 Form data to reset with:", {
-        billingAddress: formData.billingAddress,
-        city: formData.city,
-        state: formData.state,
-        zip: formData.zip,
-        ownershipType: formData.ownershipType,
-        incorporationState: formData.incorporationState,
-        entityStartDate: formData.entityStartDate,
-        bankName: formData.bankName,
-        ddaNumber: formData.ddaNumber,
-        accountName: formData.accountName,
-      });
-      
       form.reset(formData, { keepDefaultValues: false });
-      
-      // Verify form values were set correctly after a brief delay
-      setTimeout(() => {
-        const formValues = form.getValues();
-        console.log("✅ Form reset complete. Sample form values:", {
-          billingAddress: formValues.billingAddress,
-          city: formValues.city,
-          state: formValues.state,
-          zip: formValues.zip,
-          ownershipType: formValues.ownershipType,
-          incorporationState: formValues.incorporationState,
-          entityStartDate: formValues.entityStartDate,
-          bankName: formValues.bankName,
-          ddaNumber: formValues.ddaNumber,
-          accountName: formValues.accountName,
-        });
-      }, 100);
-      
       setDataLoaded(true);
     }
   }, [applicationData, form, dataLoaded]);
@@ -152,26 +88,15 @@ export function ApplicationReviewStep({ form, applicationId, onContinue, isSubmi
   // Merge extracted OCR data into form (fill empty fields with OCR data)
   useEffect(() => {
     if (extractedDataResponse?.extractedData && dataLoaded) {
-      console.log("🔍 Merging extracted OCR data into form");
-      console.log("📦 Extracted data response:", extractedDataResponse);
-      console.log("📄 Number of extracted documents:", extractedDataResponse.extractedData?.length);
-      
       // Get all extracted data and merge into form
       const allExtractedData = extractedDataResponse.extractedData.reduce((acc: any, item: any) => {
         if (item.data) {
-          console.log("📝 Merging data from document:", item.documentId, item.data);
-          // Merge this document's extracted data
           return { ...acc, ...item.data };
         }
         return acc;
       }, {});
 
-      console.log("🔗 Combined extracted data:", allExtractedData);
-      console.log("🔑 Combined data keys:", Object.keys(allExtractedData));
-
       // Fill empty fields with extracted data
-      // Priority: Use extracted data for fields that are empty, null, or have default values
-      let fieldsFilled = 0;
       Object.entries(allExtractedData).forEach(([key, value]) => {
         if (value !== null && value !== undefined && value !== '') {
           const currentValue = form.getValues(key as any);
@@ -189,41 +114,25 @@ export function ApplicationReviewStep({ form, applicationId, onContinue, isSubmi
             (key === 'businessType' && currentValue === 'Retail');
           
           if (shouldFill) {
-            console.log(`✅ Filling field ${key} with extracted value:`, value, '(current:', currentValue, ')');
             try {
               form.setValue(key as any, value, { shouldDirty: false, shouldValidate: false });
-              fieldsFilled++;
             } catch (error) {
-              console.warn(`❌ Failed to set field ${key}:`, error);
+              // Silently fail if field doesn't exist in schema
             }
-          } else {
-            console.log(`⏭️  Skipping field ${key} - already has value:`, currentValue);
           }
         }
       });
-      console.log(`📊 Total fields filled from OCR: ${fieldsFilled}`);
-    } else if (extractedDataResponse && !extractedDataResponse.extractedData) {
-      console.warn("⚠️ Extracted data response exists but has no extractedData array:", extractedDataResponse);
-    } else if (!dataLoaded) {
-      console.log("⏳ Waiting for application data to load before merging OCR data");
     }
   }, [extractedDataResponse, form, dataLoaded]);
 
-  // Refetch data when component mounts (entering Step 3) to get latest auto-applied OCR data
+  // Refetch data when component mounts (entering Step 3)
   useEffect(() => {
     if (applicationId) {
-      console.log("🔄 Step 3 mounted - resetting dataLoaded and refetching data");
-      // Reset dataLoaded to force fresh data load
       setDataLoaded(false);
-      // Invalidate and refetch to ensure we have the latest data
       queryClient.invalidateQueries({ queryKey: [`/api/merchant-applications/${applicationId}`] });
       queryClient.invalidateQueries({ queryKey: ["/api/merchant-applications", applicationId, "extracted-data"] });
-      // Refetch and wait for fresh data
-      Promise.all([refetchApplication(), refetchExtractedData()]).then(() => {
-        console.log("✅ Data refetch complete");
-      });
+      Promise.all([refetchApplication(), refetchExtractedData()]);
     }
-    // Only run on mount, not on every applicationId change
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applicationId]);
 
@@ -261,7 +170,7 @@ export function ApplicationReviewStep({ form, applicationId, onContinue, isSubmi
     } else {
       const errors = form.formState.errors;
       const requiredFieldErrors = requiredFieldsToValidate
-        .filter(field => errors[field])
+        .filter(field => (errors as any)[field])
         .map(field => {
           const fieldLabels: Record<string, string> = {
             'dbaBusinessName': 'Business Name (DBA)',
@@ -308,11 +217,10 @@ export function ApplicationReviewStep({ form, applicationId, onContinue, isSubmi
 
   const handleSaveDraft = async () => {
     const formData = form.getValues();
-    console.log("💾 Saving draft with data:", formData);
     saveDraftMutation.mutate(formData);
   };
 
-  // Check required fields with better debugging
+  // Check required fields
   const requiredFields = [
     'dbaBusinessName',
     'dbaWebsite',
@@ -323,46 +231,10 @@ export function ApplicationReviewStep({ form, applicationId, onContinue, isSubmi
     'ddaNumber',
   ];
 
-  // Helper to check if a value is empty
-  const isEmpty = (value: any): boolean => {
-    if (value === null || value === undefined) return true;
-    if (typeof value === 'string') {
-      const trimmed = value.trim();
-      // Check for placeholder values or masked values
-      if (trimmed === '' || trimmed === '[EMPTY]' || trimmed.startsWith('****') || trimmed === 'N/A') return true;
-      return false;
-    }
-    if (typeof value === 'number') return value === 0;
-    if (Array.isArray(value)) return value.length === 0;
-    if (typeof value === 'object') return Object.keys(value).length === 0;
-    return !value;
-  };
-
   const missingRequiredFields = requiredFields.filter(field => {
     const value = form.getValues(field as any);
     return isEmpty(value);
   });
-
-  // Watch required fields and only log when status changes
-  const watchedFields = form.watch(requiredFields as any);
-  const [lastMissingFields, setLastMissingFields] = useState<string[]>([]);
-  
-  // Debug: Log required field status only when it changes
-  useEffect(() => {
-    if (dataLoaded) {
-      const missing = requiredFields.filter(field => isEmpty(form.getValues(field as any)));
-      
-      // Only log if the missing fields have changed
-      if (JSON.stringify(missing) !== JSON.stringify(lastMissingFields)) {
-        if (missing.length > 0) {
-          console.log("⚠️ Missing required fields:", missing);
-        } else {
-          console.log("✅ All required fields are complete");
-        }
-        setLastMissingFields(missing);
-      }
-    }
-  }, [watchedFields, dataLoaded, form, lastMissingFields]);
 
   return (
     <Form {...form}>
@@ -401,7 +273,6 @@ export function ApplicationReviewStep({ form, applicationId, onContinue, isSubmi
                   </p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     {missingRequiredFields.map((field) => {
-                      // Map field names to user-friendly labels
                       const fieldLabels: Record<string, string> = {
                         'dbaBusinessName': 'Business Name (DBA)',
                         'dbaWebsite': 'Website',
@@ -439,7 +310,7 @@ export function ApplicationReviewStep({ form, applicationId, onContinue, isSubmi
         )}
 
         {/* All Application Sections */}
-        <div className="space-y-6 max-h-[600px] overflow-y-auto pr-2">
+        <div className="space-y-6 overflow-y-auto pr-2">
           <DetailedBusinessInfoStep form={form} />
           <BeneficialOwnershipStep form={form} />
           <RepresentativesContactsStep form={form} />
@@ -498,4 +369,3 @@ export function ApplicationReviewStep({ form, applicationId, onContinue, isSubmi
     </Form>
   );
 }
-

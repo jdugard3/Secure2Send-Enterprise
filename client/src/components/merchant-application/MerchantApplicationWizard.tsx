@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { isEmpty } from "@/lib/formUtils";
 import { 
   merchantApplicationSchema, 
   stepSchemas,
@@ -195,12 +196,12 @@ export default function MerchantApplicationWizard({
   const [hasInitialized, setHasInitialized] = useState(false);
   useEffect(() => {
     if (existingApplication?.currentStep && !hasInitialized) {
-      console.log("🔧 Initializing wizard with currentStep from DB:", existingApplication.currentStep);
+
       setUseNewFlow(true);
       setCurrentStep(existingApplication.currentStep);
       setHasInitialized(true);
     } else if (existingApplication?.currentStep) {
-      console.log("⏭️ Ignoring currentStep update from DB (already initialized). DB step:", existingApplication.currentStep, "Current step:", currentStep);
+
     }
   }, [existingApplication, hasInitialized, currentStep]);
 
@@ -347,9 +348,7 @@ export default function MerchantApplicationWizard({
   // Load existing data into form when available
   useEffect(() => {
     if (existingApplication) {
-      console.log("Loading existing application data:", existingApplication);
-      console.log("Existing agreementAccepted value:", existingApplication.agreementAccepted);
-      
+
       form.reset({
         ...existingApplication,
         // Convert ISO dates to yyyy-MM-dd format for HTML date inputs
@@ -389,7 +388,7 @@ export default function MerchantApplicationWizard({
       // Double-check that the checkbox value was set correctly
       setTimeout(() => {
         const checkboxValue = form.getValues('agreementAccepted');
-        console.log("After form reset, agreementAccepted value:", checkboxValue);
+
       }, 100);
     }
   }, [existingApplication, form]);
@@ -425,7 +424,7 @@ export default function MerchantApplicationWizard({
       queryClient.invalidateQueries({ queryKey: ['/api/merchant-applications'] });
     },
     onError: (error) => {
-      console.error('Auto-save failed:', error);
+
       // Don't show error toast for auto-save failures to avoid being intrusive
     },
   });
@@ -462,34 +461,29 @@ export default function MerchantApplicationWizard({
   // Submit application mutation
   const submitMutation = useMutation({
     mutationFn: async (data: MerchantApplicationForm) => {
-      console.log("📝 submitMutation.mutationFn - Starting submission");
-      console.log("📝 Application ID:", applicationId);
-      console.log("📝 Use new flow:", useNewFlow);
-      
+
       // First save/update the application
       const saveEndpoint = applicationId 
         ? `/api/merchant-applications/${applicationId}`
         : '/api/merchant-applications';
       
       const saveMethod = applicationId ? 'PUT' : 'POST';
-      console.log(`📝 Saving application: ${saveMethod} ${saveEndpoint}`);
-      
+
       const saveResponse = await apiRequest(saveMethod, saveEndpoint, {
         ...data,
         currentStep: useNewFlow ? 4 : undefined, // Keep at step 4 (final step) for new flow
       });
       const savedApp = await saveResponse.json();
-      console.log("✅ Application saved:", savedApp.id, savedApp.status);
 
       // Then submit it
-      console.log(`📤 Submitting application: PUT /api/merchant-applications/${savedApp.id}/status`);
+
       const submitResponse = await apiRequest(
         'PUT', 
         `/api/merchant-applications/${savedApp.id}/status`,
         { status: 'SUBMITTED' }
       );
       const result = await submitResponse.json();
-      console.log("✅ Application submitted:", result);
+
       return result;
     },
     onSuccess: () => {
@@ -690,8 +684,7 @@ export default function MerchantApplicationWizard({
 
       await apiRequest("PUT", `/api/merchant-applications/${applicationId}`, updateData);
       queryClient.invalidateQueries({ queryKey: [`/api/merchant-applications/${applicationId}`] });
-      
-      console.log(`✅ Step ${step} complete. Moving to step ${step + 1}`);
+
       if (step < 4) {
         setCurrentStep(step + 1);
       }
@@ -736,24 +729,6 @@ export default function MerchantApplicationWizard({
           'abaRoutingNumber',
           'ddaNumber',
         ];
-        
-        // Helper to check if a value is empty (handles masked values, placeholders, etc.)
-        const isEmpty = (value: any): boolean => {
-          if (value === null || value === undefined) return true;
-          if (typeof value === 'string') {
-            const trimmed = value.trim();
-            // Check for placeholder values
-            if (trimmed === '' || trimmed === '[EMPTY]' || trimmed === 'N/A') return true;
-            // Masked values (like ****1916 or **********) are considered to have content
-            // Only reject if it's ALL stars with no actual content visible (4 or fewer stars)
-            if (trimmed.match(/^\*+$/) && trimmed.length <= 4) return true;
-            return false;
-          }
-          if (typeof value === 'number') return value === 0;
-          if (Array.isArray(value)) return value.length === 0;
-          if (typeof value === 'object') return Object.keys(value).length === 0;
-          return !value;
-        };
         
         // Check if required fields are filled (simple check, not full validation)
         const missingFields = requiredFields.filter(field => {
@@ -967,12 +942,12 @@ export default function MerchantApplicationWizard({
   };
 
   const handleSubmit = async () => {
-    console.log("🚀 handleSubmit called - starting submission process");
+
     setIsSubmitting(true);
     try {
       // CRITICAL: Check if all required documents are uploaded before submission
       if (!applicationId) {
-        console.error("❌ No applicationId - cannot submit");
+
         toast({
           title: "Cannot Submit Application",
           description: "Application must be saved before checking documents. Please save as draft first.",
@@ -981,20 +956,16 @@ export default function MerchantApplicationWizard({
         setIsSubmitting(false);
         return;
       }
-      
-      console.log("✅ Application ID found:", applicationId);
 
       // Fetch documents for this application
-      console.log("📄 Fetching documents for application:", applicationId);
+
       const documentsResponse = await apiRequest('GET', '/api/documents');
       const allDocuments = await documentsResponse.json();
-      console.log("📄 All documents:", allDocuments);
-      
+
       // Filter documents for this specific application
       const applicationDocuments = allDocuments.filter(
         (doc: any) => doc.merchantApplicationId === applicationId
       );
-      console.log("📄 Application documents:", applicationDocuments);
 
       // Check which required documents are missing
       const requiredDocTypes = [
@@ -1009,8 +980,6 @@ export default function MerchantApplicationWizard({
 
       const uploadedDocTypes = new Set(applicationDocuments.map((doc: any) => doc.documentType));
       const missingDocs = requiredDocTypes.filter(docType => !uploadedDocTypes.has(docType));
-      console.log("📄 Uploaded doc types:", Array.from(uploadedDocTypes));
-      console.log("📄 Missing docs:", missingDocs);
 
       if (missingDocs.length > 0) {
         // Map document types to readable names
@@ -1025,8 +994,7 @@ export default function MerchantApplicationWizard({
         };
 
         const missingDocNames = missingDocs.map(type => docNames[type] || type).join('\n• ');
-        
-        console.error("❌ Missing required documents:", missingDocs);
+
         toast({
           title: "Missing Required Documents",
           description: `You must upload all required documents before submitting your application. Missing:\n\n• ${missingDocNames}`,
@@ -1036,9 +1004,7 @@ export default function MerchantApplicationWizard({
         setIsSubmitting(false);
         return;
       }
-      
-      console.log("✅ All required documents are uploaded");
-      
+
       // Get form data and clean null values that cause validation errors
       let formData = form.getValues();
       
@@ -1062,77 +1028,50 @@ export default function MerchantApplicationWizard({
       // Since form.getValues() is not reliable for this field
       
       const agreementValue = form.getValues('agreementAccepted');
-      console.log("Agreement value from direct get:", agreementValue);
-      
+
       // CRITICAL FIX: Server logs show agreementAccepted: true, but form keeps resetting it
       // Since we can see from server logs that the user HAS checked the agreement, force it to true
       
       const checkboxElement = document.querySelector('input[name="agreementAccepted"]') as HTMLInputElement;
       const isCheckboxChecked = checkboxElement?.checked || false;
-      
-      console.log("DOM checkbox checked state:", isCheckboxChecked);
-      console.log("Form agreementAccepted value:", formData.agreementAccepted);
-      
+
       // Check if server has this as true (from auto-save logs we can see it's true)
       // If server shows agreementAccepted: true, then user has checked it before
       const serverHasAgreementTrue = existingApplication?.agreementAccepted === true;
-      console.log("Server has agreement as true:", serverHasAgreementTrue);
-      
+
       if (serverHasAgreementTrue) {
-        console.log("FORCING agreementAccepted to true based on server data");
+
         formData.agreementAccepted = true;
         
         // Also force the DOM checkbox to be checked to match
         if (checkboxElement && !checkboxElement.checked) {
-          console.log("Also checking the DOM checkbox to match server state");
+
           checkboxElement.checked = true;
         }
       } else if (isCheckboxChecked && (formData.agreementAccepted === false || formData.agreementAccepted === undefined)) {
-        console.log("Using DOM checkbox state (checked) instead of form state");
+
         formData.agreementAccepted = true;
       } else if (!isCheckboxChecked && !serverHasAgreementTrue) {
-        console.log("Checkbox is not checked in DOM and server doesn't have it as true");
+
         formData.agreementAccepted = false;
       }
-      
-      console.log("Submit - Form data:", JSON.stringify(formData, null, 2));
-      console.log("Submit - agreementAccepted value:", formData.agreementAccepted);
-      console.log("Submit - agreementAccepted type:", typeof formData.agreementAccepted);
-      
+
       // Also log all keys to see if agreementAccepted exists
-      console.log("Submit - All form keys:", Object.keys(formData));
-      console.log("Submit - Has agreementAccepted key:", 'agreementAccepted' in formData);
-      
+
       // BYPASS ZOD VALIDATION - Submit directly to server
-      console.log("✅ Bypassing Zod validation - submitting directly to server");
-      console.log("📤 Submitting form data:", {
-        id: existingApplication?.id,
-        status: existingApplication?.status,
-        agreementAccepted: formData.agreementAccepted,
-        dbaBusinessName: formData.dbaBusinessName,
-        legalBusinessName: formData.legalBusinessName,
-      });
-      
+
       // Submit the application directly without client-side validation
       const result = await submitMutation.mutateAsync(formData);
-      console.log("✅ Submission successful! Result:", result);
+
     } catch (error) {
-      console.error("❌ Submit error:", error);
-      console.error("❌ Error details:", {
-        message: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        name: error instanceof Error ? error.name : undefined,
-      });
-      
+
       // Handle Zod validation errors with specific messages
       if (error instanceof Error && 'issues' in error) {
         const zodError = error as any;
         const errorMessages = zodError.issues.map((issue: any) => 
           `${issue.path.join('.')}: ${issue.message}`
         ).join('\n');
-        
-        console.error("Validation issues:", errorMessages);
-        
+
         toast({
           title: "Validation Error",
           description: `Please fix the following issues:\n${errorMessages}`,
@@ -1146,7 +1085,7 @@ export default function MerchantApplicationWizard({
         });
       }
     } finally {
-      console.log("🏁 handleSubmit finally block - setting isSubmitting to false");
+
       setIsSubmitting(false);
     }
   };

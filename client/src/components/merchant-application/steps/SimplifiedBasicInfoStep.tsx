@@ -15,7 +15,7 @@ interface SimplifiedBasicInfoStepProps {
 export function SimplifiedBasicInfoStep({ form, onContinue, isSubmitting = false }: SimplifiedBasicInfoStepProps) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const isValid = await form.trigger(['dbaBusinessName', 'dbaWebsite']);
+    const isValid = await form.trigger(['legalBusinessName', 'dbaWebsite']);
     if (isValid) {
       onContinue();
     }
@@ -50,22 +50,22 @@ export function SimplifiedBasicInfoStep({ form, onContinue, isSubmitting = false
           <CardContent className="space-y-6">
             <FormField
               control={form.control}
-              name="dbaBusinessName"
+              name="legalBusinessName"
               render={({ field, fieldState }) => (
                 <FormItem>
                   <FormLabel className={fieldState.error ? "text-destructive" : ""}>
-                    Business Name *
+                    Legal Business Name *
                   </FormLabel>
                   <FormControl>
                     <Input 
-                      placeholder="e.g., Joe's Coffee Shop" 
+                      placeholder="e.g., Joe's Coffee LLC" 
                       className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
                       {...field} 
                     />
                   </FormControl>
                   <FormMessage />
                   <p className="text-xs text-muted-foreground">
-                    This will be used as your application name
+                    The official registered name of your business
                   </p>
                 </FormItem>
               )}
@@ -73,7 +73,7 @@ export function SimplifiedBasicInfoStep({ form, onContinue, isSubmitting = false
 
             <FormField
               control={form.control}
-              name="legalBusinessName"
+              name="dbaBusinessName"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>
@@ -81,13 +81,13 @@ export function SimplifiedBasicInfoStep({ form, onContinue, isSubmitting = false
                   </FormLabel>
                   <FormControl>
                     <Input 
-                      placeholder="If different from business name" 
+                      placeholder="e.g., Joe's Coffee Shop" 
                       {...field} 
                     />
                   </FormControl>
                   <FormMessage />
                   <p className="text-xs text-muted-foreground">
-                    Only if your business operates under a different name than above
+                    The trade name if different from your legal business name
                   </p>
                 </FormItem>
               )}

@@ -6,9 +6,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Sidebar from "@/components/layout/sidebar";
 import { MobileSidebar } from "@/components/layout/mobile-sidebar";
 import Header from "@/components/layout/header";
-import ProgressCards from "@/components/dashboard/progress-cards";
-import DocumentUpload from "@/components/documents/document-upload";
-import DocumentList from "@/components/documents/document-list";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,7 +19,9 @@ import {
   CheckCircle,
   Circle,
   Plus,
-  Building2
+  Building2,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -43,6 +42,7 @@ export default function Home() {
   const queryClient = useQueryClient();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [selectedApplicationId, setSelectedApplicationId] = useState<string | null>(null);
+  const [showNewApplicationSection, setShowNewApplicationSection] = useState(false);
   const authFailureCount = useRef(0);
   const lastAuthCheck = useRef(Date.now());
 
@@ -412,35 +412,34 @@ export default function Home() {
               </>
                 )}
 
-                {/* Start New Application Button */}
+                {/* Start New Application - Collapsed Section */}
                 <Card>
-                  <CardContent className="p-6">
-                    <div className="text-center">
-                      <Button
-                        variant="outline"
-                        onClick={handleStartApplication}
-                        disabled={createApplicationMutation.isPending}
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        {createApplicationMutation.isPending ? "Creating..." : "Start New Application"}
-                      </Button>
-                    </div>
+                  <CardContent className="p-4">
+                    <button
+                      onClick={() => setShowNewApplicationSection(!showNewApplicationSection)}
+                      className="w-full flex items-center justify-between text-left hover:bg-gray-50 p-2 rounded transition-colors"
+                    >
+                      <span className="text-sm text-gray-600">Need to start a new application?</span>
+                      {showNewApplicationSection ? (
+                        <ChevronUp className="h-4 w-4 text-gray-400" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4 text-gray-400" />
+                      )}
+                    </button>
+                    {showNewApplicationSection && (
+                      <div className="mt-4 pt-4 border-t text-center">
+                        <Button
+                          variant="outline"
+                          onClick={handleStartApplication}
+                          disabled={createApplicationMutation.isPending}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          {createApplicationMutation.isPending ? "Creating..." : "Start New Application"}
+                        </Button>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
-              </>
-            )}
-
-            {/* Show dashboard for completed applications */}
-            {merchantApplications.some(app => app.status !== 'DRAFT') && (
-              <>
-                <div className="mt-8 pt-8 border-t">
-                  <h3 className="text-lg font-semibold mb-4">Dashboard</h3>
-                <ProgressCards />
-                  <div className="mt-6">
-                  <DocumentUpload />
-                </div>
-                <DocumentList />
-                </div>
               </>
             )}
           </div>
