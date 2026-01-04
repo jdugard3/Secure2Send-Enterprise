@@ -279,137 +279,137 @@ export default function Home() {
                 {/* Progress Overview */}
                 {selectedApplication && (
                   <>
-                    <Card className="bg-gradient-to-r from-slate-900 to-slate-800 text-white border-0">
-                      <CardContent className="p-8">
-                        <div className="flex items-center justify-between mb-6">
-                          <div>
-                            <h2 className="text-2xl font-bold mb-1">
+                <Card className="bg-gradient-to-r from-slate-900 to-slate-800 text-white border-0">
+                  <CardContent className="p-8">
+                    <div className="flex items-center justify-between mb-6">
+                      <div>
+                        <h2 className="text-2xl font-bold mb-1">
                               {selectedApplication.dbaBusinessName || selectedApplication.legalBusinessName || 'Application'}
-                            </h2>
-                            <p className="text-slate-300">
+                        </h2>
+                        <p className="text-slate-300">
                               Step {currentStep} of 4: {stepLabels[currentStep - 1]}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-4xl font-bold text-white">
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-4xl font-bold text-white">
                               {Math.round(progressPercentage)}%
-                            </div>
-                            <p className="text-slate-400 text-sm">Complete</p>
-                          </div>
                         </div>
-                        
+                        <p className="text-slate-400 text-sm">Complete</p>
+                      </div>
+                    </div>
+                    
                         <Progress value={progressPercentage} className="h-2 mb-4" />
                         
-                        <div className="flex items-center gap-2 mt-4">
+                    <div className="flex items-center gap-2 mt-4">
                           {[1, 2, 3, 4].map((step) => {
                             const isCompleted = step < currentStep;
                             const isCurrent = step === currentStep;
-                            
-                            return (
+                        
+                        return (
                               <div key={step} className="flex items-center flex-1">
-                                <div
-                                  className={`w-full h-2 rounded-full ${
-                                    isCompleted 
-                                      ? 'bg-green-400' 
-                                      : isCurrent 
-                                      ? 'bg-blue-400' 
-                                      : 'bg-slate-600'
-                                  }`}
-                                />
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </CardContent>
-                    </Card>
+                            <div
+                              className={`w-full h-2 rounded-full ${
+                                isCompleted 
+                                  ? 'bg-green-400' 
+                                  : isCurrent 
+                                  ? 'bg-blue-400' 
+                                  : 'bg-slate-600'
+                              }`}
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
 
-                    {/* Current Step CTA */}
+                {/* Current Step CTA */}
                     <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-white shadow-lg">
-                      <CardContent className="p-8">
-                        <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
+                  <CardContent className="p-8">
+                    <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
                           <div className="w-16 h-16 rounded-2xl bg-blue-100 flex items-center justify-center flex-shrink-0">
                             {currentStep === 1 && <FileText className="h-8 w-8 text-blue-600" />}
                             {currentStep === 2 && <Upload className="h-8 w-8 text-blue-600" />}
                             {currentStep === 3 && <ClipboardList className="h-8 w-8 text-blue-600" />}
                             {currentStep === 4 && <Send className="h-8 w-8 text-blue-600" />}
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
                               <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
                                 STEP {currentStep}
-                              </span>
-                              <span className="text-xs text-gray-500">Current Task</span>
-                            </div>
-                            <h3 className="text-xl font-bold text-gray-900 mb-2">
+                          </span>
+                          <span className="text-xs text-gray-500">Current Task</span>
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-900 mb-2">
                               {stepLabels[currentStep - 1]}
-                            </h3>
-                            <p className="text-gray-600">
+                        </h3>
+                        <p className="text-gray-600">
                               {currentStep === 1 && "Enter your basic business information to get started."}
                               {currentStep === 2 && "Upload all required documents for verification."}
                               {currentStep === 3 && "Review and edit all application details."}
                               {currentStep === 4 && "Submit your application for review."}
-                            </p>
-                          </div>
-                          <Button 
-                            size="lg" 
+                        </p>
+                      </div>
+                      <Button 
+                        size="lg" 
                             onClick={() => handleContinueApplication(selectedApplication.id)}
                             className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg px-8"
-                          >
+                      >
                             {currentStep === 1 && "Start Application"}
                             {currentStep === 2 && "Upload Documents"}
                             {currentStep === 3 && "Review Application"}
                             {currentStep === 4 && "Submit Application"}
-                            <ArrowRight className="ml-2 h-4 w-4" />
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
 
-                    {/* Step Overview */}
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                {/* Step Overview */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                       {[1, 2, 3, 4].map((step) => {
                         const isCompleted = step < currentStep;
                         const isCurrent = step === currentStep;
                         const isLocked = step > currentStep;
-                        
-                        return (
-                          <Card 
+                    
+                    return (
+                      <Card 
                             key={step}
-                            className={`cursor-pointer transition-all ${
-                              isCompleted 
-                                ? 'bg-green-50 border-green-200 hover:shadow-md' 
-                                : isCurrent 
-                                ? 'ring-2 ring-blue-400 shadow-md' 
-                                : 'bg-gray-50 opacity-60'
-                            }`}
+                        className={`cursor-pointer transition-all ${
+                          isCompleted 
+                            ? 'bg-green-50 border-green-200 hover:shadow-md' 
+                            : isCurrent 
+                            ? 'ring-2 ring-blue-400 shadow-md' 
+                            : 'bg-gray-50 opacity-60'
+                        }`}
                             onClick={() => !isLocked && handleContinueApplication(selectedApplication.id)}
-                          >
-                            <CardContent className="p-4">
-                              <div className="flex items-center gap-3 mb-2">
-                                {isCompleted ? (
-                                  <CheckCircle className="h-5 w-5 text-green-600" />
-                                ) : isCurrent ? (
-                                  <Circle className="h-5 w-5 text-blue-600 fill-blue-600" />
-                                ) : (
-                                  <Circle className="h-5 w-5 text-gray-300" />
-                                )}
-                                <span className={`text-xs font-medium ${
-                                  isCompleted ? 'text-green-700' : isCurrent ? 'text-blue-700' : 'text-gray-400'
-                                }`}>
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex items-center gap-3 mb-2">
+                            {isCompleted ? (
+                              <CheckCircle className="h-5 w-5 text-green-600" />
+                            ) : isCurrent ? (
+                              <Circle className="h-5 w-5 text-blue-600 fill-blue-600" />
+                            ) : (
+                              <Circle className="h-5 w-5 text-gray-300" />
+                            )}
+                            <span className={`text-xs font-medium ${
+                              isCompleted ? 'text-green-700' : isCurrent ? 'text-blue-700' : 'text-gray-400'
+                            }`}>
                                   Step {step}
-                                </span>
-                              </div>
-                              <h4 className={`font-medium text-sm ${
-                                isLocked ? 'text-gray-400' : 'text-gray-900'
-                              }`}>
+                            </span>
+                          </div>
+                          <h4 className={`font-medium text-sm ${
+                            isLocked ? 'text-gray-400' : 'text-gray-900'
+                          }`}>
                                 {stepLabels[step - 1]}
-                              </h4>
-                            </CardContent>
-                          </Card>
-                        );
-                      })}
-                    </div>
-                  </>
+                          </h4>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </>
                 )}
 
                 {/* Start New Application Button */}
@@ -435,11 +435,11 @@ export default function Home() {
               <>
                 <div className="mt-8 pt-8 border-t">
                   <h3 className="text-lg font-semibold mb-4">Dashboard</h3>
-                  <ProgressCards />
+                <ProgressCards />
                   <div className="mt-6">
-                    <DocumentUpload />
-                  </div>
-                  <DocumentList />
+                  <DocumentUpload />
+                </div>
+                <DocumentList />
                 </div>
               </>
             )}

@@ -786,7 +786,7 @@ export default function MerchantApplicationWizard({
         const isValid = await form.trigger(requiredFields as any);
         if (!isValid) {
           const errors = form.formState.errors;
-          const errorFields = requiredFields.filter(field => errors[field]);
+          const errorFields = requiredFields.filter(field => (errors as any)[field]);
           const fieldLabels: Record<string, string> = {
             'dbaBusinessName': 'Business Name (DBA)',
             'dbaWebsite': 'Website',
@@ -1106,8 +1106,8 @@ export default function MerchantApplicationWizard({
       // BYPASS ZOD VALIDATION - Submit directly to server
       console.log("✅ Bypassing Zod validation - submitting directly to server");
       console.log("📤 Submitting form data:", {
-        id: formData.id,
-        status: formData.status,
+        id: existingApplication?.id,
+        status: existingApplication?.status,
         agreementAccepted: formData.agreementAccepted,
         dbaBusinessName: formData.dbaBusinessName,
         legalBusinessName: formData.legalBusinessName,
@@ -1345,65 +1345,65 @@ export default function MerchantApplicationWizard({
 
       {/* Navigation Footer - Only show for old flow */}
       {!useNewFlow && (
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={handlePrevious}
-                  disabled={currentStep === 1}
-                >
-                  <ChevronLeft className="h-4 w-4 mr-2" />
-                  Previous
-                </Button>
-                
-                <Button
-                  variant="outline"
-                  onClick={handleSave}
-                  disabled={autoSaveMutation.isPending}
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  {autoSaveMutation.isPending ? 'Saving...' : 'Save Draft'}
-                </Button>
-                
-                <Button
-                  variant="outline"
-                  onClick={handleDownloadPDF}
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Download PDF
-                </Button>
-              </div>
-
-              <div className="flex gap-2">
-                {currentStep < activeSteps.length ? (
-                  <Button onClick={handleNext}>
-                    Next
-                    <ChevronRight className="h-4 w-4 ml-2" />
-                  </Button>
-                ) : onboardingMode === 'part1' || onboardingMode === 'part2' ? (
-                  <Button
-                    onClick={handleNext}
-                    className="bg-blue-600 hover:bg-blue-700"
-                  >
-                    Save & Continue
-                    <ChevronRight className="h-4 w-4 ml-2" />
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={handleSubmit}
-                    disabled={isSubmitting || submitMutation.isPending}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    <Send className="h-4 w-4 mr-2" />
-                    {isSubmitting ? 'Submitting...' : 'Submit Application'}
-                  </Button>
-                )}
-              </div>
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={handlePrevious}
+                disabled={currentStep === 1}
+              >
+                <ChevronLeft className="h-4 w-4 mr-2" />
+                Previous
+              </Button>
+              
+              <Button
+                variant="outline"
+                onClick={handleSave}
+                disabled={autoSaveMutation.isPending}
+              >
+                <Save className="h-4 w-4 mr-2" />
+                {autoSaveMutation.isPending ? 'Saving...' : 'Save Draft'}
+              </Button>
+              
+              <Button
+                variant="outline"
+                onClick={handleDownloadPDF}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download PDF
+              </Button>
             </div>
-          </CardContent>
-        </Card>
+
+            <div className="flex gap-2">
+              {currentStep < activeSteps.length ? (
+                <Button onClick={handleNext}>
+                  Next
+                  <ChevronRight className="h-4 w-4 ml-2" />
+                </Button>
+              ) : onboardingMode === 'part1' || onboardingMode === 'part2' ? (
+                <Button
+                  onClick={handleNext}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  Save & Continue
+                  <ChevronRight className="h-4 w-4 ml-2" />
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleSubmit}
+                  disabled={isSubmitting || submitMutation.isPending}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  <Send className="h-4 w-4 mr-2" />
+                  {isSubmitting ? 'Submitting...' : 'Submit Application'}
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
       )}
     </div>
   );
