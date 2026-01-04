@@ -18,10 +18,12 @@ import {
   Send,
   Download,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  ClipboardList
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { isEmpty } from "@/lib/formUtils";
 import { 
   merchantApplicationSchema, 
   stepSchemas,
@@ -38,6 +40,10 @@ import { BeneficialOwnershipStep } from "./steps/BeneficialOwnershipStep";
 import { RepresentativesContactsStep } from "./steps/RepresentativesContactsStep";
 import { BasicBusinessInfoStep } from "./steps/BasicBusinessInfoStep";
 import { DetailedBusinessInfoStep } from "./steps/DetailedBusinessInfoStep";
+import { SimplifiedBasicInfoStep } from "./steps/SimplifiedBasicInfoStep";
+import { DocumentUploadStep } from "./steps/DocumentUploadStep";
+import { ApplicationReviewStep } from "./steps/ApplicationReviewStep";
+import { SubmitStep } from "./steps/SubmitStep";
 
 // Onboarding mode steps (simplified flow)
 export type OnboardingMode = 'part1' | 'part2' | 'review' | 'full';
@@ -131,11 +137,42 @@ export default function MerchantApplicationWizard({
   const [currentStep, setCurrentStep] = useState(1);
   const [applicationId, setApplicationId] = useState(initialApplicationId);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [useNewFlow, setUseNewFlow] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Determine which steps to use based on onboarding mode
-  const activeSteps = onboardingMode === 'part1' 
+  // New 4-step flow steps
+  const NEW_FLOW_STEPS = [
+    {
+      id: 1,
+      title: "Basic Business Info",
+      description: "Enter your business name and website",
+      icon: Building,
+    },
+    {
+      id: 2,
+      title: "Upload Documents",
+      description: "Upload all required documents",
+      icon: FileText,
+    },
+    {
+      id: 3,
+      title: "Review Application",
+      description: "Review and edit all application details",
+      icon: ClipboardList,
+    },
+    {
+      id: 4,
+      title: "Submit",
+      description: "Submit your application for review",
+      icon: Send,
+    },
+  ] as const;
+
+  // Determine which steps to use based on onboarding mode or new flow
+  const activeSteps = useNewFlow
+    ? NEW_FLOW_STEPS
+    : onboardingMode === 'part1' 
     ? PART1_STEPS 
     : onboardingMode === 'part2' 
     ? PART2_STEPS 
@@ -153,6 +190,20 @@ export default function MerchantApplicationWizard({
     },
     enabled: !!applicationId,
   });
+
+  // Detect if we should use the new 4-step flow
+  // Only set currentStep from existingApplication on initial load, not on every update
+  const [hasInitialized, setHasInitialized] = useState(false);
+  useEffect(() => {
+    if (existingApplication?.currentStep && !hasInitialized) {
+
+      setUseNewFlow(true);
+      setCurrentStep(existingApplication.currentStep);
+      setHasInitialized(true);
+    } else if (existingApplication?.currentStep) {
+
+    }
+  }, [existingApplication, hasInitialized, currentStep]);
 
   const form = useForm<MerchantApplicationForm>({
     resolver: zodResolver(merchantApplicationSchema),
@@ -297,9 +348,7 @@ export default function MerchantApplicationWizard({
   // Load existing data into form when available
   useEffect(() => {
     if (existingApplication) {
-      console.log("Loading existing application data:", existingApplication);
-      console.log("Existing agreementAccepted value:", existingApplication.agreementAccepted);
-      
+
       form.reset({
         ...existingApplication,
         // Convert ISO dates to yyyy-MM-dd format for HTML date inputs
@@ -339,7 +388,7 @@ export default function MerchantApplicationWizard({
       // Double-check that the checkbox value was set correctly
       setTimeout(() => {
         const checkboxValue = form.getValues('agreementAccepted');
-        console.log("After form reset, agreementAccepted value:", checkboxValue);
+
       }, 100);
     }
   }, [existingApplication, form]);
@@ -375,7 +424,7 @@ export default function MerchantApplicationWizard({
       queryClient.invalidateQueries({ queryKey: ['/api/merchant-applications'] });
     },
     onError: (error) => {
-      console.error('Auto-save failed:', error);
+
       // Don't show error toast for auto-save failures to avoid being intrusive
     },
   });
@@ -412,22 +461,30 @@ export default function MerchantApplicationWizard({
   // Submit application mutation
   const submitMutation = useMutation({
     mutationFn: async (data: MerchantApplicationForm) => {
+
       // First save/update the application
       const saveEndpoint = applicationId 
         ? `/api/merchant-applications/${applicationId}`
         : '/api/merchant-applications';
       
       const saveMethod = applicationId ? 'PUT' : 'POST';
-      const saveResponse = await apiRequest(saveMethod, saveEndpoint, data);
+
+      const saveResponse = await apiRequest(saveMethod, saveEndpoint, {
+        ...data,
+        currentStep: useNewFlow ? 4 : undefined, // Keep at step 4 (final step) for new flow
+      });
       const savedApp = await saveResponse.json();
 
       // Then submit it
+
       const submitResponse = await apiRequest(
         'PUT', 
         `/api/merchant-applications/${savedApp.id}/status`,
         { status: 'SUBMITTED' }
       );
-      return submitResponse.json();
+      const result = await submitResponse.json();
+
+      return result;
     },
     onSuccess: () => {
       toast({
@@ -580,7 +637,157 @@ export default function MerchantApplicationWizard({
     return labels[fieldName] || fieldName.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
   };
 
+  // Handle step completion for new flow
+  const handleStepComplete = async (step: number, stepData?: any) => {
+    if (!applicationId) return;
+
+    try {
+      const updateData: any = {
+        // Don't increment past step 4 (max step in new flow)
+        currentStep: step < 4 ? step + 1 : 4,
+      };
+
+      // Step 1: Rename application to business name and save all Step 1 data
+      if (step === 1) {
+        const formData = form.getValues();
+        
+        // Determine the business name to use for renaming
+        // Priority: dbaBusinessName (if it's not the default date-based name), then legalBusinessName
+        let businessNameToUse = formData.dbaBusinessName;
+        if (!businessNameToUse || businessNameToUse.startsWith('Application -')) {
+          // If dbaBusinessName is empty or still the default, check legalBusinessName
+          if (formData.legalBusinessName && !formData.legalBusinessName.startsWith('Application -')) {
+            businessNameToUse = formData.legalBusinessName;
+          }
+        }
+        
+        // Rename application if we have a valid business name
+        if (businessNameToUse && !businessNameToUse.startsWith('Application -')) {
+          updateData.dbaBusinessName = businessNameToUse;
+        }
+        
+        // Save all Step 1 fields
+        if (formData.dbaWebsite) {
+          updateData.dbaWebsite = formData.dbaWebsite;
+        }
+        if (formData.legalBusinessName) {
+          updateData.legalBusinessName = formData.legalBusinessName;
+        }
+      }
+
+      // Step 2: Just advance step (documents already uploaded)
+      // Step 3: Save all form data
+      if (step === 3) {
+        const formData = form.getValues();
+        Object.assign(updateData, formData);
+      }
+
+      await apiRequest("PUT", `/api/merchant-applications/${applicationId}`, updateData);
+      queryClient.invalidateQueries({ queryKey: [`/api/merchant-applications/${applicationId}`] });
+
+      if (step < 4) {
+        setCurrentStep(step + 1);
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to save step progress",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleNext = async () => {
+    // New flow: Handle step completion differently
+    if (useNewFlow) {
+      if (currentStep === 1) {
+        // Step 1: Validate and save business name, then rename application
+        const isValid = await form.trigger(['dbaBusinessName', 'dbaWebsite']);
+        if (!isValid) {
+          toast({
+            title: "Validation Error",
+            description: "Please fill in all required fields",
+            variant: "destructive",
+          });
+          return;
+        }
+        const stepData = form.getValues();
+        await handleStepComplete(1, stepData);
+        return;
+      } else if (currentStep === 2) {
+        // Step 2: Documents - handled by DocumentUploadStep component
+        await handleStepComplete(2);
+        return;
+      } else if (currentStep === 3) {
+        // Step 3: Review - only validate required fields, not all fields
+        const requiredFields = [
+          'dbaBusinessName',
+          'dbaWebsite',
+          'legalBusinessName',
+          'federalTaxIdNumber',
+          'bankName',
+          'abaRoutingNumber',
+          'ddaNumber',
+        ];
+        
+        // Check if required fields are filled (simple check, not full validation)
+        const missingFields = requiredFields.filter(field => {
+          const value = form.getValues(field as any);
+          return isEmpty(value);
+        });
+        
+        if (missingFields.length > 0) {
+          const fieldLabels: Record<string, string> = {
+            'dbaBusinessName': 'Business Name (DBA)',
+            'dbaWebsite': 'Website',
+            'legalBusinessName': 'Legal Business Name',
+            'federalTaxIdNumber': 'Federal Tax ID (EIN)',
+            'bankName': 'Bank Name',
+            'abaRoutingNumber': 'ABA Routing Number',
+            'ddaNumber': 'Account Number (DDA)',
+          };
+          const missingLabels = missingFields.map(f => fieldLabels[f] || f);
+          
+          toast({
+            title: "Missing Required Fields",
+            description: `Please fill in: ${missingLabels.join(', ')}`,
+            variant: "destructive",
+            duration: 5000,
+          });
+          return;
+        }
+        
+        // Only validate required fields, not all fields
+        const isValid = await form.trigger(requiredFields as any);
+        if (!isValid) {
+          const errors = form.formState.errors;
+          const errorFields = requiredFields.filter(field => (errors as any)[field]);
+          const fieldLabels: Record<string, string> = {
+            'dbaBusinessName': 'Business Name (DBA)',
+            'dbaWebsite': 'Website',
+            'legalBusinessName': 'Legal Business Name',
+            'federalTaxIdNumber': 'Federal Tax ID (EIN)',
+            'bankName': 'Bank Name',
+            'abaRoutingNumber': 'ABA Routing Number',
+            'ddaNumber': 'Account Number (DDA)',
+          };
+          const errorLabels = errorFields.map(f => fieldLabels[f] || f);
+          
+          toast({
+            title: "Validation Error",
+            description: `Please fix errors in: ${errorLabels.join(', ')}`,
+            variant: "destructive",
+            duration: 5000,
+          });
+          return;
+        }
+        
+        await handleStepComplete(3);
+        return;
+      }
+    }
+
+    // Old flow: Original validation logic
     const validation = await validateCurrentStep();
     
     if (!validation.isValid) {
@@ -735,22 +942,26 @@ export default function MerchantApplicationWizard({
   };
 
   const handleSubmit = async () => {
+
     setIsSubmitting(true);
     try {
       // CRITICAL: Check if all required documents are uploaded before submission
       if (!applicationId) {
+
         toast({
           title: "Cannot Submit Application",
           description: "Application must be saved before checking documents. Please save as draft first.",
           variant: "destructive",
         });
+        setIsSubmitting(false);
         return;
       }
 
       // Fetch documents for this application
+
       const documentsResponse = await apiRequest('GET', '/api/documents');
       const allDocuments = await documentsResponse.json();
-      
+
       // Filter documents for this specific application
       const applicationDocuments = allDocuments.filter(
         (doc: any) => doc.merchantApplicationId === applicationId
@@ -783,16 +994,17 @@ export default function MerchantApplicationWizard({
         };
 
         const missingDocNames = missingDocs.map(type => docNames[type] || type).join('\n• ');
-        
+
         toast({
           title: "Missing Required Documents",
           description: `You must upload all required documents before submitting your application. Missing:\n\n• ${missingDocNames}`,
           variant: "destructive",
           duration: 10000,
         });
+        setIsSubmitting(false);
         return;
       }
-      
+
       // Get form data and clean null values that cause validation errors
       let formData = form.getValues();
       
@@ -816,65 +1028,50 @@ export default function MerchantApplicationWizard({
       // Since form.getValues() is not reliable for this field
       
       const agreementValue = form.getValues('agreementAccepted');
-      console.log("Agreement value from direct get:", agreementValue);
-      
+
       // CRITICAL FIX: Server logs show agreementAccepted: true, but form keeps resetting it
       // Since we can see from server logs that the user HAS checked the agreement, force it to true
       
       const checkboxElement = document.querySelector('input[name="agreementAccepted"]') as HTMLInputElement;
       const isCheckboxChecked = checkboxElement?.checked || false;
-      
-      console.log("DOM checkbox checked state:", isCheckboxChecked);
-      console.log("Form agreementAccepted value:", formData.agreementAccepted);
-      
+
       // Check if server has this as true (from auto-save logs we can see it's true)
       // If server shows agreementAccepted: true, then user has checked it before
       const serverHasAgreementTrue = existingApplication?.agreementAccepted === true;
-      console.log("Server has agreement as true:", serverHasAgreementTrue);
-      
+
       if (serverHasAgreementTrue) {
-        console.log("FORCING agreementAccepted to true based on server data");
+
         formData.agreementAccepted = true;
         
         // Also force the DOM checkbox to be checked to match
         if (checkboxElement && !checkboxElement.checked) {
-          console.log("Also checking the DOM checkbox to match server state");
+
           checkboxElement.checked = true;
         }
       } else if (isCheckboxChecked && (formData.agreementAccepted === false || formData.agreementAccepted === undefined)) {
-        console.log("Using DOM checkbox state (checked) instead of form state");
+
         formData.agreementAccepted = true;
       } else if (!isCheckboxChecked && !serverHasAgreementTrue) {
-        console.log("Checkbox is not checked in DOM and server doesn't have it as true");
+
         formData.agreementAccepted = false;
       }
-      
-      console.log("Submit - Form data:", JSON.stringify(formData, null, 2));
-      console.log("Submit - agreementAccepted value:", formData.agreementAccepted);
-      console.log("Submit - agreementAccepted type:", typeof formData.agreementAccepted);
-      
+
       // Also log all keys to see if agreementAccepted exists
-      console.log("Submit - All form keys:", Object.keys(formData));
-      console.log("Submit - Has agreementAccepted key:", 'agreementAccepted' in formData);
-      
+
       // BYPASS ZOD VALIDATION - Submit directly to server
-      console.log("BYPASSING Zod validation - submitting directly to server");
-      // await merchantApplicationSchema.parseAsync(formData); // DISABLED
-      
+
       // Submit the application directly without client-side validation
-      await submitMutation.mutateAsync(formData);
+      const result = await submitMutation.mutateAsync(formData);
+
     } catch (error) {
-      console.error("Submit error:", error);
-      
+
       // Handle Zod validation errors with specific messages
       if (error instanceof Error && 'issues' in error) {
         const zodError = error as any;
         const errorMessages = zodError.issues.map((issue: any) => 
           `${issue.path.join('.')}: ${issue.message}`
         ).join('\n');
-        
-        console.error("Validation issues:", errorMessages);
-        
+
         toast({
           title: "Validation Error",
           description: `Please fix the following issues:\n${errorMessages}`,
@@ -888,6 +1085,7 @@ export default function MerchantApplicationWizard({
         });
       }
     } finally {
+
       setIsSubmitting(false);
     }
   };
@@ -911,6 +1109,47 @@ export default function MerchantApplicationWizard({
   };
 
   const getStepComponent = () => {
+    // New 4-step flow
+    if (useNewFlow) {
+      switch (currentStep) {
+        case 1:
+          return (
+            <SimplifiedBasicInfoStep
+              form={form}
+              onContinue={() => handleNext()}
+              isSubmitting={isSubmitting}
+            />
+          );
+        case 2:
+          return applicationId ? (
+            <DocumentUploadStep
+              applicationId={applicationId}
+              onContinue={() => handleNext()}
+              isSubmitting={isSubmitting}
+            />
+          ) : null;
+        case 3:
+          return applicationId ? (
+            <ApplicationReviewStep
+              form={form}
+              applicationId={applicationId}
+              onContinue={() => handleNext()}
+              isSubmitting={isSubmitting}
+            />
+          ) : null;
+        case 4:
+          return (
+            <SubmitStep
+              form={form}
+              onSubmit={handleSubmit}
+              isSubmitting={isSubmitting || submitMutation.isPending}
+            />
+          );
+        default:
+          return null;
+      }
+    }
+
     // Onboarding mode: Part 1 (Basic Business Info only)
     if (onboardingMode === 'part1') {
       return <BasicBusinessInfoStep form={form} />;
@@ -1000,6 +1239,7 @@ export default function MerchantApplicationWizard({
               const StepIcon = step.icon;
               const isActive = currentStep === step.id;
               const isCompleted = currentStep > step.id;
+              const isLocked = useNewFlow && currentStep < step.id; // Lock future steps in new flow
               
               return (
                 <div
@@ -1009,8 +1249,12 @@ export default function MerchantApplicationWizard({
                       ? 'bg-primary text-primary-foreground'
                       : isCompleted
                       ? 'bg-green-100 text-green-700'
+                      : isLocked
+                      ? 'bg-gray-100 text-gray-400 opacity-50 cursor-not-allowed'
                       : 'bg-muted text-muted-foreground'
                   }`}
+                  onClick={() => !isLocked && currentStep !== step.id && setCurrentStep(step.id)}
+                  style={{ cursor: isLocked ? 'not-allowed' : 'pointer' }}
                 >
                   <StepIcon className="h-4 w-4" />
                   <span className="text-xs font-medium hidden sm:inline">
@@ -1038,7 +1282,8 @@ export default function MerchantApplicationWizard({
         getFieldLabel={getFieldLabel}
       /> */}
 
-      {/* Navigation Footer */}
+      {/* Navigation Footer - Only show for old flow */}
+      {!useNewFlow && (
       <Card>
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
@@ -1098,6 +1343,7 @@ export default function MerchantApplicationWizard({
           </div>
         </CardContent>
       </Card>
+      )}
     </div>
   );
 }
