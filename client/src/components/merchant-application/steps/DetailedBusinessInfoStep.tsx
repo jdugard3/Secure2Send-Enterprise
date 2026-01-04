@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { SSNInput } from "@/components/ui/ssn-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
@@ -297,8 +298,7 @@ export function DetailedBusinessInfoStep({ form }: DetailedBusinessInfoStepProps
                       Federal Tax ID (EIN) *
                     </FormLabel>
                     <FormControl>
-                      <Input 
-                        placeholder="XX-XXXXXXX" 
+                      <SSNInput 
                         className={fieldState.error ? "border-destructive focus-visible:ring-destructive" : ""}
                         {...field} 
                       />
@@ -849,7 +849,7 @@ export function DetailedBusinessInfoStep({ form }: DetailedBusinessInfoStepProps
                   <FormItem>
                     <FormLabel>SSN</FormLabel>
                     <FormControl>
-                      <Input placeholder="XXX-XX-XXXX" {...field} />
+                      <SSNInput {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
+import { SSNInput } from "@/components/ui/ssn-input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -322,7 +323,7 @@ export function RepresentativesContactsStep({ form }: RepresentativesContactsSte
                   <FormItem>
                     <FormLabel>SSN *</FormLabel>
                     <FormControl>
-                      <Input placeholder="XXX-XX-XXXX" {...field} />
+                      <SSNInput {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
