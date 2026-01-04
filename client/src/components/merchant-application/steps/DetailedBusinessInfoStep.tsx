@@ -1226,7 +1226,7 @@ export function DetailedBusinessInfoStep({ form }: DetailedBusinessInfoStepProps
                       <FormItem>
                         <FormLabel>SSN *</FormLabel>
                         <FormControl>
-                          <Input placeholder="XXX-XX-XXXX" {...field} />
+                          <SSNInput {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
