@@ -15,6 +15,7 @@ import Admin from "@/pages/admin";
 import AdminSettings from "@/pages/admin-settings";
 import Agent from "@/pages/agent";
 import AgentMerchantDetail from "@/pages/agent-merchant-detail";
+import AgentAnalytics from "@/pages/agent-analytics";
 import Documents from "@/pages/documents";
 import MerchantApplications from "@/pages/merchant-applications";
 import Activity from "@/pages/activity";
@@ -61,12 +62,13 @@ function Router() {
               <Route path="/admin/settings" component={AdminSettings} />
             </>
           )}
-          {user?.role === 'AGENT' && (
-            <>
-              <Route path="/agent" component={Agent} />
-              <Route path="/agent/merchants/:merchantId" component={AgentMerchantDetail} />
-            </>
-          )}
+        {user?.role === 'AGENT' && (
+          <>
+            <Route path="/agent" component={Agent} />
+            <Route path="/agent/analytics" component={AgentAnalytics} />
+            <Route path="/agent/merchants/:merchantId" component={AgentMerchantDetail} />
+          </>
+        )}
         </>
       )}
       <Route component={NotFound} />

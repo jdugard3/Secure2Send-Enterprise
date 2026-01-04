@@ -138,7 +138,8 @@ export default function Sidebar({ isCollapsed = false, onToggle }: SidebarProps)
   ];
 
   const agentItems = [
-    { href: "/agent", icon: Users, label: "Onboarding Dashboard", roles: ["AGENT"] },
+    { href: "/agent", icon: Users, label: "Dashboard", roles: ["AGENT"] },
+    { href: "/agent/analytics", icon: BarChart3, label: "Analytics", roles: ["AGENT"] },
   ];
 
   const filteredNavItems = navItems.filter(item => 

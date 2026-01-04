@@ -45,6 +45,11 @@ export default function Agent() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showCreateInvitationCode, setShowCreateInvitationCode] = useState(false);
   const [showCreateUser, setShowCreateUser] = useState(false);
+  
+  // Search, filter, and sort state
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<"date" | "name">("date");
 
   useEffect(() => {
     if (!isLoading && (!isAuthenticated || user?.role !== 'AGENT')) {
@@ -179,7 +184,7 @@ export default function Agent() {
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Active Onboarding</CardTitle>

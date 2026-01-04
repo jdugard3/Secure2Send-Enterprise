@@ -158,6 +158,21 @@ export const clients = pgTable("clients", {
   index("IDX_clients_agent_id").on(table.agentId),
 ]);
 
+// Agent notes table for tracking merchant interactions
+export const agentNotes = pgTable("agent_notes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  agentId: varchar("agent_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  merchantId: varchar("merchant_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  noteText: text("note_text").notNull(),
+  isPriority: boolean("is_priority").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("IDX_agent_notes_agent_id").on(table.agentId),
+  index("IDX_agent_notes_merchant_id").on(table.merchantId),
+  index("IDX_agent_notes_created_at").on(table.createdAt),
+]);
+
 // Documents table
 export const documents = pgTable("documents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -516,6 +531,12 @@ export const insertClientSchema = createInsertSchema(clients).omit({
   updatedAt: true,
 });
 
+export const insertAgentNoteSchema = createInsertSchema(agentNotes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertDocumentSchema = createInsertSchema(documents).omit({
   id: true,
   uploadedAt: true,
@@ -560,6 +581,8 @@ export type InsertLoginAttempt = typeof loginAttempts.$inferInsert;
 export type LoginAttempt = typeof loginAttempts.$inferSelect;
 export type InsertExtractedDocumentData = typeof extractedDocumentData.$inferInsert;
 export type ExtractedDocumentData = typeof extractedDocumentData.$inferSelect;
+export type InsertAgentNote = typeof agentNotes.$inferInsert;
+export type AgentNote = typeof agentNotes.$inferSelect;
 export type OnboardingStep = 'PART1' | 'DOCUMENTS' | 'PART2' | 'REVIEW' | 'COMPLETE';
 
 // Combined types

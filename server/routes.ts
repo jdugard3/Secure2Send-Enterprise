@@ -3542,8 +3542,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Validate invitation code (public endpoint - used during signup)
-  app.post('/api/invitation-codes/validate', async (req: Request, res: Response) => {
+  // Agent-specific invitation code creation
+  app.post('/api/agent/invitation-codes', requireAgent, async (req: any, res: Response) => {
     try {
       const { code } = req.body;
 
@@ -3972,6 +3972,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch merchant details" });
     }
   });
+
+  // Import and register agent-specific routes
+  const { registerAgentRoutes } = await import("./routes-agent.js");
+  registerAgentRoutes(app);
 
   const httpServer = createServer(app);
   return httpServer;

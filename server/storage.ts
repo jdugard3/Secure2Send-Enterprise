@@ -8,6 +8,7 @@ import {
   invitationCodes,
   loginAttempts,
   extractedDocumentData,
+  agentNotes,
   type User,
   type InsertUser,
   type Client,
@@ -24,6 +25,8 @@ import {
   type InsertLoginAttempt,
   type InsertExtractedDocumentData,
   type ExtractedDocumentData,
+  type AgentNote,
+  type InsertAgentNote,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, sql } from "drizzle-orm";
@@ -56,6 +59,13 @@ export interface IStorage {
   getAllClients(): Promise<ClientWithUser[]>;
   updateClientStatus(clientId: string, status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'INCOMPLETE'): Promise<Client>;
   updateClientIrisLeadId(clientId: string, irisLeadId: string): Promise<Client>;
+  
+  // Agent notes operations
+  createAgentNote(note: InsertAgentNote): Promise<AgentNote>;
+  getAgentNotesByMerchant(merchantId: string, agentId: string): Promise<AgentNote[]>;
+  getAgentNotesByAgent(agentId: string): Promise<AgentNote[]>;
+  updateAgentNote(noteId: string, noteText: string, isPriority?: boolean): Promise<AgentNote>;
+  deleteAgentNote(noteId: string, agentId: string): Promise<void>;
   
   // Document operations
   createDocument(document: InsertDocument): Promise<Document>;
@@ -1090,6 +1100,58 @@ export class DatabaseStorage implements IStorage {
         )
       );
     return result.rowCount || 0;
+  }
+  
+  // Agent notes operations
+  async createAgentNote(noteData: InsertAgentNote): Promise<AgentNote> {
+    const [note] = await db.insert(agentNotes).values(noteData).returning();
+    return note;
+  }
+  
+  async getAgentNotesByMerchant(merchantId: string, agentId: string): Promise<AgentNote[]> {
+    return await db
+      .select()
+      .from(agentNotes)
+      .where(and(
+        eq(agentNotes.merchantId, merchantId),
+        eq(agentNotes.agentId, agentId)
+      ))
+      .orderBy(desc(agentNotes.createdAt));
+  }
+  
+  async getAgentNotesByAgent(agentId: string): Promise<AgentNote[]> {
+    return await db
+      .select()
+      .from(agentNotes)
+      .where(eq(agentNotes.agentId, agentId))
+      .orderBy(desc(agentNotes.createdAt));
+  }
+  
+  async updateAgentNote(noteId: string, noteText: string, isPriority?: boolean): Promise<AgentNote> {
+    const updateData: any = { 
+      noteText, 
+      updatedAt: new Date() 
+    };
+    
+    if (isPriority !== undefined) {
+      updateData.isPriority = isPriority;
+    }
+    
+    const [note] = await db
+      .update(agentNotes)
+      .set(updateData)
+      .where(eq(agentNotes.id, noteId))
+      .returning();
+    return note;
+  }
+  
+  async deleteAgentNote(noteId: string, agentId: string): Promise<void> {
+    await db
+      .delete(agentNotes)
+      .where(and(
+        eq(agentNotes.id, noteId),
+        eq(agentNotes.agentId, agentId)
+      ));
   }
 }
 
