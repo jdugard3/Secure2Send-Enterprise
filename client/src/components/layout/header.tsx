@@ -6,9 +6,17 @@ interface HeaderProps {
   title: string;
   subtitle: string;
   showApplicationSwitcher?: boolean;
+  hasUnsavedChanges?: boolean;
+  onGetPendingData?: () => any;
 }
 
-export default function Header({ title, subtitle, showApplicationSwitcher = false }: HeaderProps) {
+export default function Header({ 
+  title, 
+  subtitle, 
+  showApplicationSwitcher = false,
+  hasUnsavedChanges = false,
+  onGetPendingData
+}: HeaderProps) {
   const { user } = useAuth();
   const isClient = user?.role === 'CLIENT';
 
@@ -19,7 +27,10 @@ export default function Header({ title, subtitle, showApplicationSwitcher = fals
           {/* Left side: Application switcher (if enabled) or title */}
           <div className="flex items-center gap-4 min-w-0 flex-1">
             {showApplicationSwitcher && isClient && (
-              <ApplicationSwitcher />
+              <ApplicationSwitcher 
+                hasUnsavedChanges={hasUnsavedChanges}
+                onGetPendingData={onGetPendingData}
+              />
             )}
             <div className="min-w-0">
               <h2 className="text-2xl font-semibold text-gray-900 tracking-tight truncate">{title}</h2>

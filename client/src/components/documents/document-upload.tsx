@@ -286,19 +286,18 @@ function DocumentUploadZone({
   );
 }
 
-export default function DocumentUpload() {
+export default function DocumentUpload({ applicationId }: { applicationId?: string }) {
   const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [uploadingTypes, setUploadingTypes] = useState<Set<string>>(new Set());
   const [stagedFilesByType, setStagedFilesByType] = useState<Record<string, File[]>>({});
-  const [selectedMerchantApplicationId, setSelectedMerchantApplicationId] = useState<string>("");
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [reviewDocumentId, setReviewDocumentId] = useState<string>("");
   const [reviewMerchantApplicationId, setReviewMerchantApplicationId] = useState<string>("");
 
-  // Fetch merchant applications for the dropdown
-  const { data: merchantApplications = [], isLoading: isLoadingApplications } = useQuery<any[]>({
+  // Fetch merchant applications for the merchant app map only
+  const { data: merchantApplications = [] } = useQuery<any[]>({
     queryKey: ["/api/merchant-applications", user?.id],
     queryFn: async () => {
       const response = await apiRequest("GET", "/api/merchant-applications");
@@ -428,16 +427,16 @@ export default function DocumentUpload() {
   const handleUploadStaged = (documentType: string) => {
     const files = stagedFilesByType[documentType];
     if (files && files.length > 0) {
-      if (!selectedMerchantApplicationId) {
+      if (!applicationId) {
         toast({
-          title: "Select Merchant Application",
-          description: "Please select a merchant application before uploading documents.",
+          title: "No Application Selected",
+          description: "Please select an application using the switcher in the header.",
           variant: "destructive",
         });
         return;
       }
       setUploadingTypes(prev => new Set(prev).add(documentType));
-      uploadMutation.mutate({ files, documentType, merchantApplicationId: selectedMerchantApplicationId });
+      uploadMutation.mutate({ files, documentType, merchantApplicationId: applicationId });
     }
   };
 
@@ -516,65 +515,23 @@ export default function DocumentUpload() {
           </p>
         </div>
 
-        {/* Merchant Application Selector */}
-        <div className="max-w-2xl mx-auto mb-8">
-          <Card className="border-2 border-orange-200 bg-orange-50">
-            <CardContent className="pt-6">
-              <div className="flex items-start gap-4">
-                <Building2 className="h-6 w-6 text-orange-600 mt-1 flex-shrink-0" />
-                <div className="flex-1 space-y-3">
-                  <div>
-                    <h3 className="font-semibold text-gray-900 mb-1">Select Merchant Application</h3>
+        {!applicationId && (
+          <div className="max-w-2xl mx-auto mb-8">
+            <Card className="border-2 border-orange-200 bg-orange-50">
+              <CardContent className="pt-6">
+                <div className="flex items-start gap-4">
+                  <AlertCircle className="h-6 w-6 text-orange-600 mt-1 flex-shrink-0" />
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-gray-900 mb-1">No Application Selected</h3>
                     <p className="text-sm text-gray-600">
-                      Choose which business/merchant application these documents are for
+                      Please select an application using the switcher in the header before uploading documents.
                     </p>
                   </div>
-                  
-                  {merchantApplications.length === 0 ? (
-                    <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                      <div className="flex items-center gap-2 text-yellow-800 mb-2">
-                        <AlertCircle className="h-5 w-5" />
-                        <span className="font-semibold">No Merchant Applications Found</span>
-                      </div>
-                      <p className="text-sm text-yellow-700 mb-3">
-                        You need to create a merchant application before you can upload documents.
-                      </p>
-                      <Button
-                        onClick={() => window.location.href = '/merchant-applications'}
-                        className="bg-orange-500 hover:bg-orange-600 text-white"
-                      >
-                        Create Merchant Application
-                      </Button>
-                    </div>
-                  ) : (
-                    <Select
-                      value={selectedMerchantApplicationId}
-                      onValueChange={setSelectedMerchantApplicationId}
-                    >
-                      <SelectTrigger className="w-full bg-white border-gray-300">
-                        <SelectValue placeholder="Select a merchant application..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {merchantApplications.map((app) => (
-                          <SelectItem key={app.id} value={app.id}>
-                            <div className="flex items-center justify-between w-full">
-                              <span className="font-medium">
-                                {app.dbaBusinessName || app.legalBusinessName || 'Unnamed Application'}
-                              </span>
-                              <Badge variant="outline" className="ml-2 text-xs">
-                                {app.status}
-                              </Badge>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         <div className="space-y-8 pb-8">
           {/* Required Documents Section */}

@@ -18,6 +18,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useApplicationContext } from "@/contexts/ApplicationContext";
+import { UnsavedChangesDialog } from "./UnsavedChangesDialog";
 import { cn } from "@/lib/utils";
 
 const STATUS_COLORS = {
@@ -36,7 +37,15 @@ const STATUS_LABELS = {
   REJECTED: "Rejected",
 } as const;
 
-export function ApplicationSwitcher() {
+interface ApplicationSwitcherProps {
+  hasUnsavedChanges?: boolean;
+  onGetPendingData?: () => any;
+}
+
+export function ApplicationSwitcher({ 
+  hasUnsavedChanges = false,
+  onGetPendingData 
+}: ApplicationSwitcherProps = {}) {
   const {
     currentApplication,
     allApplications,
@@ -45,14 +54,63 @@ export function ApplicationSwitcher() {
     createNewApplication,
     getApplicationProgress,
     getApplicationDisplayName,
+    saveCurrentApplicationData,
   } = useApplicationContext();
 
   const [open, setOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
+  const [pendingApplicationId, setPendingApplicationId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleSwitch = async (applicationId: string) => {
+    // Check for unsaved changes
+    if (hasUnsavedChanges && currentApplication && applicationId !== currentApplication.id) {
+      setPendingApplicationId(applicationId);
+      setShowUnsavedDialog(true);
+      setOpen(false);
+      return;
+    }
+
     await switchApplication(applicationId);
     setOpen(false);
+  };
+
+  const handleSaveAndSwitch = async () => {
+    if (!pendingApplicationId) return;
+
+    setIsSaving(true);
+    try {
+      // Get pending form data if callback provided
+      const pendingData = onGetPendingData?.();
+      
+      if (pendingData) {
+        await saveCurrentApplicationData(pendingData);
+      }
+
+      // Now switch to the new application
+      await switchApplication(pendingApplicationId);
+      setShowUnsavedDialog(false);
+      setPendingApplicationId(null);
+    } catch (error) {
+      console.error("Failed to save and switch:", error);
+      // Still proceed with switch even if save fails
+      if (pendingApplicationId) {
+        await switchApplication(pendingApplicationId);
+      }
+      setShowUnsavedDialog(false);
+      setPendingApplicationId(null);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDiscardAndSwitch = async () => {
+    if (!pendingApplicationId) return;
+
+    await switchApplication(pendingApplicationId);
+    setShowUnsavedDialog(false);
+    setPendingApplicationId(null);
   };
 
   const handleCreateNew = async () => {
@@ -106,80 +164,34 @@ export function ApplicationSwitcher() {
   const currentDisplayName = getApplicationDisplayName(currentApplication);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          role="combobox"
-          aria-expanded={open}
-          aria-label="Select application"
-          className="w-full sm:w-[280px] justify-between text-sm"
-        >
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <span className="truncate">{currentDisplayName}</span>
-            <span className="text-xs text-muted-foreground flex-shrink-0">{Math.round(currentProgress)}%</span>
-          </div>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-screen sm:w-[320px] p-0" align="start">
-        <Command>
-          <CommandInput placeholder="Search applications..." className="h-9" />
-          <CommandList className="max-h-[60vh] sm:max-h-[400px]">
-            <CommandEmpty>No applications found.</CommandEmpty>
+    <>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            aria-label="Select application"
+            className="w-full sm:w-[280px] justify-between text-sm"
+          >
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <span className="truncate">{currentDisplayName}</span>
+              <span className="text-xs text-muted-foreground flex-shrink-0">{Math.round(currentProgress)}%</span>
+            </div>
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-screen sm:w-[320px] p-0" align="start">
+          <Command>
+            <CommandInput placeholder="Search applications..." className="h-9" />
+            <CommandList className="max-h-[60vh] sm:max-h-[400px]">
+              <CommandEmpty>No applications found.</CommandEmpty>
 
-            {/* Draft Applications */}
-            {draftApplications.length > 0 && (
-              <CommandGroup heading="Draft Applications">
-                {draftApplications.map((app) => {
-                  const progress = getApplicationProgress(app);
-                  const displayName = getApplicationDisplayName(app);
-                  const isSelected = currentApplication.id === app.id;
-
-                  return (
-                    <CommandItem
-                      key={app.id}
-                      onSelect={() => handleSwitch(app.id)}
-                      className="flex flex-col items-start gap-2 p-3"
-                    >
-                      <div className="flex items-center justify-between w-full">
-                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <Check
-                            className={cn(
-                              "h-4 w-4 shrink-0",
-                              isSelected ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          <span className="truncate font-medium text-sm">{displayName}</span>
-                        </div>
-                        <Badge
-                          variant="secondary"
-                          className={cn("text-xs flex-shrink-0", STATUS_COLORS[app.status])}
-                        >
-                          {STATUS_LABELS[app.status]}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-2 w-full pl-6">
-                        <Progress value={progress} className="h-1 flex-1" />
-                        <span className="text-xs text-muted-foreground flex-shrink-0">
-                          {Math.round(progress)}%
-                        </span>
-                      </div>
-                      <span className="text-xs text-muted-foreground pl-6">
-                        Updated {new Date(app.updatedAt).toLocaleDateString()}
-                      </span>
-                    </CommandItem>
-                  );
-                })}
-              </CommandGroup>
-            )}
-
-            {/* Completed Applications */}
-            {completedApplications.length > 0 && (
-              <>
-                {draftApplications.length > 0 && <CommandSeparator />}
-                <CommandGroup heading="Completed Applications">
-                  {completedApplications.map((app) => {
+              {/* Draft Applications */}
+              {draftApplications.length > 0 && (
+                <CommandGroup heading="Draft Applications">
+                  {draftApplications.map((app) => {
+                    const progress = getApplicationProgress(app);
                     const displayName = getApplicationDisplayName(app);
                     const isSelected = currentApplication.id === app.id;
 
@@ -187,55 +199,111 @@ export function ApplicationSwitcher() {
                       <CommandItem
                         key={app.id}
                         onSelect={() => handleSwitch(app.id)}
-                        className="flex items-center justify-between p-3"
+                        className="flex flex-col items-start gap-2 p-3"
                       >
-                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <Check
-                            className={cn(
-                              "h-4 w-4 shrink-0",
-                              isSelected ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          <span className="truncate text-sm">{displayName}</span>
+                        <div className="flex items-center justify-between w-full">
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <Check
+                              className={cn(
+                                "h-4 w-4 shrink-0",
+                                isSelected ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            <span className="truncate font-medium text-sm">{displayName}</span>
+                          </div>
+                          <Badge
+                            variant="secondary"
+                            className={cn("text-xs flex-shrink-0", STATUS_COLORS[app.status])}
+                          >
+                            {STATUS_LABELS[app.status]}
+                          </Badge>
                         </div>
-                        <Badge
-                          variant="secondary"
-                          className={cn("text-xs flex-shrink-0", STATUS_COLORS[app.status])}
-                        >
-                          {STATUS_LABELS[app.status]}
-                        </Badge>
+                        <div className="flex items-center gap-2 w-full pl-6">
+                          <Progress value={progress} className="h-1 flex-1" />
+                          <span className="text-xs text-muted-foreground flex-shrink-0">
+                            {Math.round(progress)}%
+                          </span>
+                        </div>
+                        <span className="text-xs text-muted-foreground pl-6">
+                          Updated {new Date(app.updatedAt).toLocaleDateString()}
+                        </span>
                       </CommandItem>
                     );
                   })}
                 </CommandGroup>
-              </>
-            )}
+              )}
 
-            {/* New Application Button */}
-            <CommandSeparator />
-            <CommandGroup>
-              <CommandItem
-                onSelect={handleCreateNew}
-                disabled={isCreating}
-                className="p-3"
-              >
-                {isCreating ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    <span className="text-sm">Creating application...</span>
-                  </>
-                ) : (
-                  <>
-                    <Plus className="mr-2 h-4 w-4" />
-                    <span className="text-sm">New Application</span>
-                  </>
-                )}
-              </CommandItem>
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+              {/* Completed Applications */}
+              {completedApplications.length > 0 && (
+                <>
+                  {draftApplications.length > 0 && <CommandSeparator />}
+                  <CommandGroup heading="Completed Applications">
+                    {completedApplications.map((app) => {
+                      const displayName = getApplicationDisplayName(app);
+                      const isSelected = currentApplication.id === app.id;
+
+                      return (
+                        <CommandItem
+                          key={app.id}
+                          onSelect={() => handleSwitch(app.id)}
+                          className="flex items-center justify-between p-3"
+                        >
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            <Check
+                              className={cn(
+                                "h-4 w-4 shrink-0",
+                                isSelected ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            <span className="truncate text-sm">{displayName}</span>
+                          </div>
+                          <Badge
+                            variant="secondary"
+                            className={cn("text-xs flex-shrink-0", STATUS_COLORS[app.status])}
+                          >
+                            {STATUS_LABELS[app.status]}
+                          </Badge>
+                        </CommandItem>
+                      );
+                    })}
+                  </CommandGroup>
+                </>
+              )}
+
+              {/* New Application Button */}
+              <CommandSeparator />
+              <CommandGroup>
+                <CommandItem
+                  onSelect={handleCreateNew}
+                  disabled={isCreating}
+                  className="p-3"
+                >
+                  {isCreating ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <span className="text-sm">Creating application...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="mr-2 h-4 w-4" />
+                      <span className="text-sm">New Application</span>
+                    </>
+                  )}
+                </CommandItem>
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+
+      <UnsavedChangesDialog
+        open={showUnsavedDialog}
+        onOpenChange={setShowUnsavedDialog}
+        onSave={handleSaveAndSwitch}
+        onDiscard={handleDiscardAndSwitch}
+        isSaving={isSaving}
+      />
+    </>
   );
 }
 

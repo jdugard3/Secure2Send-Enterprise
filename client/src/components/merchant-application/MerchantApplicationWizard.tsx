@@ -53,6 +53,7 @@ interface MerchantApplicationWizardProps {
   onComplete?: () => void;
   onboardingMode?: OnboardingMode;
   onOnboardingStepComplete?: (completedStep: 'PART1' | 'PART2' | 'REVIEW') => void;
+  onFormChange?: (isDirty: boolean, formData?: any) => void;
 }
 
 // Full wizard steps (original 4-step flow)
@@ -132,7 +133,8 @@ export default function MerchantApplicationWizard({
   applicationId: initialApplicationId, 
   onComplete,
   onboardingMode = 'full',
-  onOnboardingStepComplete
+  onOnboardingStepComplete,
+  onFormChange
 }: MerchantApplicationWizardProps) {
   const [currentStep, setCurrentStep] = useState(1);
   const [applicationId, setApplicationId] = useState(initialApplicationId);
@@ -316,6 +318,18 @@ export default function MerchantApplicationWizard({
     },
     mode: "onChange",
   });
+
+  // Track form changes and notify parent
+  useEffect(() => {
+    if (!onFormChange) return;
+
+    const subscription = form.watch((data) => {
+      const isDirty = form.formState.isDirty;
+      onFormChange(isDirty, data);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [form, onFormChange]);
 
   // Sync applicationId with initial prop
   useEffect(() => {
