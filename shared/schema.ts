@@ -338,6 +338,9 @@ export const merchantApplications = pgTable("merchant_applications", {
   // Auto-save tracking
   lastSavedAt: timestamp("last_saved_at").defaultNow(),
   
+  // Application flow tracking
+  currentStep: integer("current_step").default(1), // 1=Basic Info, 2=Documents, 3=Review, 4=Submit
+  
   // E-Signature tracking
   eSignatureStatus: text("e_signature_status").default('NOT_SENT'), // 'NOT_SENT' | 'PENDING' | 'SIGNED' | 'DECLINED' | 'EXPIRED'
   eSignatureApplicationId: text("e_signature_application_id"), // IRIS e-signature application ID

@@ -1428,10 +1428,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         });
 
+        // Generate date-based temporary name if no business name provided
+        const dateBasedName = `Application - ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+        
         const applicationData = {
           ...sanitizedBody,
           clientId: client.id,
           status: 'DRAFT' as const,
+          currentStep: 1, // Start at step 1 (Basic Info)
+          // Set temporary date-based name if no business name provided
+          dbaBusinessName: sanitizedBody.dbaBusinessName || sanitizedBody.legalBusinessName || dateBasedName,
         };
 
       const application = await storage.createMerchantApplication(applicationData);

@@ -190,9 +190,10 @@ export async function processDocumentInBackground(
       });
     }
 
-    // Auto-apply extracted data if confidence is high enough (>= 95%)
+    // Auto-apply extracted data regardless of confidence score
+    // User will review and verify all data in Step 3 (Review) before submission
     const confidence = confidenceScore ? parseFloat(confidenceScore) : undefined;
-    if (confidence && confidence >= 0.95 && merchantApplicationId) {
+    if (merchantApplicationId) {
       try {
         const { autoApplyExtractedData } = await import('./autoApplyExtractedData');
         const autoApplied = await autoApplyExtractedData(
@@ -203,14 +204,12 @@ export async function processDocumentInBackground(
           req
         );
         if (autoApplied) {
-          console.log(`✅ Auto-applied extracted data to merchant application: ${merchantApplicationId}`);
+          console.log(`✅ Auto-applied extracted data to merchant application: ${merchantApplicationId} (confidence: ${confidence || 'unknown'})`);
         }
       } catch (autoApplyError) {
         console.error('Failed to auto-apply extracted data:', autoApplyError);
         // Don't fail the OCR processing if auto-apply fails
       }
-    } else if (confidence && confidence < 0.95) {
-      console.log(`⏭️  Skipping auto-apply: confidence score ${confidence} is below 95% threshold (requires manual review)`);
     }
 
     // Clear file buffer from memory
