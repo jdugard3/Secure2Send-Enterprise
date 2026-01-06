@@ -33,10 +33,10 @@ import {
   ChevronLeft,
   ChevronRight,
   CreditCard,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  FileText,
+  Clock
 } from "lucide-react";
-import { OnboardingProgress } from "./onboarding-progress";
-
 interface SidebarProps {
   isCollapsed?: boolean;
   onToggle?: () => void;
@@ -132,9 +132,11 @@ export default function Sidebar({ isCollapsed = false, onToggle }: SidebarProps)
   ];
 
   const adminItems = [
-    { href: "/admin", icon: Users, label: "All Clients", roles: ["ADMIN"] },
-    { href: "/admin/documents", icon: ClipboardCheck, label: "Document Review", roles: ["ADMIN"] },
-    { href: "/admin/settings", icon: SettingsIcon, label: "Admin Settings", roles: ["ADMIN"] },
+    { href: "/admin#dashboard", icon: BarChart3, label: "Dashboard", roles: ["ADMIN"] },
+    { href: "/admin#users", icon: Users, label: "Users", roles: ["ADMIN"] },
+    { href: "/admin#applications", icon: FileText, label: "Applications", roles: ["ADMIN"] },
+    { href: "/admin#documents", icon: Clock, label: "Document Review", roles: ["ADMIN"] },
+    { href: "/admin#settings", icon: SettingsIcon, label: "Settings", roles: ["ADMIN"] },
   ];
 
   const agentItems = [
@@ -155,6 +157,17 @@ export default function Sidebar({ isCollapsed = false, onToggle }: SidebarProps)
   );
 
   const isActive = (href: string) => {
+    // Handle hash-based navigation for admin tabs
+    if (href.includes("#")) {
+      const [path, hash] = href.split("#");
+      if (location.startsWith(path)) {
+        const currentHash = window.location.hash.slice(1);
+        // If no hash in URL and this is dashboard, or hash matches
+        if ((!currentHash && hash === "dashboard") || currentHash === hash) {
+          return true;
+        }
+      }
+    }
     if (href === "/" && location === "/") return true;
     if (href !== "/" && location.startsWith(href)) return true;
     return false;
@@ -192,11 +205,6 @@ export default function Sidebar({ isCollapsed = false, onToggle }: SidebarProps)
           )}
         </div>
       </div>
-
-      {/* Onboarding Progress - Only shown for client users who haven't completed onboarding */}
-      {user?.role === 'CLIENT' && user?.onboardingStep !== 'COMPLETE' && (
-        <OnboardingProgress isCollapsed={isCollapsed} />
-      )}
       
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-2">
@@ -230,8 +238,20 @@ export default function Sidebar({ isCollapsed = false, onToggle }: SidebarProps)
             )}
             {filteredAdminItems.map((item) => {
               const Icon = item.icon;
+              const handleClick = (e: React.MouseEvent) => {
+                if (item.href.includes("#")) {
+                  const [path, hash] = item.href.split("#");
+                  if (location.startsWith(path)) {
+                    // Already on admin page, just update hash
+                    e.preventDefault();
+                    window.location.hash = hash;
+                    // Trigger hashchange event for tabs to respond
+                    window.dispatchEvent(new HashChangeEvent('hashchange'));
+                  }
+                }
+              };
               return (
-                <Link key={item.href} href={item.href}>
+                <Link key={item.href} href={item.href} onClick={handleClick}>
                   <Button
                     variant={isActive(item.href) ? "default" : "ghost"}
                     className={`w-full ${isCollapsed ? 'justify-center px-2' : 'justify-start'} ${
