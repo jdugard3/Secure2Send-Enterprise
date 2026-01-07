@@ -156,11 +156,6 @@ export async function processDocumentInBackground(
       .update(fileBuffer)
       .digest('hex');
 
-    // Extract confidence score from result data
-    const confidenceScore = result.data.confidence 
-      ? result.data.confidence.toFixed(2)
-      : result.confidenceScore?.toFixed(2) || undefined;
-
     // Store extracted data in database
     const extractedData = await storage.createExtractedDocumentData({
       documentId,
@@ -169,7 +164,6 @@ export async function processDocumentInBackground(
       extractedDataPublic: publicData,
       encryptedFields,
       documentHash,
-      confidenceScore,
       processingIpAddress: req?.ip || req?.socket?.remoteAddress || undefined,
       processingUserAgent: req?.get('user-agent') || undefined,
     });
@@ -185,14 +179,11 @@ export async function processDocumentInBackground(
           documentType: document.documentType,
           filename: document.originalName,
           extractedDataId: extractedData.id,
-          confidenceScore: confidenceScore ? parseFloat(confidenceScore) : undefined,
         },
       });
     }
 
-    // Auto-apply extracted data regardless of confidence score
-    // User will review and verify all data in Step 3 (Review) before submission
-    const confidence = confidenceScore ? parseFloat(confidenceScore) : undefined;
+    // Auto-apply extracted data immediately after extraction
     if (merchantApplicationId) {
       try {
         const { autoApplyExtractedData } = await import('./autoApplyExtractedData');
@@ -200,11 +191,10 @@ export async function processDocumentInBackground(
           extractedData.id,
           merchantApplicationId,
           userId,
-          confidence,
           req
         );
         if (autoApplied) {
-          console.log(`✅ Auto-applied extracted data to merchant application: ${merchantApplicationId} (confidence: ${confidence || 'unknown'})`);
+          console.log(`✅ Auto-applied extracted data to merchant application: ${merchantApplicationId}`);
         }
       } catch (autoApplyError) {
         console.error('Failed to auto-apply extracted data:', autoApplyError);

@@ -2,7 +2,7 @@
  * Auto-Apply Extracted Data Service
  * 
  * Automatically applies extracted OCR data to merchant applications
- * regardless of confidence score. User reviews all data before submission.
+ * immediately after extraction.
  */
 
 import { storage } from "../storage";
@@ -13,19 +13,15 @@ import type { InsertMerchantApplication } from "../../shared/schema";
 
 /**
  * Apply extracted data to merchant application automatically
- * Applies all data regardless of confidence score (user reviews before submission)
+ * Always applies extracted data regardless of confidence
  */
 export async function autoApplyExtractedData(
   extractedDataId: string,
   merchantApplicationId: string,
   userId: string,
-  confidenceScore: number | undefined,
   req?: Request
 ): Promise<boolean> {
   try {
-    // Apply all extracted data regardless of confidence score
-    // User will review and verify all data in Step 3 (Review) before submission
-    console.log(`📝 Auto-applying extracted data with confidence score: ${confidenceScore || 'unknown'} (no threshold - user reviews before submission)`);
 
     // Get extracted data
     const extractedData = await storage.getExtractedDocumentDataById(extractedDataId);
@@ -172,7 +168,6 @@ export async function autoApplyExtractedData(
             extractedDataId,
             fieldsApplied: appliedFields,
             autoApplied: true,
-            confidenceScore,
           },
         });
       } catch (auditError) {

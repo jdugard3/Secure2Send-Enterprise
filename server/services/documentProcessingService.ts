@@ -124,7 +124,6 @@ export class SecureDocumentProcessingService {
         success: true,
         data: validatedData,
         documentHash,
-        confidenceScore: validatedData.confidence,
         processingTimeMs,
       };
     } catch (error) {

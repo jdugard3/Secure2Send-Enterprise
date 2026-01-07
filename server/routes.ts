@@ -658,7 +658,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.json({
           status: 'complete',
           extractedDataId: extractedData.id,
-          confidenceScore: extractedData.confidenceScore ? parseFloat(extractedData.confidenceScore) : undefined,
           userReviewed: extractedData.userReviewed,
           appliedToApplication: extractedData.appliedToApplication,
           extractionTimestamp: extractedData.extractionTimestamp,
@@ -749,7 +748,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             id: extractedData.id,
             documentId: extractedData.documentId,
             data: includeSensitive ? fullData : publicData,
-            confidenceScore: extractedData.confidenceScore ? parseFloat(extractedData.confidenceScore) : undefined,
             userReviewed: extractedData.userReviewed,
             reviewedAt: extractedData.reviewedAt,
             appliedToApplication: extractedData.appliedToApplication,
@@ -3982,7 +3980,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Import and register agent-specific routes
   const { registerAgentRoutes } = await import("./routes-agent.js");
   registerAgentRoutes(app);
-
   const httpServer = createServer(app);
   return httpServer;
 }

@@ -384,7 +384,6 @@ export const extractedDocumentData = pgTable("extracted_document_data", {
   // Document tracking
   documentHash: varchar("document_hash", { length: 64 }).notNull(), // SHA-256 hash for duplicate detection
   extractionTimestamp: timestamp("extraction_timestamp").defaultNow().notNull(),
-  confidenceScore: varchar("confidence_score"), // Stored as string to preserve precision (0.00-1.00)
   
   // User review tracking
   userReviewed: boolean("user_reviewed").default(false),

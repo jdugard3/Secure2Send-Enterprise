@@ -12,7 +12,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
 import { DOCUMENT_TYPES } from "@/lib/constants";
 import OcrProcessingIndicator from "./OcrProcessingIndicator";
-import ExtractedDataReviewModal from "./ExtractedDataReviewModal";
 
 interface DocumentUploadZoneProps {
   documentType: string;
@@ -26,7 +25,6 @@ interface DocumentUploadZoneProps {
   onRemoveStagedFile: (index: number, documentType: string) => void;
   onUploadStaged: (documentType: string) => void;
   merchantAppMap: Record<string, string>;
-  onReviewExtractedData?: (documentId: string, merchantApplicationId: string) => void;
 }
 
 function DocumentUploadZone({ 
@@ -40,8 +38,7 @@ function DocumentUploadZone({
   onStageFiles,
   onRemoveStagedFile,
   onUploadStaged,
-  merchantAppMap,
-  onReviewExtractedData
+  merchantAppMap
 }: DocumentUploadZoneProps) {
   const { toast } = useToast();
 
@@ -214,21 +211,6 @@ function DocumentUploadZone({
                         <div className="mt-2">
                           <OcrProcessingIndicator
                             documentId={doc.id}
-                            onReviewClick={() => {
-                              console.log('onReviewClick called from OcrProcessingIndicator', { 
-                                documentId: doc.id, 
-                                merchantApplicationId: doc.merchantApplicationId,
-                                hasHandler: !!onReviewExtractedData
-                              });
-                              if (onReviewExtractedData && doc.merchantApplicationId) {
-                                onReviewExtractedData(doc.id, doc.merchantApplicationId);
-                              } else {
-                                console.error('Missing handler or merchantApplicationId', { 
-                                  hasHandler: !!onReviewExtractedData,
-                                  merchantApplicationId: doc.merchantApplicationId
-                                });
-                              }
-                            }}
                             className="text-xs"
                           />
                         </div>
@@ -444,13 +426,6 @@ export default function DocumentUpload({ applicationId }: { applicationId?: stri
     deleteMutation.mutate(documentId);
   };
 
-  const handleReviewExtractedData = (documentId: string, merchantApplicationId: string) => {
-    console.log('handleReviewExtractedData called', { documentId, merchantApplicationId });
-    setReviewDocumentId(documentId);
-    setReviewMerchantApplicationId(merchantApplicationId);
-    setReviewModalOpen(true);
-    console.log('Modal state set to open');
-  };
 
   // Group documents by type
   const documentsByType = documents.reduce((acc, doc) => {
@@ -557,7 +532,6 @@ export default function DocumentUpload({ applicationId }: { applicationId?: stri
                     onRemoveStagedFile={handleRemoveStagedFile}
                     onUploadStaged={handleUploadStaged}
                     merchantAppMap={merchantAppMap}
-                    onReviewExtractedData={handleReviewExtractedData}
                   />
                 ))}
             </div>
@@ -586,26 +560,11 @@ export default function DocumentUpload({ applicationId }: { applicationId?: stri
                     onRemoveStagedFile={handleRemoveStagedFile}
                     onUploadStaged={handleUploadStaged}
                     merchantAppMap={merchantAppMap}
-                    onReviewExtractedData={handleReviewExtractedData}
                   />
                 ))}
             </div>
           </div>
         </div>
-
-        {/* Extracted Data Review Modal */}
-        {reviewMerchantApplicationId && (
-          <ExtractedDataReviewModal
-            isOpen={reviewModalOpen}
-            onClose={() => {
-              setReviewModalOpen(false);
-              setReviewDocumentId("");
-              setReviewMerchantApplicationId("");
-            }}
-            merchantApplicationId={reviewMerchantApplicationId}
-            documentId={reviewDocumentId}
-          />
-        )}
 
         {documents.length > 0 && (() => {
           // Calculate required document sections
