@@ -14,6 +14,7 @@ import ResetPassword from "@/pages/reset-password";
 import Home from "@/pages/home";
 import Admin from "@/pages/admin";
 import AdminSettings from "@/pages/admin-settings";
+import AdminCompanyDetail from "@/pages/admin-company-detail";
 import Agent from "@/pages/agent";
 import AgentMerchantDetail from "@/pages/agent-merchant-detail";
 import AgentAnalytics from "@/pages/agent-analytics";
@@ -61,6 +62,7 @@ function Router() {
               <Route path="/admin" component={Admin} />
               <Route path="/admin/documents" component={Admin} />
               <Route path="/admin/settings" component={AdminSettings} />
+              <Route path="/admin/company/:id" component={AdminCompanyDetail} />
             </>
           )}
         {user?.role === 'AGENT' && (

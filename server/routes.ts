@@ -1387,6 +1387,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get single company details for admin
+  app.get('/api/admin/company/:clientId', requireAdmin, async (req: any, res: Response) => {
+    try {
+      const { clientId } = req.params;
+      const userId = req.user.id;
+      const user = await storage.getUser(userId);
+
+      if (!user || user.role !== 'ADMIN') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const client = await storage.getClientById(clientId);
+      if (!client) {
+        return res.status(404).json({ message: "Company not found" });
+      }
+
+      const clientUser = await storage.getUser(client.userId);
+      if (!clientUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Fetch related data
+      const merchantApplications = await storage.getMerchantApplicationsByClientId(clientId);
+      const documents = await storage.getDocumentsByClientId(clientId);
+      const auditLogs = await AuditService.getUserAuditTrail(client.userId, 100);
+
+      res.json({
+        id: client.id,
+        companyName: clientUser.companyName,
+        status: client.status,
+        createdAt: client.createdAt,
+        updatedAt: client.updatedAt,
+        user: {
+          id: clientUser.id,
+          firstName: clientUser.firstName,
+          lastName: clientUser.lastName,
+          email: clientUser.email,
+          role: clientUser.role,
+          mfaEnabled: clientUser.mfaEnabled,
+          mfaEmailEnabled: clientUser.mfaEmailEnabled,
+          createdAt: clientUser.createdAt,
+        },
+        merchantApplications,
+        documents,
+        auditLogs,
+      });
+    } catch (error) {
+      console.error("Error fetching company details:", error);
+      res.status(500).json({ message: "Failed to fetch company details" });
+    }
+  });
+
   // Merchant Application routes
   app.post('/api/merchant-applications', requireAuth, async (req: any, res: Response) => {
     // Agents cannot create merchant applications

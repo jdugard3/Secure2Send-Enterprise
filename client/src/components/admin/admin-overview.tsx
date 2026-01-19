@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,8 @@ import {
   Mail,
   Smartphone,
   ShieldOff,
-  Filter
+  Filter,
+  ChevronRight
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import AddClientForm from "./add-client-form";
@@ -68,6 +70,7 @@ interface CompanyOverview {
 }
 
 export default function AdminOverview() {
+  const [, navigate] = useLocation();
   const [showAddClientForm, setShowAddClientForm] = useState(false);
   const [sortBy, setSortBy] = useState<'recent' | 'oldest' | 'name' | 'status' | 'pending'>('recent');
   const [statusFilter, setStatusFilter] = useState<'all' | 'PENDING' | 'APPROVED' | 'REJECTED' | 'INCOMPLETE'>('all');
@@ -260,181 +263,74 @@ export default function AdminOverview() {
         </div>
       </div>
 
-      <div className="grid gap-6">
+      <div className="grid gap-4">
         {filteredAndSortedCompanies.map((company) => (
-          <Card key={company.id} className="bg-white border border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-md transition-all">
-            <CardHeader className="pb-4">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center space-x-3">
-                  <Avatar className="h-12 w-12">
-                    <AvatarFallback className="bg-[#2563EB]/10 text-[#2563EB]">
-                      <Building2 className="h-6 w-6" />
+          <Card 
+            key={company.id} 
+            className="bg-white border border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all cursor-pointer group"
+            onClick={() => navigate(`/admin/company/${company.id}`)}
+          >
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                {/* Left: Company Info */}
+                <div className="flex items-center gap-4 flex-1">
+                  <Avatar className="h-14 w-14 border-2 border-gray-100">
+                    <AvatarFallback className="bg-blue-50 text-blue-600 text-lg font-semibold">
+                      {company.companyName?.substring(0, 2).toUpperCase() || 
+                       getInitials(company.user.firstName, company.user.lastName)}
                     </AvatarFallback>
                   </Avatar>
-                  <div>
-                    <CardTitle className="text-xl">
+                  
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg font-semibold text-gray-900 truncate group-hover:text-blue-600 transition-colors">
                       {company.companyName || 'No Company Name'}
-                    </CardTitle>
-                    <div className="space-y-1.5">
-                      <div className="flex items-center space-x-2">
-                        <Avatar className="h-6 w-6">
-                          <AvatarFallback className="text-xs">
-                            {getInitials(company.user.firstName, company.user.lastName)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="text-sm text-gray-600">
-                          {company.user.firstName} {company.user.lastName}
-                        </span>
-                        <span className="text-sm text-gray-400">•</span>
-                        <span className="text-sm text-gray-600">{company.user.email}</span>
-                        <span className="text-sm text-gray-400">•</span>
-                        <Badge variant={company.user.role === 'ADMIN' ? 'destructive' : 'secondary'} className="text-xs">
-                          {company.user.role || 'CLIENT'}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center space-x-2 ml-8">
-                        <span className="text-xs text-gray-500 font-medium">MFA:</span>
-                        {company.user.mfaEnabled && (
-                          <Badge variant="outline" className="text-xs gap-1">
-                            <Smartphone className="h-3 w-3" />
-                            Authenticator
-                          </Badge>
-                        )}
-                        {company.user.mfaEmailEnabled && (
-                          <Badge variant="outline" className="text-xs gap-1">
-                            <Mail className="h-3 w-3" />
-                            Email
-                          </Badge>
-                        )}
-                        {!company.user.mfaEnabled && !company.user.mfaEmailEnabled && (
-                          <Badge variant="secondary" className="text-xs gap-1">
-                            <ShieldOff className="h-3 w-3" />
-                            Not Set Up
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex flex-col items-end space-y-2">
-                  <div className="flex items-center gap-2">
-                    {getStatusBadge(company.status)}
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Delete User</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Are you sure you want to delete this user? This action cannot be undone and will permanently remove:
-                          </AlertDialogDescription>
-                          <div className="mt-2 space-y-1">
-                            <div className="font-medium">• User: {company.user.firstName} {company.user.lastName} ({company.user.email})</div>
-                            <div className="font-medium">• Role: {company.user.role || 'CLIENT'}</div>
-                            <div className="font-medium">• Company: {company.companyName || 'No Company Name'}</div>
-                            <div className="font-medium">• All associated documents and data</div>
-                          </div>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => deleteUserMutation.mutate(company.user.id)}
-                            className="bg-red-600 hover:bg-red-700"
-                          >
-                            Delete User
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </div>
-                  <span className="text-xs text-gray-500">
-                    {company.createdAt 
-                      ? `Joined ${formatDistanceToNow(new Date(company.createdAt), { addSuffix: true })}`
-                      : 'Join date unknown'
-                    }
-                  </span>
-                </div>
-              </div>
-            </CardHeader>
-            
-            <CardContent className="pt-0">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Document Summary */}
-                <div>
-                  <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
-                    <FileText className="h-4 w-4 mr-2" />
-                    Document Summary
-                  </h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="text-center p-4 bg-gray-50 rounded-lg border border-gray-200">
-                      <div className="text-2xl font-semibold text-gray-900">{company.documents.total}</div>
-                      <div className="text-xs text-gray-600 font-medium mt-1">Total</div>
-                    </div>
-                    <div className="text-center p-4 bg-[#F59E0B]/5 rounded-lg border border-[#F59E0B]/20">
-                      <div className="text-2xl font-semibold text-[#F59E0B]">{company.documents.pending}</div>
-                      <div className="text-xs text-gray-600 font-medium mt-1">Pending</div>
-                    </div>
-                    <div className="text-center p-4 bg-[#10B981]/5 rounded-lg border border-[#10B981]/20">
-                      <div className="text-2xl font-semibold text-[#10B981]">{company.documents.approved}</div>
-                      <div className="text-xs text-gray-600 font-medium mt-1">Approved</div>
-                    </div>
-                    <div className="text-center p-4 bg-red-50 rounded-lg border border-red-100">
-                      <div className="text-2xl font-semibold text-red-600">{company.documents.rejected}</div>
-                      <div className="text-xs text-gray-600 font-medium mt-1">Rejected</div>
+                    </h3>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-sm text-gray-600 truncate">
+                        {company.user.firstName} {company.user.lastName}
+                      </span>
+                      <span className="text-gray-300">•</span>
+                      <span className="text-sm text-gray-500 truncate">{company.user.email}</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Pending Documents */}
-                <div>
-                  <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
-                    <Clock className="h-4 w-4 mr-2" />
-                    Pending Documents ({company.documents.pending})
-                  </h4>
-                  <div className="space-y-2 max-h-32 overflow-y-auto">
-                    {company.documents.pendingList.length > 0 ? (
-                      company.documents.pendingList.map((doc) => (
-                        <div key={doc.id} className="flex items-center justify-between p-3 bg-[#F59E0B]/5 rounded-lg border border-[#F59E0B]/20 text-sm">
-                          <div className="flex-1 min-w-0">
-                            <div className="font-medium text-gray-900 truncate">
-                              {formatDocumentType(doc.documentType)}
-                            </div>
-                            <div className="text-xs text-gray-500 truncate mt-1">
-                              {doc.filename}
-                            </div>
-                          </div>
-                          <div className="text-xs text-gray-500 ml-2 font-medium">
-                            {formatDistanceToNow(new Date(doc.uploadedAt), { addSuffix: true })}
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-sm text-gray-500 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                        No pending documents
-                      </div>
-                    )}
+                {/* Center: Document Stats */}
+                <div className="hidden md:flex items-center gap-6 px-6">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-gray-900">{company.documents.total}</div>
+                    <div className="text-xs text-gray-500">Total Docs</div>
                   </div>
+                  
+                  {company.documents.pending > 0 && (
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-orange-600">{company.documents.pending}</div>
+                      <div className="text-xs text-gray-500">Pending</div>
+                    </div>
+                  )}
+                  
+                  {company.documents.approved > 0 && (
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-green-600">{company.documents.approved}</div>
+                      <div className="text-xs text-gray-500">Approved</div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right: Status & Action */}
+                <div className="flex items-center gap-4">
+                  {getStatusBadge(company.status)}
+                  
+                  {company.documents.pending > 0 && (
+                    <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 bg-orange-50 rounded-full">
+                      <AlertCircle className="h-4 w-4 text-orange-600" />
+                      <span className="text-sm font-medium text-orange-700">Needs Review</span>
+                    </div>
+                  )}
+                  
+                  <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-blue-600 transition-colors" />
                 </div>
               </div>
-
-              {/* Action needed indicator */}
-              {company.documents.pending > 0 && (
-                <div className="mt-4 p-3 bg-[#F59E0B]/5 border border-[#F59E0B]/20 rounded-lg">
-                  <div className="flex items-center">
-                    <AlertCircle className="h-4 w-4 text-[#F59E0B] mr-2" />
-                    <span className="text-sm font-medium text-gray-700">
-                      Action needed: {company.documents.pending} document{company.documents.pending !== 1 ? 's' : ''} waiting for review
-                    </span>
-                  </div>
-                </div>
-              )}
             </CardContent>
           </Card>
         ))}

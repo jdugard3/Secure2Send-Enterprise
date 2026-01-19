@@ -420,6 +420,12 @@ export class IrisCrmService {
     filePath: string
   ): Promise<void> {
     try {
+      // Check if webhook URL is configured
+      if (!this.ZAPIER_DOCUMENT_WEBHOOK_URL) {
+        console.warn('⚠️ ZAPIER_DOCUMENT_WEBHOOK_URL not configured, skipping document sync to IRIS');
+        return;
+      }
+
       console.log('🔄 Syncing document to IRIS CRM via Zapier:', document.originalName);
 
       // Read file and convert to base64
@@ -427,7 +433,7 @@ export class IrisCrmService {
       const fileBuffer = fs.readFileSync(filePath);
       const fileContent = fileBuffer.toString('base64');
 
-      const payload: ZapierDocumentPayload = {
+      const payload = {
         leadId,
         document: {
           filename: document.filename,
@@ -444,9 +450,12 @@ export class IrisCrmService {
           companyName: user.companyName || '',
         },
         uploadedAt: new Date().toISOString(),
+        // Security: Include authentication token (flattened for Zapier)
+        auth_token: env.ZAPIER_WEBHOOK_SECRET || '',
+        auth_timestamp: new Date().toISOString(),
       };
 
-      const response = await fetch(this.ZAPIER_DOCUMENT_WEBHOOK_URL, {
+      const response = await fetch(this.ZAPIER_DOCUMENT_WEBHOOK_URL!, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -478,10 +487,16 @@ export class IrisCrmService {
     fileBuffer?: Buffer
   ): Promise<void> {
     try {
+      // Check if webhook URL is configured
+      if (!this.ZAPIER_DOCUMENT_WEBHOOK_URL) {
+        console.warn('⚠️ ZAPIER_DOCUMENT_WEBHOOK_URL not configured, skipping document sync to IRIS');
+        return;
+      }
+
       const method = fileUrl ? 'URL' : 'buffer';
       console.log(`🔄 Syncing document to IRIS CRM via Zapier (${method}):`, document.originalName);
 
-      const payload: ZapierDocumentPayload = {
+      const payload = {
         leadId,
         document: {
           filename: document.filename,
@@ -501,6 +516,9 @@ export class IrisCrmService {
           companyName: user.companyName || '',
         },
         uploadedAt: new Date().toISOString(),
+        // Security: Include authentication token (flattened for Zapier)
+        auth_token: env.ZAPIER_WEBHOOK_SECRET || '',
+        auth_timestamp: new Date().toISOString(),
       };
 
       console.log(`📤 Sending ${fileUrl ? 'file URL' : 'base64 content'} to Zapier webhook`);
@@ -508,7 +526,7 @@ export class IrisCrmService {
         console.log(`🔗 File URL: ${fileUrl}`);
       }
 
-      const response = await fetch(this.ZAPIER_DOCUMENT_WEBHOOK_URL, {
+      const response = await fetch(this.ZAPIER_DOCUMENT_WEBHOOK_URL!, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -600,6 +618,12 @@ export class IrisCrmService {
     leadId: string
   ): Promise<void> {
     try {
+      // Check if webhook URL is configured
+      if (!this.ZAPIER_APPLICATION_WEBHOOK_URL) {
+        console.warn('⚠️ ZAPIER_APPLICATION_WEBHOOK_URL not configured, skipping application sync to IRIS');
+        return;
+      }
+
       console.log('🔄 Syncing merchant application to IRIS CRM via Zapier:', application.id);
 
       const payload = {
@@ -737,12 +761,15 @@ export class IrisCrmService {
           email: user.email,
           companyName: user.companyName || '',
         },
+        // Security: Include authentication token (flattened for Zapier)
+        auth_token: env.ZAPIER_WEBHOOK_SECRET || '',
+        auth_timestamp: new Date().toISOString(),
       };
 
       // Debug: Log the payload being sent to Zapier
       console.log('📤 Sending payload to Zapier webhook:', JSON.stringify(payload, null, 2));
 
-      const response = await fetch(this.ZAPIER_APPLICATION_WEBHOOK_URL, {
+      const response = await fetch(this.ZAPIER_APPLICATION_WEBHOOK_URL!, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
