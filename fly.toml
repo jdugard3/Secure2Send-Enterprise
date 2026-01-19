@@ -42,7 +42,7 @@ primary_region = "dfw"
 
 # Deploy configuration
 [deploy]
-  release_command = "npm run db:push"
+  release_command = "npm run migrate"
   strategy = "rolling"
 
 # Metrics
