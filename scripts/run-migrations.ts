@@ -7,13 +7,20 @@ import { readdir, readFile } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { Pool } from 'pg';
-import { env } from '../server/env.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 async function runMigrations() {
-  const pool = new Pool({ connectionString: env.DATABASE_URL });
+  // Get DATABASE_URL from environment (works in both dev and production)
+  const databaseUrl = process.env.DATABASE_URL;
+  
+  if (!databaseUrl) {
+    console.error('❌ DATABASE_URL environment variable is not set');
+    process.exit(1);
+  }
+  
+  const pool = new Pool({ connectionString: databaseUrl });
   const client = await pool.connect();
   
   try {
