@@ -42,9 +42,11 @@ RUN apk add --no-cache \
     giflib \
     pixman
 
-# Install production dependencies only
+# Copy package files
 COPY package*.json ./
-RUN npm ci --only=production && npm cache clean --force
+
+# Copy built node_modules from builder (includes compiled native modules)
+COPY --from=builder /app/node_modules ./node_modules
 
 # Copy built application from builder stage
 COPY --from=builder /app/dist ./dist
