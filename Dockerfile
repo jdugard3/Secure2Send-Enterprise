@@ -14,7 +14,7 @@ RUN apk add --no-cache \
     pango-dev \
     giflib-dev \
     pixman-dev \
-    pkg-config
+    pkgconf
 
 # Copy package files
 COPY package*.json ./
