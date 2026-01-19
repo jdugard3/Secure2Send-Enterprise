@@ -186,8 +186,8 @@ export const documents = pgTable("documents", {
   rejectionReason: text("rejection_reason"),
   clientId: varchar("client_id").notNull().references(() => clients.id),
   merchantApplicationId: varchar("merchant_application_id").references(() => merchantApplications.id),
-  uploadedAt: timestamp("uploaded_at").defaultNow(),
-  reviewedAt: timestamp("reviewed_at"),
+  uploadedAt: timestamp("uploaded_at", { mode: 'string' }).defaultNow().notNull(),
+  reviewedAt: timestamp("reviewed_at", { mode: 'string' }),
   // Cloudflare R2 fields
   r2Key: text("r2_key"),
   r2Url: text("r2_url"),

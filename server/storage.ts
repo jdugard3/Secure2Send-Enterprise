@@ -134,12 +134,29 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByPasswordResetToken(token: string): Promise<User | undefined> {
-    // The token passed is the plain token, but we store hashed tokens
-    // We need to check if the stored hash contains the token
+    // The token passed is the plain token, but we store hashed tokens in format: randomHex.actualToken
+    // We need to find the user whose hashedToken ends with the plain token
     const allUsers = await db.select().from(users).where(sql`${users.passwordResetToken} IS NOT NULL`);
 
     // Find user whose hashed token contains the plain token
-    const user = allUsers.find(u => u.passwordResetToken?.includes(token));
+    // The hashedToken format is: "randomHex.actualToken" so we check if it ends with ".token"
+    const user = allUsers.find(u => {
+      if (!u.passwordResetToken) return false;
+      // Check if the stored token ends with the plain token (after the dot)
+      const parts = u.passwordResetToken.split('.');
+      if (parts.length === 2) {
+        return parts[1] === token;
+      }
+      // Fallback to includes check for backwards compatibility
+      return u.passwordResetToken.includes(token);
+    });
+    
+    if (user) {
+      console.log(`✅ Found user for password reset token: ${user.email}`);
+    } else {
+      console.log(`❌ No user found for password reset token`);
+    }
+    
     return user;
   }
 

@@ -112,22 +112,69 @@ export default function Home() {
           <Header 
             title="Application Overview"
             subtitle="Manage your merchant applications"
-            showApplicationSwitcher={true}
+            showApplicationSwitcher={false}
           />
           
           <main className="flex-1 overflow-auto p-6 lg:p-8 bg-gray-50/50">
-            <div className="max-w-7xl mx-auto">
-              <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
-                <CardContent className="p-12 text-center">
-                  <Building2 className="h-16 w-16 text-blue-600 mx-auto mb-4" />
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            <div className="max-w-4xl mx-auto">
+              {/* Empty State Card */}
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="p-12 text-center">
+                  {/* Icon */}
+                  <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-blue-50 mb-6">
+                    <Building2 className="h-10 w-10 text-blue-600" />
+                  </div>
+                  
+                  {/* Heading */}
+                  <h2 className="text-3xl font-bold text-gray-900 mb-3">
                     Start Your Merchant Application
                   </h2>
-                  <p className="text-gray-600 mb-6 max-w-md mx-auto">
-                    Get started with your merchant application. Use the application switcher above to create a new application.
+                  
+                  {/* Description */}
+                  <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
+                    Begin your journey to accepting payments. Complete your merchant application to get approved and start processing transactions.
                   </p>
-                </CardContent>
-              </Card>
+                  
+                  {/* CTA Button */}
+                  <Button 
+                    size="lg"
+                    onClick={() => navigate('/merchant-applications')}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-6 text-lg h-auto font-semibold shadow-lg hover:shadow-xl transition-all"
+                  >
+                    <FileText className="h-5 w-5 mr-2" />
+                    Start New Application
+                  </Button>
+                </div>
+                
+                {/* Features Section */}
+                <div className="border-t border-gray-200 bg-gray-50 p-8">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl mx-auto">
+                    <div className="text-center">
+                      <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-white border border-gray-200 mb-3">
+                        <FileText className="h-6 w-6 text-blue-600" />
+                      </div>
+                      <h3 className="font-semibold text-gray-900 mb-1">Simple Process</h3>
+                      <p className="text-sm text-gray-600">Complete your application in 4 easy steps</p>
+                    </div>
+                    
+                    <div className="text-center">
+                      <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-white border border-gray-200 mb-3">
+                        <Upload className="h-6 w-6 text-blue-600" />
+                      </div>
+                      <h3 className="font-semibold text-gray-900 mb-1">Secure Upload</h3>
+                      <p className="text-sm text-gray-600">Safely submit required documents</p>
+                    </div>
+                    
+                    <div className="text-center">
+                      <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-white border border-gray-200 mb-3">
+                        <CheckCircle className="h-6 w-6 text-blue-600" />
+                      </div>
+                      <h3 className="font-semibold text-gray-900 mb-1">Quick Approval</h3>
+                      <p className="text-sm text-gray-600">Get approved and start processing</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </main>
         </div>

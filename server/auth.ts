@@ -9,7 +9,7 @@ import { storage } from "./storage";
 import { User } from "@shared/schema";
 import { pool } from "./db";
 import { env } from "./env";
-import { authLimiter } from "./middleware/rateLimiting";
+import { authLimiter, passwordResetLimiter } from "./middleware/rateLimiting";
 import { EmailService } from "./services/emailService";
 import { AuditService } from "./services/auditService";
 import { PasswordSecurity } from "./services/passwordSecurity";
@@ -386,7 +386,7 @@ export async function setupAuth(app: Express) {
   });
 
   // Password reset request endpoint (public - no auth required)
-  app.post("/api/forgot-password", authLimiter, async (req, res) => {
+  app.post("/api/forgot-password", passwordResetLimiter, async (req, res) => {
     try {
       const { email } = req.body;
 
@@ -439,16 +439,20 @@ export async function setupAuth(app: Express) {
   });
 
   // Password reset completion endpoint (public - no auth required)
-  app.post("/api/reset-password", authLimiter, async (req, res) => {
+  app.post("/api/reset-password", passwordResetLimiter, async (req, res) => {
     try {
       const { token, newPassword } = req.body;
 
+      console.log(`🔐 Password reset attempt received with token length: ${token?.length || 0}`);
+
       if (!token || !newPassword) {
+        console.log('❌ Missing token or password in request');
         return res.status(400).json({ message: "Token and new password are required" });
       }
 
       // Validate password strength
       if (newPassword.length < 8) {
+        console.log('❌ Password too short');
         return res.status(400).json({ message: "Password must be at least 8 characters long" });
       }
 
@@ -456,11 +460,15 @@ export async function setupAuth(app: Express) {
       const user = await storage.getUserByPasswordResetToken(token);
 
       if (!user) {
+        console.log('❌ No user found with provided reset token');
         return res.status(400).json({ message: "Invalid or expired password reset token" });
       }
 
+      console.log(`✅ Found user: ${user.email} for password reset`);
+
       // Check if token has expired
       if (!user.passwordResetTokenExpiresAt || new Date() > user.passwordResetTokenExpiresAt) {
+        console.log(`❌ Token expired for user ${user.email}. Expires: ${user.passwordResetTokenExpiresAt}, Now: ${new Date()}`);
         return res.status(400).json({ message: "Password reset token has expired" });
       }
 

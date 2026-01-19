@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
@@ -28,6 +28,7 @@ export default function Login() {
   } | null>(null);
   const [loginError, setLoginError] = useState<string>("");
   const { toast } = useToast();
+  const hasHandledRedirect = useRef(false);
 
   const form = useForm<LoginData>({
     resolver: zodResolver(loginSchema),
@@ -71,6 +72,9 @@ export default function Login() {
     onSuccess: (data) => {
       // Clear any previous login errors on success
       setLoginError("");
+      // Mark that we're handling the redirect from login mutation
+      hasHandledRedirect.current = true;
+      
       if (data.mfaRequired) {
         // MFA challenge required
         setMfaChallenge({
@@ -122,8 +126,12 @@ export default function Login() {
   });
 
   useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      // Check if there's a redirect path stored from session timeout
+    // Only auto-redirect if:
+    // 1. User is already authenticated when page loads (not from login form submission)
+    // 2. We haven't already handled a redirect
+    // 3. There's no active MFA challenge
+    if (!isLoading && isAuthenticated && !hasHandledRedirect.current && !mfaChallenge) {
+      hasHandledRedirect.current = true;
       const redirectPath = sessionStorage.getItem('redirectAfterLogin');
       if (redirectPath) {
         sessionStorage.removeItem('redirectAfterLogin');
@@ -132,7 +140,7 @@ export default function Login() {
         navigate("/");
       }
     }
-  }, [isAuthenticated, isLoading, navigate]);
+  }, [isAuthenticated, isLoading, mfaChallenge, navigate]);
 
   // Show session timeout message if user was redirected here
   useEffect(() => {
@@ -168,6 +176,7 @@ export default function Login() {
   }, [mfaChallenge]);
 
   const handleMfaSuccess = (userData: any) => {
+    hasHandledRedirect.current = true;
     queryClient.setQueryData(["/api/auth/user"], userData);
     toast({
       title: "Login Successful",

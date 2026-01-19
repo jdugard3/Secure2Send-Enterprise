@@ -29,7 +29,9 @@ import {
   ChevronDown,
   UserCheck,
   Menu,
-  CreditCard
+  CreditCard,
+  FileText,
+  Settings
 } from "lucide-react";
 import type { User } from "@shared/schema";
 
@@ -134,11 +136,26 @@ export function MobileSidebar() {
   ];
 
   const adminItems = [
-    { label: "Admin Dashboard", href: "/admin", icon: Users, roles: ["ADMIN"] },
-    { label: "Document Review", href: "/admin/documents", icon: ClipboardCheck, roles: ["ADMIN"] },
+    { label: "Dashboard", href: "/admin#dashboard", icon: BarChart3, roles: ["ADMIN"] },
+    { label: "Users", href: "/admin#users", icon: Users, roles: ["ADMIN"] },
+    { label: "Applications", href: "/admin#applications", icon: FileText, roles: ["ADMIN"] },
+    { label: "Document Review", href: "/admin#documents", icon: ClipboardCheck, roles: ["ADMIN"] },
+    { label: "Settings", href: "/admin#settings", icon: Settings, roles: ["ADMIN"] },
   ];
 
   const isActive = (href: string) => {
+    // Handle hash-based navigation for admin tabs
+    if (href.includes("#")) {
+      const [path, hash] = href.split("#");
+      if (location.startsWith(path)) {
+        const currentHash = window.location.hash.slice(1);
+        // If no hash in URL and this is dashboard, or hash matches
+        if ((!currentHash && hash === "dashboard") || currentHash === hash) {
+          return true;
+        }
+      }
+      return false;
+    }
     if (href === "/") return location === "/";
     return location.startsWith(href);
   };
@@ -210,8 +227,21 @@ export function MobileSidebar() {
                 </p>
                 {filteredAdminItems.map((item) => {
                   const Icon = item.icon;
+                  const handleClick = (e: React.MouseEvent) => {
+                    if (item.href.includes("#")) {
+                      const [path, hash] = item.href.split("#");
+                      if (location.startsWith(path)) {
+                        // Already on admin page, just update hash
+                        e.preventDefault();
+                        window.location.hash = hash;
+                        // Trigger hashchange event for tabs to respond
+                        window.dispatchEvent(new HashChangeEvent('hashchange'));
+                      }
+                    }
+                    setOpen(false);
+                  };
                   return (
-                    <Link key={item.href} href={item.href}>
+                    <Link key={item.href} href={item.href} onClick={handleClick}>
                       <Button
                         variant={isActive(item.href) ? "default" : "ghost"}
                         className={`w-full justify-start ${
@@ -219,7 +249,6 @@ export function MobileSidebar() {
                             ? "bg-blue-50 text-primary border-r-2 border-primary" 
                             : "text-gray-700 hover:bg-gray-100"
                         }`}
-                        onClick={() => setOpen(false)}
                       >
                         <Icon className="mr-3 h-4 w-4" />
                         {item.label}

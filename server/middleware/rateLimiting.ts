@@ -71,6 +71,24 @@ export const adminLimiter = rateLimit({
   },
 });
 
+// Password reset rate limiter (more lenient than auth limiter)
+export const passwordResetLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: env.NODE_ENV === "production" ? 10 : 50, // 10 attempts per hour in production
+  message: {
+    error: "Too many password reset attempts, please try again later.",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true, // Don't count successful resets
+  skip: (req) => {
+    if (env.NODE_ENV === "development" && req.ip === "127.0.0.1") {
+      return true;
+    }
+    return false;
+  },
+});
+
 // OCR processing rate limiter (per user, not per IP)
 export const ocrLimiter = rateLimit({
   windowMs: (typeof env.OCR_RATE_LIMIT_WINDOW_MS === 'number' ? env.OCR_RATE_LIMIT_WINDOW_MS : 15 * 60 * 1000), // 15 minutes default
@@ -100,6 +118,7 @@ export const ocrLimiter = rateLimit({
 export const rateLimitConfig = {
   general: { windowMs: 15, max: env.NODE_ENV === "production" ? 100 : 1000 },
   auth: { windowMs: 15, max: env.NODE_ENV === "production" ? 5 : 50 },
+  passwordReset: { windowMs: 60, max: env.NODE_ENV === "production" ? 10 : 50 },
   upload: { windowMs: 60, max: env.NODE_ENV === "production" ? 20 : 100 },
   admin: { windowMs: 15, max: env.NODE_ENV === "production" ? 200 : 1000 },
   ocr: { 
@@ -112,6 +131,7 @@ console.log("✅ Rate limiting configured:");
 console.log(`   - Environment: ${env.NODE_ENV}`);
 console.log(`   - General API: ${rateLimitConfig.general.max} requests per ${rateLimitConfig.general.windowMs}min`);
 console.log(`   - Authentication: ${rateLimitConfig.auth.max} attempts per ${rateLimitConfig.auth.windowMs}min`);
+console.log(`   - Password Reset: ${rateLimitConfig.passwordReset.max} attempts per ${rateLimitConfig.passwordReset.windowMs}min`);
 console.log(`   - File uploads: ${rateLimitConfig.upload.max} uploads per ${rateLimitConfig.upload.windowMs}min`);
 console.log(`   - Admin operations: ${rateLimitConfig.admin.max} requests per ${rateLimitConfig.admin.windowMs}min`);
 console.log(`   - OCR processing: ${rateLimitConfig.ocr.max} requests per ${rateLimitConfig.ocr.windowMs}min per user`);
