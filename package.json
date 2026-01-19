@@ -19,7 +19,8 @@
     "cleanup:extracted-data": "tsx scripts/cleanup-extracted-data.ts",
     "create:mock-extracted-data": "tsx scripts/create-mock-extracted-data.ts",
     "list:admins": "tsx scripts/list-admin-users.js",
-    "reset:admin:password": "tsx scripts/reset-admin-password.ts"
+    "reset:admin:password": "tsx scripts/reset-admin-password.ts",
+    "verify:migrations": "tsx scripts/verify-production-migrations.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.864.0",
