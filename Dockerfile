@@ -4,8 +4,17 @@ FROM node:18-alpine AS builder
 # Set working directory
 WORKDIR /app
 
-# Install dependencies for building
-RUN apk add --no-cache python3 make g++
+# Install dependencies for building (including canvas native dependencies)
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    cairo-dev \
+    jpeg-dev \
+    pango-dev \
+    giflib-dev \
+    pixman-dev \
+    pkg-config
 
 # Copy package files
 COPY package*.json ./
@@ -24,6 +33,14 @@ FROM node:18-alpine AS production
 
 # Set working directory
 WORKDIR /app
+
+# Install canvas runtime dependencies (required for OCR/image processing)
+RUN apk add --no-cache \
+    cairo \
+    jpeg \
+    pango \
+    giflib \
+    pixman
 
 # Install production dependencies only
 COPY package*.json ./
