@@ -416,6 +416,7 @@ export default function AdminCompanyDetail() {
       {selectedDocument && (
         <DocumentReviewModal
           document={selectedDocument}
+          isOpen={!!selectedDocument}
           onClose={() => setSelectedDocument(null)}
         />
       )}

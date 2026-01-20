@@ -25,6 +25,13 @@ export default function DocumentReviewModal({ document, isOpen, onClose }: Docum
   const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  
+  // Reset state when modal closes
+  const handleClose = () => {
+    setReviewStatus("");
+    setComments("");
+    onClose();
+  };
 
   const reviewMutation = useMutation({
     mutationFn: async (data: { status: string; rejectionReason?: string }) => {
@@ -35,7 +42,7 @@ export default function DocumentReviewModal({ document, isOpen, onClose }: Docum
         title: "Success",
         description: "Document review submitted successfully.",
       });
-      onClose();
+      handleClose();
       queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
     },
@@ -106,7 +113,7 @@ export default function DocumentReviewModal({ document, isOpen, onClose }: Docum
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-5xl max-h-[95vh] overflow-auto">
         <DialogHeader className="pb-4 border-b border-gray-200">
           <DialogTitle className="text-2xl font-bold text-gray-900">Document Review</DialogTitle>
