@@ -131,7 +131,7 @@ export function ApplicationSwitcher({
 
   if (isLoading) {
     return (
-      <Button variant="outline" disabled className="w-full sm:w-[280px] justify-between text-sm">
+      <Button variant="outline" disabled className="w-full sm:w-[170px] justify-between text-sm">
         <Loader2 className="h-4 w-4 animate-spin mr-2" />
         <span className="truncate">Loading...</span>
       </Button>
@@ -143,7 +143,7 @@ export function ApplicationSwitcher({
       <Button
         onClick={handleCreateNew}
         disabled={isCreating}
-        className="w-full sm:w-[280px] justify-between text-sm"
+        className="w-full sm:w-[170px] justify-between text-sm"
       >
         {isCreating ? (
           <>
@@ -172,7 +172,7 @@ export function ApplicationSwitcher({
             role="combobox"
             aria-expanded={open}
             aria-label="Select application"
-            className="w-full sm:w-[280px] justify-between text-sm"
+            className="w-full sm:w-[170px] justify-between text-sm"
           >
             <div className="flex items-center gap-2 flex-1 min-w-0">
               <span className="truncate">{currentDisplayName}</span>
