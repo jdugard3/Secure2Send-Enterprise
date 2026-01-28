@@ -205,6 +205,8 @@ export function ApplicationReviewStep({ form, applicationId, onContinue, isSubmi
         description: "Your application has been saved as a draft.",
       });
       queryClient.invalidateQueries({ queryKey: [`/api/merchant-applications/${applicationId}`] });
+      // Invalidate list so ApplicationSwitcher/tracker bar shows updated data without refresh
+      queryClient.invalidateQueries({ queryKey: ["/api/merchant-applications"] });
     },
     onError: (error: Error) => {
       toast({

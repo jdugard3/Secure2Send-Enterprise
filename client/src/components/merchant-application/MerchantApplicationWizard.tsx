@@ -698,6 +698,8 @@ export default function MerchantApplicationWizard({
 
       await apiRequest("PUT", `/api/merchant-applications/${applicationId}`, updateData);
       queryClient.invalidateQueries({ queryKey: [`/api/merchant-applications/${applicationId}`] });
+      // Invalidate list so ApplicationSwitcher/tracker bar shows updated name without refresh
+      queryClient.invalidateQueries({ queryKey: ["/api/merchant-applications"] });
 
       if (step < 4) {
         setCurrentStep(step + 1);
