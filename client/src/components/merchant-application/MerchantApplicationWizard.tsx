@@ -143,6 +143,13 @@ export default function MerchantApplicationWizard({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Sync applicationId when parent switches application (e.g. "Create New Application") so wizard shows correct app without refresh
+  useEffect(() => {
+    if (initialApplicationId && initialApplicationId !== applicationId) {
+      setApplicationId(initialApplicationId);
+    }
+  }, [initialApplicationId]);
+
   // New 4-step flow steps
   const NEW_FLOW_STEPS = [
     {
@@ -196,6 +203,10 @@ export default function MerchantApplicationWizard({
   // Detect if we should use the new 4-step flow
   // Only set currentStep from existingApplication on initial load, not on every update
   const [hasInitialized, setHasInitialized] = useState(false);
+  // When applicationId changes (e.g. user created/switched app), re-initialize so we load the new app's step
+  useEffect(() => {
+    setHasInitialized(false);
+  }, [applicationId]);
   useEffect(() => {
     if (existingApplication?.currentStep && !hasInitialized) {
 

@@ -147,15 +147,21 @@ export function ApplicationProvider({ children }: { children: ReactNode }) {
       }
 
       const newApp = await response.json();
-      
-      // Refresh applications list
-      await refetch();
-      
-      // Switch to the new application
+
+      // Optimistically add new app to list cache so UI updates immediately (no refresh)
+      queryClient.setQueryData<MerchantApplication[]>(
+        ["/api/merchant-applications", user?.id],
+        (prev = []) => [...prev, newApp]
+      );
+
+      // Switch to the new application (updates currentApplicationId and URL)
       switchApplication(newApp.id);
-      
-      // Navigate to the application wizard
+
+      // Navigate to the application wizard so user lands on Step 1 without refresh
       setLocation(`/merchant-applications?applicationId=${newApp.id}`);
+
+      // Refresh list in background so server state stays in sync
+      refetch();
     } catch (error) {
       console.error("Error creating application:", error);
       throw error;
