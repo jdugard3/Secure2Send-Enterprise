@@ -42,7 +42,8 @@ primary_region = "dfw"
 
 # Deploy configuration
 [deploy]
-  release_command = "npm run migrate"
+  # Run SQL migrations then encrypt existing merchant PII (idempotent; skips already-encrypted rows)
+  release_command = "npm run migrate && npm run migrate:encrypt-pii"
   strategy = "rolling"
 
 # Metrics

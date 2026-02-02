@@ -3,6 +3,11 @@
  * This script executes all migration files in the migrations directory
  */
 
+import { config } from 'dotenv';
+
+// Load .env so DATABASE_URL is available when run via npm run migrate
+config();
+
 import { readdir, readFile } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';

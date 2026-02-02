@@ -117,63 +117,27 @@ export default function Home() {
           
           <main className="flex-1 overflow-auto p-6 lg:p-8 bg-gray-50/50">
             <div className="max-w-4xl mx-auto">
-              {/* Empty State Card */}
-              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                <div className="p-12 text-center">
-                  {/* Icon */}
-                  <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-blue-50 mb-6">
-                    <Building2 className="h-10 w-10 text-blue-600" />
-                  </div>
-                  
-                  {/* Heading */}
-                  <h2 className="text-3xl font-bold text-gray-900 mb-3">
-                    Start Your Merchant Application
-                  </h2>
-                  
-                  {/* Description */}
-                  <p className="text-lg text-gray-600 mb-8 max-w-2xl mx-auto">
-                    Begin your journey to accepting payments. Complete your merchant application to get approved and start processing transactions.
-                  </p>
-                  
-                  {/* CTA Button */}
-                  <Button 
-                    size="lg"
-                    onClick={() => navigate('/merchant-applications')}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-6 text-lg h-auto font-semibold shadow-lg hover:shadow-xl transition-all"
-                  >
-                    <FileText className="h-5 w-5 mr-2" />
-                    Start New Application
-                  </Button>
+              {/* Empty State */}
+              <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded bg-gray-100 mb-4">
+                  <Building2 className="h-6 w-6 text-gray-600" />
                 </div>
                 
-                {/* Features Section */}
-                <div className="border-t border-gray-200 bg-gray-50 p-8">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-3xl mx-auto">
-                    <div className="text-center">
-                      <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-white border border-gray-200 mb-3">
-                        <FileText className="h-6 w-6 text-blue-600" />
-                      </div>
-                      <h3 className="font-semibold text-gray-900 mb-1">Simple Process</h3>
-                      <p className="text-sm text-gray-600">Complete your application in 4 easy steps</p>
-                    </div>
-                    
-                    <div className="text-center">
-                      <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-white border border-gray-200 mb-3">
-                        <Upload className="h-6 w-6 text-blue-600" />
-                      </div>
-                      <h3 className="font-semibold text-gray-900 mb-1">Secure Upload</h3>
-                      <p className="text-sm text-gray-600">Safely submit required documents</p>
-                    </div>
-                    
-                    <div className="text-center">
-                      <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-white border border-gray-200 mb-3">
-                        <CheckCircle className="h-6 w-6 text-blue-600" />
-                      </div>
-                      <h3 className="font-semibold text-gray-900 mb-1">Quick Approval</h3>
-                      <p className="text-sm text-gray-600">Get approved and start processing</p>
-                    </div>
-                  </div>
-                </div>
+                <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                  Start Your Merchant Application
+                </h2>
+                
+                <p className="text-sm text-gray-600 mb-6 max-w-md mx-auto">
+                  Complete your merchant application to get approved and start processing transactions.
+                </p>
+                
+                <Button 
+                  onClick={() => navigate('/merchant-applications')}
+                  className="bg-[#2563EB] hover:bg-[#1D4ED8]"
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Start New Application
+                </Button>
               </div>
             </div>
           </main>
@@ -208,133 +172,104 @@ export default function Home() {
         />
         
         <main className="flex-1 overflow-auto p-6 lg:p-8 bg-gray-50/50">
-          <div className="max-w-7xl mx-auto space-y-6">
+          <div className="max-w-7xl mx-auto space-y-4">
             {/* Progress Overview */}
-            <Card className="bg-gradient-to-r from-slate-900 to-slate-800 text-white border-0">
-              <CardContent className="p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h2 className="text-2xl font-bold mb-1">{applicationName}</h2>
-                    <p className="text-slate-300">
-                      Step {currentStep} of 4: {stepLabels[currentStep - 1]}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-4xl font-bold text-white">
-                      {Math.round(progressPercentage)}%
-                    </div>
-                    <p className="text-slate-400 text-sm">Complete</p>
-                  </div>
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 mb-1">{applicationName}</h2>
+                  <p className="text-sm text-gray-600">
+                    Step {currentStep} of 4: {stepLabels[currentStep - 1]}
+                  </p>
                 </div>
-                
-                <Progress value={progressPercentage} className="h-2 mb-4" />
-                
-                <div className="flex items-center gap-2 mt-4">
-                  {[1, 2, 3, 4].map((step) => {
-                    const isCompleted = step < currentStep;
-                    const isCurrent = step === currentStep;
-                    
-                    return (
-                      <div key={step} className="flex items-center flex-1">
-                        <div
-                          className={`w-full h-2 rounded-full ${
-                            isCompleted 
-                              ? 'bg-green-400' 
-                              : isCurrent 
-                              ? 'bg-blue-400' 
-                              : 'bg-slate-600'
-                          }`}
-                        />
-                      </div>
-                    );
-                  })}
+                <div className="text-right">
+                  <div className="text-2xl font-semibold text-gray-900">
+                    {Math.round(progressPercentage)}%
+                  </div>
+                  <p className="text-xs text-gray-500">Complete</p>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+              
+              <Progress value={progressPercentage} className="h-2" />
+            </div>
 
             {/* Current Step CTA */}
-            <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-white shadow-lg">
-              <CardContent className="p-8">
-                <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-                  <div className="w-16 h-16 rounded-2xl bg-blue-100 flex items-center justify-center flex-shrink-0">
-                    {currentStep === 1 && <FileText className="h-8 w-8 text-blue-600" />}
-                    {currentStep === 2 && <Upload className="h-8 w-8 text-blue-600" />}
-                    {currentStep === 3 && <ClipboardList className="h-8 w-8 text-blue-600" />}
-                    {currentStep === 4 && <Send className="h-8 w-8 text-blue-600" />}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                        STEP {currentStep}
-                      </span>
-                      <span className="text-xs text-gray-500">Current Task</span>
-                    </div>
-                    <h3 className="text-xl font-bold text-gray-900 mb-2">
-                      {stepLabels[currentStep - 1]}
-                    </h3>
-                    <p className="text-gray-600">
-                      {currentStep === 1 && "Enter your basic business information to get started."}
-                      {currentStep === 2 && "Upload all required documents for verification."}
-                      {currentStep === 3 && "Review and edit all application details."}
-                      {currentStep === 4 && "Submit your application for review."}
-                    </p>
-                  </div>
-                  <Button 
-                    size="lg" 
-                    onClick={handleContinueApplication}
-                    className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg px-8"
-                  >
-                    {currentStep === 1 && "Start Application"}
-                    {currentStep === 2 && "Upload Documents"}
-                    {currentStep === 3 && "Review Application"}
-                    {currentStep === 4 && "Submit Application"}
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+                <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center flex-shrink-0">
+                  {currentStep === 1 && <FileText className="h-5 w-5 text-gray-600" />}
+                  {currentStep === 2 && <Upload className="h-5 w-5 text-gray-600" />}
+                  {currentStep === 3 && <ClipboardList className="h-5 w-5 text-gray-600" />}
+                  {currentStep === 4 && <Send className="h-5 w-5 text-gray-600" />}
                 </div>
-              </CardContent>
-            </Card>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs font-medium px-2 py-0.5 rounded bg-gray-100 text-gray-700">
+                      STEP {currentStep}
+                    </span>
+                  </div>
+                  <h3 className="text-base font-semibold text-gray-900 mb-1">
+                    {stepLabels[currentStep - 1]}
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    {currentStep === 1 && "Enter your basic business information to get started."}
+                    {currentStep === 2 && "Upload all required documents for verification."}
+                    {currentStep === 3 && "Review and edit all application details."}
+                    {currentStep === 4 && "Submit your application for review."}
+                  </p>
+                </div>
+                <Button 
+                  onClick={handleContinueApplication}
+                  className="bg-[#2563EB] hover:bg-[#1D4ED8]"
+                >
+                  {currentStep === 1 && "Start Application"}
+                  {currentStep === 2 && "Upload Documents"}
+                  {currentStep === 3 && "Review Application"}
+                  {currentStep === 4 && "Submit Application"}
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            </div>
 
             {/* Step Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               {[1, 2, 3, 4].map((step) => {
                 const isCompleted = step < currentStep;
                 const isCurrent = step === currentStep;
                 const isLocked = step > currentStep;
                 
                 return (
-                  <Card 
+                  <div
                     key={step}
-                    className={`cursor-pointer transition-all ${
-                      isCompleted 
-                        ? 'bg-green-50 border-green-200 hover:shadow-md' 
-                        : isCurrent 
-                        ? 'ring-2 ring-blue-400 shadow-md' 
-                        : 'bg-gray-50 opacity-60'
+                    className={`bg-white border rounded-lg p-3 cursor-pointer ${
+                      isCurrent 
+                        ? 'border-[#2563EB]' 
+                        : isCompleted
+                        ? 'border-green-200'
+                        : 'border-gray-200 opacity-60'
                     }`}
                     onClick={() => !isLocked && handleContinueApplication()}
                   >
-                    <CardContent className="p-4">
-                      <div className="flex items-center gap-3 mb-2">
-                        {isCompleted ? (
-                          <CheckCircle className="h-5 w-5 text-green-600" />
-                        ) : isCurrent ? (
-                          <Circle className="h-5 w-5 text-blue-600 fill-blue-600" />
-                        ) : (
-                          <Circle className="h-5 w-5 text-gray-300" />
-                        )}
-                        <span className={`text-xs font-medium ${
-                          isCompleted ? 'text-green-700' : isCurrent ? 'text-blue-700' : 'text-gray-400'
-                        }`}>
-                          Step {step}
-                        </span>
-                      </div>
-                      <h4 className={`font-medium text-sm ${
-                        isLocked ? 'text-gray-400' : 'text-gray-900'
+                    <div className="flex items-center gap-2 mb-1">
+                      {isCompleted ? (
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                      ) : isCurrent ? (
+                        <Circle className="h-4 w-4 text-[#2563EB] fill-[#2563EB]" />
+                      ) : (
+                        <Circle className="h-4 w-4 text-gray-300" />
+                      )}
+                      <span className={`text-xs font-medium ${
+                        isCompleted ? 'text-green-700' : isCurrent ? 'text-[#2563EB]' : 'text-gray-400'
                       }`}>
-                        {stepLabels[step - 1]}
-                      </h4>
-                    </CardContent>
-                  </Card>
+                        Step {step}
+                      </span>
+                    </div>
+                    <h4 className={`text-sm font-medium ${
+                      isLocked ? 'text-gray-400' : 'text-gray-900'
+                    }`}>
+                      {stepLabels[step - 1]}
+                    </h4>
+                  </div>
                 );
               })}
             </div>

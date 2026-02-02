@@ -107,15 +107,11 @@ export default function DocumentsPage() {
           />
           
           <main className="flex-1 overflow-auto p-6">
-            <Card>
-              <CardContent className="p-12 text-center">
-                <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Select an Application</h3>
-                <p className="text-gray-600">
-                  Use the application switcher above to select an application and manage its documents.
-                </p>
-              </CardContent>
-            </Card>
+            <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
+              <p className="text-sm text-gray-600">
+                Use the application switcher above to select an application and manage its documents.
+              </p>
+            </div>
           </main>
         </div>
       </div>
@@ -141,131 +137,86 @@ export default function DocumentsPage() {
         />
         
         <main className="flex-1 overflow-auto p-6">
-          <div className="space-y-6">
+          <div className="space-y-4">
             {/* Document Statistics */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Total Documents</p>
-                      <p className="text-2xl font-bold text-gray-900">{documents.length}</p>
-                    </div>
-                    <FileText className="h-8 w-8 text-gray-400" />
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Pending Review</p>
-                      <p className="text-2xl font-bold text-yellow-600">{documentsByStatus.pending.length}</p>
-                    </div>
-                    <Clock className="h-8 w-8 text-yellow-400" />
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Approved</p>
-                      <p className="text-2xl font-bold text-green-600">{documentsByStatus.approved.length}</p>
-                    </div>
-                    <CheckCircle className="h-8 w-8 text-green-400" />
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Needs Attention</p>
-                      <p className="text-2xl font-bold text-red-600">
-                        {documentsByStatus.rejected.length + documentsByStatus.needsRevision.length}
-                      </p>
-                    </div>
-                    <AlertCircle className="h-8 w-8 text-red-400" />
-                  </div>
-                </CardContent>
-              </Card>
+            <div className="grid grid-cols-4 gap-3">
+              <div className="bg-white border border-gray-200 rounded-lg p-3">
+                <p className="text-xs text-gray-600 mb-1">Total</p>
+                <p className="text-xl font-semibold text-gray-900">{documents.length}</p>
+              </div>
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                <p className="text-xs text-gray-600 mb-1">Pending</p>
+                <p className="text-xl font-semibold text-yellow-600">{documentsByStatus.pending.length}</p>
+              </div>
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                <p className="text-xs text-gray-600 mb-1">Approved</p>
+                <p className="text-xl font-semibold text-green-600">{documentsByStatus.approved.length}</p>
+              </div>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <p className="text-xs text-gray-600 mb-1">Needs Attention</p>
+                <p className="text-xl font-semibold text-red-600">
+                  {documentsByStatus.rejected.length + documentsByStatus.needsRevision.length}
+                </p>
+              </div>
             </div>
 
             {/* Upload Section */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Upload className="h-5 w-5 text-blue-500" />
-                  <CardTitle>Upload Documents</CardTitle>
-                </div>
-                <p className="text-sm text-gray-600">
-                  Upload required documents for your merchant application. Supported formats: PDF, JPG, PNG
-                </p>
-              </CardHeader>
-              <CardContent>
-                <DocumentUpload applicationId={currentApplication.id} />
-              </CardContent>
-            </Card>
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <h3 className="text-sm font-semibold text-gray-900 mb-2">Upload Documents</h3>
+              <p className="text-xs text-gray-500 mb-3">
+                Upload required documents. Supported formats: PDF, JPG, PNG
+              </p>
+              <DocumentUpload applicationId={currentApplication.id} />
+            </div>
 
             {/* Documents Tabs */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-blue-500" />
-                    <CardTitle>Your Documents</CardTitle>
-                  </div>
-                  <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                    {documents.length} Total
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <Tabs defaultValue="all" className="w-full">
-                  <TabsList className="grid w-full grid-cols-5">
-                    <TabsTrigger value="all">
-                      All ({documents.length})
-                    </TabsTrigger>
-                    <TabsTrigger value="pending">
-                      Pending ({documentsByStatus.pending.length})
-                    </TabsTrigger>
-                    <TabsTrigger value="approved">
-                      Approved ({documentsByStatus.approved.length})
-                    </TabsTrigger>
-                    <TabsTrigger value="needs-revision">
-                      Needs Revision ({documentsByStatus.needsRevision.length})
-                    </TabsTrigger>
-                    <TabsTrigger value="rejected">
-                      Rejected ({documentsByStatus.rejected.length})
-                    </TabsTrigger>
-                  </TabsList>
-                  
-                  <TabsContent value="all">
-                    <DocumentList documents={documents} />
-                  </TabsContent>
-                  
-                  <TabsContent value="pending">
-                    <DocumentList documents={documentsByStatus.pending} />
-                  </TabsContent>
-                  
-                  <TabsContent value="approved">
-                    <DocumentList documents={documentsByStatus.approved} />
-                  </TabsContent>
-                  
-                  <TabsContent value="needs-revision">
-                    <DocumentList documents={documentsByStatus.needsRevision} />
-                  </TabsContent>
-                  
-                  <TabsContent value="rejected">
-                    <DocumentList documents={documentsByStatus.rejected} />
-                  </TabsContent>
-                </Tabs>
-              </CardContent>
-            </Card>
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-gray-900">Your Documents</h3>
+                <Badge className="bg-gray-100 text-gray-800">
+                  {documents.length} Total
+                </Badge>
+              </div>
+              <Tabs defaultValue="all" className="w-full">
+                <TabsList className="grid w-full grid-cols-5">
+                  <TabsTrigger value="all">
+                    All ({documents.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="pending">
+                    Pending ({documentsByStatus.pending.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="approved">
+                    Approved ({documentsByStatus.approved.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="needs-revision">
+                    Needs Revision ({documentsByStatus.needsRevision.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="rejected">
+                    Rejected ({documentsByStatus.rejected.length})
+                  </TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="all" className="mt-4">
+                  <DocumentList documents={documents} />
+                </TabsContent>
+                
+                <TabsContent value="pending" className="mt-4">
+                  <DocumentList documents={documentsByStatus.pending} />
+                </TabsContent>
+                
+                <TabsContent value="approved" className="mt-4">
+                  <DocumentList documents={documentsByStatus.approved} />
+                </TabsContent>
+                
+                <TabsContent value="needs-revision" className="mt-4">
+                  <DocumentList documents={documentsByStatus.needsRevision} />
+                </TabsContent>
+                
+                <TabsContent value="rejected" className="mt-4">
+                  <DocumentList documents={documentsByStatus.rejected} />
+                </TabsContent>
+              </Tabs>
+            </div>
           </div>
         </main>
       </div>

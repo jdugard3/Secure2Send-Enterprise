@@ -12,13 +12,17 @@ import { FileText, Download, Eye, RotateCcw, Trash2, Building2 } from "lucide-re
 import { formatDistanceToNow } from "date-fns";
 import type { Document } from "@shared/schema";
 
-export default function DocumentList() {
+interface DocumentListProps {
+  documents?: Document[];
+}
+
+export default function DocumentList({ documents: propDocuments }: DocumentListProps = {}) {
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
-  const { data: documents = [], isLoading } = useQuery<Document[]>({
+  const { data: fetchedDocuments = [], isLoading } = useQuery<Document[]>({
     queryKey: ["/api/documents", user?.id],
     queryFn: async () => {
       const response = await fetch("/api/documents", {
@@ -29,8 +33,10 @@ export default function DocumentList() {
       }
       return response.json();
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id && !propDocuments,
   });
+
+  const documents = propDocuments || fetchedDocuments;
 
   // Fetch merchant applications to display names
   const { data: merchantApplications = [] } = useQuery<any[]>({
@@ -99,29 +105,13 @@ export default function DocumentList() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'APPROVED':
-        return (
-          <Badge className="bg-green-100 text-green-800 border-green-200">
-            Approved
-          </Badge>
-        );
+        return <Badge className="bg-green-100 text-green-800">Approved</Badge>;
       case 'PENDING':
-        return (
-          <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">
-            Pending
-          </Badge>
-        );
+        return <Badge className="bg-yellow-100 text-yellow-800">Pending</Badge>;
       case 'REJECTED':
-        return (
-          <Badge className="bg-red-100 text-red-800 border-red-200">
-            Rejected
-          </Badge>
-        );
+        return <Badge className="bg-red-100 text-red-800">Rejected</Badge>;
       default:
-        return (
-          <Badge variant="secondary">
-            {status}
-          </Badge>
-        );
+        return <Badge className="bg-gray-100 text-gray-800">{status}</Badge>;
     }
   };
 
@@ -131,126 +121,102 @@ export default function DocumentList() {
 
   if (isLoading) {
     return (
-      <Card>
-        <CardContent className="p-6">
-          <div className="animate-pulse space-y-4">
-            <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-            <div className="space-y-3">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="h-16 bg-gray-200 rounded"></div>
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="border border-gray-200 rounded-lg p-4">
+        <div className="animate-pulse space-y-3">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-12 bg-gray-200 rounded"></div>
+          ))}
+        </div>
+      </div>
     );
   }
 
   return (
     <>
-      <Card className="bg-white border border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-md transition-all">
-        <div className="p-6 border-b border-gray-200/50">
-          <h3 className="text-lg font-semibold text-gray-900">Your Documents</h3>
+      {documents.length === 0 ? (
+        <div className="text-center py-8 text-sm text-gray-500">
+          <p>No documents uploaded</p>
         </div>
-        
-        {documents.length === 0 ? (
-          <CardContent className="p-8 text-center">
-            <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-              <FileText className="h-6 w-6 text-gray-400" />
-            </div>
-            <h4 className="text-base font-semibold text-gray-900 mb-2">No documents uploaded</h4>
-            <p className="text-sm text-gray-500">Upload your first compliance document to get started.</p>
-          </CardContent>
-        ) : (
-          <div className="divide-y divide-gray-200/50">
-            {documents.map((document) => (
-              <div key={document.id} className="p-6 hover:bg-gray-50/50 transition-colors">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-10 h-10 bg-[#2563EB]/10 rounded-lg flex items-center justify-center">
-                      <FileText className="h-5 w-5 text-[#2563EB]" />
-                    </div>
-                    <div>
-                      <h4 className="font-medium text-gray-900">{document.originalName || 'Unknown'}</h4>
-                      <p className="text-sm text-gray-500">
-                        {getDocumentTypeName(document.documentType)}
-                      </p>
-                      {document.merchantApplicationId ? (
-                        <div className="flex items-center gap-1 mt-1">
-                          <Building2 className="h-3 w-3 text-gray-400" />
-                          <span className="text-xs text-gray-500">
-                            {merchantAppMap[document.merchantApplicationId] || 'Unknown Application'}
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1 mt-1">
-                          <span className="text-xs text-orange-600 font-medium">
-                            Not linked to application
-                          </span>
-                        </div>
-                      )}
-                    </div>
+      ) : (
+        <div className="border border-gray-200 rounded-lg divide-y divide-gray-200">
+          {documents.map((document) => (
+            <div key={document.id} className="p-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className={`w-8 h-8 rounded flex items-center justify-center flex-shrink-0 ${
+                    document.status === 'APPROVED' ? 'bg-green-100' :
+                    document.status === 'PENDING' ? 'bg-yellow-100' :
+                    document.status === 'REJECTED' ? 'bg-red-100' :
+                    'bg-blue-100'
+                  }`}>
+                    <FileText className={`h-4 w-4 ${
+                      document.status === 'APPROVED' ? 'text-green-600' :
+                      document.status === 'PENDING' ? 'text-yellow-600' :
+                      document.status === 'REJECTED' ? 'text-red-600' :
+                      'text-blue-600'
+                    }`} />
                   </div>
-                  <div className="flex items-center space-x-4">
-                    {getStatusBadge(document.status || 'PENDING')}
-                    <span className="text-sm text-gray-500">
-                      {document.uploadedAt ? formatDistanceToNow(new Date(document.uploadedAt), { addSuffix: true }) : 'Unknown'}
-                    </span>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setSelectedDocument(document)}
-                        className="text-gray-400 hover:text-gray-600"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDownload(document)}
-                        className="text-gray-400 hover:text-gray-600"
-                      >
-                        <Download className="h-4 w-4" />
-                      </Button>
-                      {document.status === 'REJECTED' && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {/* Handle re-upload */}}
-                          className="text-blue-500 hover:text-blue-700"
-                        >
-                          <RotateCcw className="h-4 w-4" />
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => deleteMutation.mutate(document.id)}
-                        disabled={deleteMutation.isPending}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{document.originalName || 'Unknown'}</p>
+                    <p className="text-xs text-gray-500">
+                      {getDocumentTypeName(document.documentType)}
+                    </p>
+                    {document.merchantApplicationId && (
+                      <p className="text-xs text-gray-400 mt-0.5">
+                        {merchantAppMap[document.merchantApplicationId] || 'Unknown Application'}
+                      </p>
+                    )}
                   </div>
                 </div>
-                
-                {/* Rejection Reason */}
-                {document.status === 'REJECTED' && document.rejectionReason && (
-                  <div className="mt-3 ml-14">
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                      <p className="text-sm text-red-800">
-                        <strong>Rejection Reason:</strong> {document.rejectionReason}
-                      </p>
-                    </div>
+                <div className="flex items-center gap-3 ml-4">
+                  {getStatusBadge(document.status || 'PENDING')}
+                  <span className="text-xs text-gray-500">
+                    {document.uploadedAt ? formatDistanceToNow(new Date(document.uploadedAt), { addSuffix: true }) : 'Unknown'}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedDocument(document)}
+                      className="h-7 w-7 p-0"
+                    >
+                      <Eye className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDownload(document)}
+                      className="h-7 w-7 p-0"
+                    >
+                      <Download className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => deleteMutation.mutate(document.id)}
+                      disabled={deleteMutation.isPending}
+                      className="h-7 w-7 p-0 text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
                   </div>
-                )}
+                </div>
               </div>
-            ))}
-          </div>
-        )}
-      </Card>
+              
+              {/* Rejection Reason */}
+              {document.status === 'REJECTED' && document.rejectionReason && (
+                <div className="mt-2 ml-11">
+                  <div className="bg-red-50 border border-red-200 rounded p-2">
+                    <p className="text-xs text-red-800">
+                      <strong>Rejection Reason:</strong> {document.rejectionReason}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       {selectedDocument && (
         <DocumentReviewModal

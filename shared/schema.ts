@@ -68,6 +68,11 @@ export const auditLogEnum = pgEnum('audit_action', [
   'MERCHANT_APPLICATION_SUBMIT',
   'MERCHANT_APPLICATION_REVIEW',
   'MERCHANT_APPLICATION_DELETE',
+  'MERCHANT_APP_ENCRYPTED',
+  'MERCHANT_APP_DECRYPTED',
+  'MERCHANT_APP_PII_ACCESSED',
+  'ENCRYPTION_KEY_ROTATED',
+  'DECRYPTION_FAILURE',
   'MFA_ENABLED',
   'MFA_DISABLED',
   'MFA_BACKUP_CODE_USED',
@@ -347,6 +352,11 @@ export const merchantApplications = pgTable("merchant_applications", {
   eSignatureSentAt: timestamp("e_signature_sent_at"),
   eSignatureCompletedAt: timestamp("e_signature_completed_at"),
   signedDocumentId: integer("signed_document_id"), // Reference to signed document
+  
+  // Encryption tracking for PII fields
+  encryptedFields: jsonb("encrypted_fields").default({}), // AES-256-GCM encrypted sensitive fields
+  hasEncryptedData: boolean("has_encrypted_data").default(false), // Flag indicating encryption status
+  encryptedAt: timestamp("encrypted_at"), // When the data was encrypted
 });
 
 // Sensitive data table for encrypted PII

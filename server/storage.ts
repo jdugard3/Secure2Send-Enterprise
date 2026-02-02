@@ -31,6 +31,7 @@ import {
 import { db } from "./db";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { LogSanitizer, safeLog } from "./utils/logSanitizer";
+import { PIIProtectionService } from "./services/piiProtectionService";
 
 export interface IStorage {
   // User operations
@@ -515,30 +516,97 @@ export class DatabaseStorage implements IStorage {
       sanitizedData.clientId = application.clientId;
     }
     
+    // Encrypt sensitive PII fields if encryption is available
+    let dataToInsert: any = sanitizedData;
+    if (PIIProtectionService.isEncryptionAvailable()) {
+      try {
+        const { encryptedFields, publicData } = PIIProtectionService.encryptMerchantApplication(sanitizedData);
+        
+        // Only apply encryption if there are fields to encrypt
+        if (Object.keys(encryptedFields).length > 0) {
+          dataToInsert = {
+            ...publicData,
+            encryptedFields: encryptedFields,
+            hasEncryptedData: true,
+            encryptedAt: new Date(),
+          };
+          
+          safeLog.log("createMerchantApplication - Encrypted fields:", Object.keys(encryptedFields));
+        }
+      } catch (error) {
+        // Log error but don't fail - fall back to unencrypted storage
+        console.error("createMerchantApplication - Encryption error (falling back to plaintext):", error);
+      }
+    } else {
+      console.warn("createMerchantApplication - FIELD_ENCRYPTION_KEY not set, storing data without encryption");
+    }
+    
     const [merchantApplication] = await db
       .insert(merchantApplications)
-      .values(sanitizedData as any) // Type assertion needed due to Partial type from sanitization
+      .values(dataToInsert as any) // Type assertion needed due to Partial type from sanitization
       .returning();
     return merchantApplication;
   }
 
-  async getMerchantApplicationsByClientId(clientId: string): Promise<MerchantApplication[]> {
-    return db
+  async getMerchantApplicationsByClientId(clientId: string, decryptData: boolean = true): Promise<MerchantApplication[]> {
+    const applications = await db
       .select()
       .from(merchantApplications)
       .where(eq(merchantApplications.clientId, clientId))
       .orderBy(desc(merchantApplications.createdAt));
+    
+    // Decrypt sensitive fields if requested
+    if (decryptData) {
+      return applications.map(app => {
+        if (app.hasEncryptedData && app.encryptedFields) {
+          try {
+            const decrypted = PIIProtectionService.decryptMerchantApplication({
+              ...app,
+              encrypted_fields: app.encryptedFields as Record<string, string>,
+            });
+            return { ...app, ...decrypted } as MerchantApplication;
+          } catch (error) {
+            console.error(`getMerchantApplicationsByClientId - Decryption error for app ${app.id}:`, error);
+            // Return with masked values on decryption failure
+            return app;
+          }
+        }
+        return app;
+      });
+    }
+    
+    return applications;
   }
 
-  async getMerchantApplicationById(id: string): Promise<MerchantApplication | undefined> {
+  async getMerchantApplicationById(id: string, decryptData: boolean = true): Promise<MerchantApplication | undefined> {
     const [application] = await db
       .select()
       .from(merchantApplications)
       .where(eq(merchantApplications.id, id));
+    
+    if (!application) {
+      return undefined;
+    }
+    
+    // Decrypt sensitive fields if requested and data is encrypted
+    if (decryptData && application.hasEncryptedData && application.encryptedFields) {
+      try {
+        const decrypted = PIIProtectionService.decryptMerchantApplication({
+          ...application,
+          encrypted_fields: application.encryptedFields as Record<string, string>,
+        });
+        return { ...application, ...decrypted } as MerchantApplication;
+      } catch (error) {
+        console.error("getMerchantApplicationById - Decryption error:", error);
+        // Return the application with masked values if decryption fails
+        // This is a safety fallback
+      }
+    }
+    
     return application;
   }
 
-  async getAllMerchantApplicationsForReview(): Promise<MerchantApplicationWithClient[]> {
+  async getAllMerchantApplicationsForReview(decryptData: boolean = false): Promise<MerchantApplicationWithClient[]> {
     const rows = await db
       .select()
       .from(merchantApplications)
@@ -548,13 +616,31 @@ export class DatabaseStorage implements IStorage {
 
     return rows
       .filter((row) => row.clients && row.users)
-      .map((row) => ({
-        ...row.merchant_applications,
-        client: {
-          ...row.clients!,
-          user: row.users!,
-        },
-      }));
+      .map((row) => {
+        let appData = row.merchant_applications;
+        
+        // Decrypt sensitive fields if requested and data is encrypted
+        if (decryptData && appData.hasEncryptedData && appData.encryptedFields) {
+          try {
+            const decrypted = PIIProtectionService.decryptMerchantApplication({
+              ...appData,
+              encrypted_fields: appData.encryptedFields as Record<string, string>,
+            });
+            appData = { ...appData, ...decrypted } as typeof appData;
+          } catch (error) {
+            console.error(`getAllMerchantApplicationsForReview - Decryption error for app ${appData.id}:`, error);
+            // Keep masked values on decryption failure
+          }
+        }
+        
+        return {
+          ...appData,
+          client: {
+            ...row.clients!,
+            user: row.users!,
+          },
+        };
+      });
   }
 
   async updateMerchantApplication(id: string, application: Partial<InsertMerchantApplication>): Promise<MerchantApplication> {
@@ -566,9 +652,45 @@ export class DatabaseStorage implements IStorage {
       const sanitizedData = this.sanitizeApplicationData(application);
       safeLog.log("updateMerchantApplication - sanitized data:", sanitizedData);
       
+      // Encrypt sensitive PII fields if encryption is available
+      let dataToUpdate: any = sanitizedData;
+      if (PIIProtectionService.isEncryptionAvailable()) {
+        try {
+          // Get existing encrypted fields to merge with new ones
+          const existing = await this.getMerchantApplicationById(id, false); // Get without decryption
+          const existingEncryptedFields = (existing?.encryptedFields as Record<string, string>) || {};
+          
+          const { encryptedFields, publicData } = PIIProtectionService.encryptMerchantApplication(sanitizedData);
+          
+          // Merge new encrypted fields with existing ones
+          // New fields override existing ones for the same key
+          const mergedEncryptedFields = {
+            ...existingEncryptedFields,
+            ...encryptedFields,
+          };
+          
+          // Only mark as encrypted if there are encrypted fields
+          if (Object.keys(mergedEncryptedFields).length > 0) {
+            dataToUpdate = {
+              ...publicData,
+              encryptedFields: mergedEncryptedFields,
+              hasEncryptedData: true,
+              encryptedAt: new Date(),
+            };
+            
+            safeLog.log("updateMerchantApplication - Encrypted fields:", Object.keys(encryptedFields));
+          }
+        } catch (error) {
+          // Log error but don't fail - fall back to unencrypted storage
+          console.error("updateMerchantApplication - Encryption error (falling back to plaintext):", error);
+        }
+      } else {
+        console.warn("updateMerchantApplication - FIELD_ENCRYPTION_KEY not set, storing data without encryption");
+      }
+      
       // Always set these timestamps manually (don't let them come from frontend)
       const updateData = {
-        ...sanitizedData,
+        ...dataToUpdate,
         updatedAt: new Date(),
         lastSavedAt: new Date(),
       };

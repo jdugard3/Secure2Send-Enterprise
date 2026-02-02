@@ -1,3 +1,24 @@
+/**
+ * IRIS CRM Integration Service
+ * 
+ * SECURITY NOTE: This service transmits sensitive PII data to IRIS CRM including:
+ * - Federal Tax ID (EIN)
+ * - Owner SSN
+ * - Banking information (ABA routing number, account number)
+ * - Driver's license numbers
+ * - SSN/DOB for principal officers and beneficial owners
+ * 
+ * This is intentional and required for legitimate business processing in IRIS CRM.
+ * The data sent to IRIS CRM is:
+ * 1. Transmitted over HTTPS (encrypted in transit)
+ * 2. Authenticated via API keys and webhook secrets
+ * 3. Subject to IRIS CRM's own security controls
+ * 
+ * For audit purposes, all IRIS CRM syncs are logged in the audit_logs table.
+ * If you need to send masked data instead, modify syncMerchantApplicationToIris()
+ * and updateLeadWithMerchantApplication() to use PIIProtectionService.maskSensitiveValue().
+ */
+
 import { env } from '../env';
 import type { User, Document, Client } from '@shared/schema';
 

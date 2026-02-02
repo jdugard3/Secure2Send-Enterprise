@@ -2,18 +2,21 @@
  * PII Protection Service
  * 
  * Handles encryption and masking of sensitive personally identifiable information (PII)
- * extracted from documents via OCR. Uses AES-256-GCM encryption with a dedicated key
- * separate from document encryption.
+ * for both OCR-extracted data AND merchant application form submissions.
+ * Uses AES-256-GCM encryption with a dedicated key separate from document encryption.
  * 
  * Features:
  * - Field-level encryption for sensitive data (SSN, Tax ID, Account Numbers, etc.)
  * - Data masking for UI display (public view)
- * - Separate encryption key for OCR-extracted PII
+ * - Separate encryption key for PII (FIELD_ENCRYPTION_KEY)
  * - Field-type-aware masking (different formats for different field types)
+ * - Merchant application encryption/decryption
+ * - Support for JSONB arrays (principalOfficers, beneficialOwners)
  */
 
 import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'crypto';
 import { env } from '../env';
+import type { MerchantApplication } from '@shared/schema';
 
 const ALGORITHM = 'aes-256-gcm';
 const KEY_LENGTH = 32; // 256 bits
@@ -412,6 +415,294 @@ export class PIIProtectionService {
     }
     
     return decrypted;
+  }
+
+  // =====================================================
+  // MERCHANT APPLICATION ENCRYPTION METHODS
+  // =====================================================
+
+  /**
+   * List of sensitive fields in merchant applications that need encryption
+   */
+  static readonly MERCHANT_APP_SENSITIVE_FIELDS = {
+    // Critical - SSN/Tax ID/Banking
+    federalTaxIdNumber: 'tax_id',
+    ownerSsn: 'ssn',
+    abaRoutingNumber: 'routing_number',
+    ddaNumber: 'account_number',
+    
+    // High - ID numbers
+    ownerStateIssuedIdNumber: 'license_number',
+    
+    // JSONB arrays with nested sensitive data
+    // These are handled specially
+  } as const;
+
+  /**
+   * Encrypt a merchant application's sensitive fields
+   * Returns the encrypted fields and the public (masked) version of the application
+   */
+  static encryptMerchantApplication(application: Partial<MerchantApplication>): {
+    encryptedFields: Record<string, string>;
+    publicData: Partial<MerchantApplication>;
+  } {
+    const encryptedFields: Record<string, string> = {};
+    const publicData: Partial<MerchantApplication> = { ...application };
+
+    // Encrypt simple sensitive fields
+    for (const [fieldName, fieldType] of Object.entries(this.MERCHANT_APP_SENSITIVE_FIELDS)) {
+      const value = (application as any)[fieldName];
+      if (value && typeof value === 'string' && value.trim() !== '') {
+        try {
+          // Encrypt the value
+          encryptedFields[fieldName] = this.encryptField(value);
+          // Replace with masked value in public data
+          (publicData as any)[fieldName] = this.maskSensitiveValue(value, fieldType as SensitiveFieldType);
+        } catch (error) {
+          console.error(`Failed to encrypt field ${fieldName}:`, error);
+          // Keep original value if encryption fails (will be logged)
+        }
+      }
+    }
+
+    // Handle principalOfficers JSONB array
+    if (application.principalOfficers && Array.isArray(application.principalOfficers)) {
+      const maskedOfficers: any[] = [];
+      
+      (application.principalOfficers as any[]).forEach((officer, index) => {
+        const maskedOfficer = { ...officer };
+        
+        // Encrypt SSN
+        if (officer.ssn && typeof officer.ssn === 'string' && officer.ssn.trim() !== '') {
+          const fieldKey = `principalOfficers.${index}.ssn`;
+          try {
+            encryptedFields[fieldKey] = this.encryptField(officer.ssn);
+            maskedOfficer.ssn = this.maskSensitiveValue(officer.ssn, 'ssn');
+          } catch (error) {
+            console.error(`Failed to encrypt principalOfficer ${index} SSN:`, error);
+          }
+        }
+        
+        // Encrypt DOB if present
+        if (officer.dob && typeof officer.dob === 'string' && officer.dob.trim() !== '') {
+          const fieldKey = `principalOfficers.${index}.dob`;
+          try {
+            encryptedFields[fieldKey] = this.encryptField(officer.dob);
+            maskedOfficer.dob = this.maskSensitiveValue(officer.dob, 'dob');
+          } catch (error) {
+            console.error(`Failed to encrypt principalOfficer ${index} DOB:`, error);
+          }
+        }
+
+        // Encrypt driver's license number if present
+        if (officer.driversLicenseNumber && typeof officer.driversLicenseNumber === 'string' && officer.driversLicenseNumber.trim() !== '') {
+          const fieldKey = `principalOfficers.${index}.driversLicenseNumber`;
+          try {
+            encryptedFields[fieldKey] = this.encryptField(officer.driversLicenseNumber);
+            maskedOfficer.driversLicenseNumber = this.maskSensitiveValue(officer.driversLicenseNumber, 'license_number');
+          } catch (error) {
+            console.error(`Failed to encrypt principalOfficer ${index} driversLicenseNumber:`, error);
+          }
+        }
+        
+        maskedOfficers.push(maskedOfficer);
+      });
+      
+      publicData.principalOfficers = maskedOfficers;
+    }
+
+    // Handle beneficialOwners JSONB array
+    if (application.beneficialOwners && Array.isArray(application.beneficialOwners)) {
+      const maskedOwners: any[] = [];
+      
+      (application.beneficialOwners as any[]).forEach((owner, index) => {
+        const maskedOwner = { ...owner };
+        
+        // Encrypt SSN
+        if (owner.ssn && typeof owner.ssn === 'string' && owner.ssn.trim() !== '') {
+          const fieldKey = `beneficialOwners.${index}.ssn`;
+          try {
+            encryptedFields[fieldKey] = this.encryptField(owner.ssn);
+            maskedOwner.ssn = this.maskSensitiveValue(owner.ssn, 'ssn');
+          } catch (error) {
+            console.error(`Failed to encrypt beneficialOwner ${index} SSN:`, error);
+          }
+        }
+        
+        // Encrypt DOB
+        if (owner.dob && typeof owner.dob === 'string' && owner.dob.trim() !== '') {
+          const fieldKey = `beneficialOwners.${index}.dob`;
+          try {
+            encryptedFields[fieldKey] = this.encryptField(owner.dob);
+            maskedOwner.dob = this.maskSensitiveValue(owner.dob, 'dob');
+          } catch (error) {
+            console.error(`Failed to encrypt beneficialOwner ${index} DOB:`, error);
+          }
+        }
+
+        // Encrypt driver's license number if present
+        if (owner.driversLicenseNumber && typeof owner.driversLicenseNumber === 'string' && owner.driversLicenseNumber.trim() !== '') {
+          const fieldKey = `beneficialOwners.${index}.driversLicenseNumber`;
+          try {
+            encryptedFields[fieldKey] = this.encryptField(owner.driversLicenseNumber);
+            maskedOwner.driversLicenseNumber = this.maskSensitiveValue(owner.driversLicenseNumber, 'license_number');
+          } catch (error) {
+            console.error(`Failed to encrypt beneficialOwner ${index} driversLicenseNumber:`, error);
+          }
+        }
+        
+        maskedOwners.push(maskedOwner);
+      });
+      
+      publicData.beneficialOwners = maskedOwners;
+    }
+
+    return { encryptedFields, publicData };
+  }
+
+  /**
+   * Decrypt a merchant application's encrypted fields
+   * Merges decrypted values back into the application data
+   */
+  static decryptMerchantApplication(
+    application: Partial<MerchantApplication> & { encrypted_fields?: Record<string, string> | null }
+  ): Partial<MerchantApplication> {
+    // If no encrypted fields, return as-is
+    if (!application.encrypted_fields || Object.keys(application.encrypted_fields).length === 0) {
+      return application;
+    }
+
+    const decrypted: Partial<MerchantApplication> = { ...application };
+    const encryptedFields = application.encrypted_fields;
+
+    // Decrypt simple sensitive fields
+    for (const fieldName of Object.keys(this.MERCHANT_APP_SENSITIVE_FIELDS)) {
+      if (fieldName in encryptedFields) {
+        try {
+          (decrypted as any)[fieldName] = this.decryptField(encryptedFields[fieldName]);
+        } catch (error) {
+          console.error(`Failed to decrypt field ${fieldName}:`, error);
+          // Keep masked value if decryption fails
+        }
+      }
+    }
+
+    // Decrypt principalOfficers array fields
+    if (decrypted.principalOfficers && Array.isArray(decrypted.principalOfficers)) {
+      decrypted.principalOfficers = (decrypted.principalOfficers as any[]).map((officer, index) => {
+        const decryptedOfficer = { ...officer };
+        
+        const ssnKey = `principalOfficers.${index}.ssn`;
+        if (ssnKey in encryptedFields) {
+          try {
+            decryptedOfficer.ssn = this.decryptField(encryptedFields[ssnKey]);
+          } catch (error) {
+            console.error(`Failed to decrypt principalOfficer ${index} SSN:`, error);
+          }
+        }
+        
+        const dobKey = `principalOfficers.${index}.dob`;
+        if (dobKey in encryptedFields) {
+          try {
+            decryptedOfficer.dob = this.decryptField(encryptedFields[dobKey]);
+          } catch (error) {
+            console.error(`Failed to decrypt principalOfficer ${index} DOB:`, error);
+          }
+        }
+
+        const dlKey = `principalOfficers.${index}.driversLicenseNumber`;
+        if (dlKey in encryptedFields) {
+          try {
+            decryptedOfficer.driversLicenseNumber = this.decryptField(encryptedFields[dlKey]);
+          } catch (error) {
+            console.error(`Failed to decrypt principalOfficer ${index} driversLicenseNumber:`, error);
+          }
+        }
+        
+        return decryptedOfficer;
+      });
+    }
+
+    // Decrypt beneficialOwners array fields
+    if (decrypted.beneficialOwners && Array.isArray(decrypted.beneficialOwners)) {
+      decrypted.beneficialOwners = (decrypted.beneficialOwners as any[]).map((owner, index) => {
+        const decryptedOwner = { ...owner };
+        
+        const ssnKey = `beneficialOwners.${index}.ssn`;
+        if (ssnKey in encryptedFields) {
+          try {
+            decryptedOwner.ssn = this.decryptField(encryptedFields[ssnKey]);
+          } catch (error) {
+            console.error(`Failed to decrypt beneficialOwner ${index} SSN:`, error);
+          }
+        }
+        
+        const dobKey = `beneficialOwners.${index}.dob`;
+        if (dobKey in encryptedFields) {
+          try {
+            decryptedOwner.dob = this.decryptField(encryptedFields[dobKey]);
+          } catch (error) {
+            console.error(`Failed to decrypt beneficialOwner ${index} DOB:`, error);
+          }
+        }
+
+        const dlKey = `beneficialOwners.${index}.driversLicenseNumber`;
+        if (dlKey in encryptedFields) {
+          try {
+            decryptedOwner.driversLicenseNumber = this.decryptField(encryptedFields[dlKey]);
+          } catch (error) {
+            console.error(`Failed to decrypt beneficialOwner ${index} driversLicenseNumber:`, error);
+          }
+        }
+        
+        return decryptedOwner;
+      });
+    }
+
+    // Remove the encrypted_fields from the response (it's internal)
+    delete (decrypted as any).encrypted_fields;
+
+    return decrypted;
+  }
+
+  /**
+   * Check if encryption is available (key is set)
+   */
+  static isEncryptionAvailable(): boolean {
+    try {
+      getEncryptionKey();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Get a list of which fields were encrypted in a merchant application
+   * Useful for audit logging
+   */
+  static getEncryptedFieldNames(encryptedFields: Record<string, string>): string[] {
+    return Object.keys(encryptedFields);
+  }
+
+  /**
+   * Validate that encryption/decryption works correctly for a test value
+   * Returns true if round-trip succeeds
+   */
+  static validateEncryption(): { success: boolean; error?: string } {
+    try {
+      const testValue = 'test-encryption-123';
+      const encrypted = this.encryptField(testValue);
+      const decrypted = this.decryptField(encrypted);
+      
+      if (decrypted !== testValue) {
+        return { success: false, error: 'Round-trip encryption mismatch' };
+      }
+      
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
   }
 }
 

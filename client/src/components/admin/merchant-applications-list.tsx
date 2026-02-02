@@ -48,6 +48,90 @@ import { apiRequest } from "@/lib/queryClient";
 import { formatDistanceToNow } from "date-fns";
 import { PricingTermsModal, type PricingTermsData } from "./PricingTermsModal";
 
+/**
+ * PII Masking Utilities for Frontend Display
+ * These ensure consistent masking even for legacy unencrypted records
+ */
+const maskPII = {
+  /**
+   * Mask SSN to show last 4 digits: ***-**-1234
+   */
+  ssn: (value: string | null | undefined): string => {
+    if (!value) return 'Not provided';
+    // If already masked, return as-is
+    if (value.startsWith('***')) return value;
+    // Clean and mask
+    const cleaned = value.replace(/\D/g, '');
+    if (cleaned.length === 9) {
+      return `***-**-${cleaned.slice(-4)}`;
+    }
+    // If already formatted with dashes
+    if (value.match(/^\d{3}-\d{2}-\d{4}$/)) {
+      return `***-**-${value.slice(-4)}`;
+    }
+    return `***-**-${cleaned.slice(-4) || '****'}`;
+  },
+
+  /**
+   * Mask Tax ID (EIN) to show last 4 digits: **-****1234
+   */
+  taxId: (value: string | null | undefined): string => {
+    if (!value) return 'Not provided';
+    // If already masked, return as-is
+    if (value.startsWith('**-')) return value;
+    // Clean and mask
+    const cleaned = value.replace(/\D/g, '');
+    if (cleaned.length === 9) {
+      return `**-****${cleaned.slice(-4)}`;
+    }
+    return `**-****${cleaned.slice(-4) || '****'}`;
+  },
+
+  /**
+   * Mask routing number to show last 4 digits: *****1234
+   */
+  routingNumber: (value: string | null | undefined): string => {
+    if (!value) return 'Not provided';
+    // If already masked, return as-is
+    if (value.startsWith('*****')) return value;
+    // Clean and mask
+    const cleaned = value.replace(/\D/g, '');
+    return `*****${cleaned.slice(-4) || '****'}`;
+  },
+
+  /**
+   * Mask account number to show last 4 digits: ****1234
+   */
+  accountNumber: (value: string | null | undefined): string => {
+    if (!value) return 'Not provided';
+    // If already masked, return as-is
+    if (value.startsWith('****')) return value;
+    // Clean and mask
+    const cleaned = value.replace(/\D/g, '');
+    return `****${cleaned.slice(-4) || '****'}`;
+  },
+
+  /**
+   * Mask DOB completely (full date hidden).
+   */
+  dob: (value: string | null | undefined): string => {
+    if (!value) return 'Not provided';
+    // If already masked, return as-is
+    if (value.startsWith('**')) return value;
+    return '**/**/****';
+  },
+
+  /**
+   * Mask driver's license to show last 4 chars: ****1234
+   */
+  licenseNumber: (value: string | null | undefined): string => {
+    if (!value) return 'Not provided';
+    // If already masked, return as-is
+    if (value.startsWith('****')) return value;
+    return `****${value.slice(-4) || '****'}`;
+  },
+};
+
 interface MerchantApplication {
   id: string;
   status: 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'APPROVED' | 'REJECTED';
@@ -115,7 +199,7 @@ function ApplicationDetailsView({ application }: { application: any }) {
           <DetailField label="Legal Business Name" value={application.legalBusinessName} />
           <DetailField label="DBA Business Name" value={application.dbaBusinessName} />
           <DetailField label="Business Phone" value={application.businessPhone} />
-          <DetailField label="Federal Tax ID" value={application.federalTaxIdNumber} />
+          <DetailField label="Federal Tax ID" value={maskPII.taxId(application.federalTaxIdNumber)} />
           <DetailField label="Location Address" value={application.locationAddress} />
           <DetailField label="Billing Address" value={application.billingAddress} />
           <DetailField label="City" value={application.city} />
@@ -148,8 +232,9 @@ function ApplicationDetailsView({ application }: { application: any }) {
                 <DetailField label="Title" value={officer.title} />
                 <DetailField label="Email" value={officer.email} />
                 <DetailField label="Phone" value={officer.phoneNumber} />
-                <DetailField label="Date of Birth" value={officer.dob} />
-                <DetailField label="SSN" value={officer.ssn ? '***-**-' + officer.ssn.slice(-4) : 'Not provided'} />
+                <DetailField label="Date of Birth" value={maskPII.dob(officer.dob)} />
+                <DetailField label="SSN" value={maskPII.ssn(officer.ssn)} />
+                <DetailField label="Driver's License" value={maskPII.licenseNumber(officer.driversLicenseNumber)} />
                 <DetailField label="Ownership %" value={officer.equityPercentage ? `${officer.equityPercentage}%` : ''} />
                 <DetailField label="Residential Address" value={officer.residentialAddress} />
                 <DetailField label="City" value={officer.city} />
@@ -172,8 +257,15 @@ function ApplicationDetailsView({ application }: { application: any }) {
                 <DetailField label="Title" value={owner.title} />
                 <DetailField label="Email" value={owner.email} />
                 <DetailField label="Phone" value={owner.phoneNumber} />
+                <DetailField label="Date of Birth" value={maskPII.dob(owner.dob)} />
+                <DetailField label="SSN" value={maskPII.ssn(owner.ssn)} />
+                <DetailField label="Driver's License" value={maskPII.licenseNumber(owner.driversLicenseNumber)} />
                 <DetailField label="Ownership %" value={owner.ownershipPercentage ? `${owner.ownershipPercentage}%` : ''} />
                 <DetailField label="Control Person" value={owner.controlPerson ? 'Yes' : 'No'} />
+                <DetailField label="Address" value={owner.address} />
+                <DetailField label="City" value={owner.city} />
+                <DetailField label="State" value={owner.state} />
+                <DetailField label="ZIP" value={owner.zip} />
               </div>
             </div>
           ))}
@@ -184,9 +276,9 @@ function ApplicationDetailsView({ application }: { application: any }) {
       <DetailSection title="Banking Information">
         <div className="grid grid-cols-2 gap-4">
           <DetailField label="Bank Name" value={application.bankName} />
-          <DetailField label="ABA Routing Number" value={application.abaRoutingNumber} />
+          <DetailField label="ABA Routing Number" value={maskPII.routingNumber(application.abaRoutingNumber)} />
           <DetailField label="Account Name" value={application.nameOnBankAccount || application.accountName} />
-          <DetailField label="DDA Number" value={application.ddaNumber} />
+          <DetailField label="DDA Number (Account #)" value={maskPII.accountNumber(application.ddaNumber)} />
           <DetailField label="Bank Officer Name" value={application.bankOfficerName} />
           <DetailField label="Bank Officer Phone" value={application.bankOfficerPhone} />
           <DetailField label="Bank Officer Email" value={application.bankOfficerEmail} />

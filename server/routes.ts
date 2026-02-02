@@ -1549,12 +1549,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = req.user;
       
-      // If user is admin, show all applications for review
+      // If user is admin, show all applications for review (masked by default in list view)
       if (user.role === 'ADMIN') {
-        const applications = await storage.getAllMerchantApplicationsForReview();
+        // Admins see masked data in list view, request decrypt=true to see full data
+        const shouldDecrypt = req.query.decrypt === 'true';
+        const applications = await storage.getAllMerchantApplicationsForReview(shouldDecrypt);
+        
+        // Audit log if admin requested decrypted PII data for bulk view
+        if (shouldDecrypt) {
+          await AuditService.logAction(user, 'MERCHANT_APP_PII_ACCESSED', req, {
+            resourceType: 'merchant_application',
+            metadata: { 
+              action: 'bulk_view_decrypted_pii',
+              applicationCount: applications.length,
+            }
+          });
+        }
+        
         res.json(applications);
       } else {
-        // Show specific client's applications
+        // Show specific client's applications - clients always see their own data decrypted
         let client = await storage.getClientByUserId(user.id);
         if (!client) {
           console.log('Client profile not found for user, creating one:', user.id);
@@ -1566,7 +1580,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log('Created client record:', client.id);
         }
         
-        const applications = await storage.getMerchantApplicationsByClientId(client.id);
+        // Clients always get decrypted data (it's their own data)
+        const applications = await storage.getMerchantApplicationsByClientId(client.id, true);
         res.json(applications);
       }
     } catch (error) {
@@ -1580,7 +1595,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const user = req.user;
       
-      const application = await storage.getMerchantApplicationById(id);
+      // Determine if we should decrypt based on user role and query param
+      // - Clients always get their own data decrypted
+      // - Admins can request decrypted data with ?decrypt=true
+      // - Agents see masked data only
+      const shouldDecrypt = user.role === 'CLIENT' || 
+        (user.role === 'ADMIN' && req.query.decrypt === 'true');
+      
+      const application = await storage.getMerchantApplicationById(id, shouldDecrypt);
       if (!application) {
         return res.status(404).json({ message: "Merchant application not found" });
       }
@@ -1591,6 +1613,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!client || application.clientId !== client.id) {
           return res.status(403).json({ message: "Access denied" });
         }
+      }
+
+      // Audit log if admin requested decrypted PII data
+      if (user.role === 'ADMIN' && shouldDecrypt && application.hasEncryptedData) {
+        await AuditService.logAction(user, 'MERCHANT_APP_PII_ACCESSED', req, {
+          resourceType: 'merchant_application',
+          resourceId: id,
+          metadata: { 
+            action: 'view_decrypted_pii',
+            applicationId: id,
+            hasEncryptedData: application.hasEncryptedData,
+          }
+        });
       }
 
       res.json(application);
