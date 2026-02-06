@@ -2,29 +2,35 @@
 
 ## Overview
 
-This integration automatically syncs Secure2Send Enterprise client data with IRIS CRM, a specialized CRM for the payments industry. The integration consists of two main components:
+This integration automatically syncs Secure2Send Enterprise client data with IRIS CRM, a specialized CRM for the payments industry. All sync is done **directly via the IRIS CRM API** (no Zapier in the path). The integration consists of:
 
-1. **Lead Creation**: When new clients register, leads are automatically created in IRIS CRM
-2. **Document Sync**: When clients upload documents, they are synced to IRIS CRM via Zapier webhook
+1. **Lead Creation**: When new clients register or create a merchant application, leads are created in IRIS CRM.
+2. **Document Sync**: When clients upload documents, they are uploaded directly to IRIS CRM via `POST /leads/{leadId}/documents`.
+3. **Merchant Application Sync**: The entire merchant application is written to the correct IRIS lead fields via `PATCH /leads/{leadId}` (field ID mapping in `updateLeadWithMerchantApplication`).
 
 ## Features
 
-### ✅ Automatic Lead Creation
-- Creates IRIS CRM leads for new client registrations (both self-registration and admin-created)
-- Maps client data: firstName, lastName, email, companyName
-- Stores IRIS lead ID in Secure2Send database for future reference
-- Asynchronous processing - doesn't block user registration
+### Automatic Lead Creation
+- Creates IRIS CRM leads for new merchant applications (and backfills when missing).
+- Maps client data: firstName, lastName, email, companyName.
+- Stores IRIS lead ID on the merchant application for future reference.
+- Asynchronous processing - doesn't block the user.
 
-### ✅ Document Synchronization
-- Syncs uploaded documents to IRIS CRM via Zapier webhook
-- Includes document metadata and base64-encoded file content
-- Links documents to the correct IRIS lead
-- Asynchronous processing - doesn't block document uploads
+### Document Synchronization (Direct API)
+- Uploads documents directly to IRIS CRM using `IrisCrmService.uploadDocumentToIris`.
+- Accepts either a file URL (e.g. R2 signed URL) or a buffer; sends file as binary body with query params `tab`, `label`, `filename` to `POST /leads/{leadId}/documents`.
+- Links documents to the correct IRIS lead.
+- Asynchronous processing - doesn't block uploads.
 
-### ✅ Error Handling
-- Graceful error handling - IRIS CRM failures don't break normal workflow
-- Comprehensive logging for troubleshooting
-- Continues with Secure2Send operations even if IRIS integration fails
+### Merchant Application to IRIS Fields (Direct API)
+- The full merchant application is mapped to IRIS lead custom fields via `updateLeadWithMerchantApplication`.
+- Uses IRIS field IDs for DBA, corporate, banking, owner, financial representative, beneficial owners, authorized contacts, etc.
+- Pipeline stage is updated on application lifecycle (draft, submitted, approved, rejected) via `updateLeadStatus`.
+
+### Error Handling
+- Graceful error handling - IRIS CRM failures don't break normal workflow.
+- Comprehensive logging for troubleshooting.
+- Continues with Secure2Send operations even if IRIS integration fails.
 
 ## Setup Instructions
 
@@ -33,41 +39,23 @@ This integration automatically syncs Secure2Send Enterprise client data with IRI
 Add these variables to your `.env` file:
 
 ```bash
-# IRIS CRM Integration
+# IRIS CRM Integration (required for lead, document, and application sync)
 IRIS_CRM_API_KEY=your-iris-crm-api-key
 IRIS_CRM_SUBDOMAIN=your-company-subdomain
 ```
 
-**Important**: The `IRIS_CRM_SUBDOMAIN` should be your company's subdomain in IRIS CRM. For example, if your IRIS CRM URL is `https://secure2send.iriscrm.com/`, then your subdomain is `secure2send`.
+**Important**: The `IRIS_CRM_SUBDOMAIN` should be your company's subdomain in IRIS CRM. For example, if your IRIS CRM URL is `https://iris.corduro.com/`, use `corduro`; if `https://secure2send.iriscrm.com/`, use `secure2send`.
 
-### 2. Database Migration
-
-Run the database migration to add the IRIS lead ID field:
+**Document upload (tab/label IDs):** The IRIS API requires **integer** Tab Id and Label Id as query parameters ([API doc](https://www.iriscrm.com/api/#/paths/~1leads~1{leadId}~1documents/post)). Defaults are `1` and `2`. If upload returns "The selected label is invalid" or "The selected tab is invalid", set the correct IDs from your IRIS instance (admin document settings or API):
 
 ```bash
-npm run db:push
+IRIS_DOCUMENT_TAB_ID=1
+IRIS_DOCUMENT_LABEL_ID=2
 ```
 
-Or manually run the SQL migration:
+### 2. Database
 
-```sql
--- Migration: Add IRIS CRM integration support
-ALTER TABLE clients ADD COLUMN iris_lead_id VARCHAR;
-CREATE INDEX IF NOT EXISTS idx_clients_iris_lead_id ON clients(iris_lead_id);
-COMMENT ON COLUMN clients.iris_lead_id IS 'IRIS CRM lead ID for integration tracking';
-```
-
-### 3. Zapier Webhook Setup
-
-The document sync uses this Zapier webhook:
-```
-https://hooks.zapier.com/hooks/catch/15790762/umqr4bb/
-```
-
-Configure your Zapier automation to:
-1. Receive the webhook payload
-2. Extract document data and lead ID
-3. Upload to IRIS CRM using their documents API
+Merchant applications and clients store `iris_lead_id` where applicable. No Zapier webhook URLs are needed for IRIS document or application sync.
 
 ## API Integration Details
 
@@ -77,15 +65,16 @@ Configure your Zapier automation to:
 sequenceDiagram
     participant User
     participant Secure2Send
-    participant IRIS CRM
+    participant IRIS_CRM
     participant Database
 
-    User->>Secure2Send: Register/Create Account
-    Secure2Send->>Database: Create User & Client
-    Secure2Send->>IRIS CRM: POST /leads (async)
-    IRIS CRM-->>Secure2Send: Return leadId
-    Secure2Send->>Database: Update client.iris_lead_id
-    Secure2Send->>User: Registration Complete
+    User->>Secure2Send: Create merchant application
+    Secure2Send->>Database: Create application
+    Secure2Send->>IRIS_CRM: POST /leads (async)
+    IRIS_CRM-->>Secure2Send: leadId
+    Secure2Send->>Database: Update application.iris_lead_id
+    Secure2Send->>IRIS_CRM: PATCH /leads/{leadId} (application fields)
+    Secure2Send->>User: Success
 ```
 
 ### Document Sync Flow
@@ -94,28 +83,36 @@ sequenceDiagram
 sequenceDiagram
     participant User
     participant Secure2Send
-    participant Zapier
-    participant IRIS CRM
+    participant IRIS_CRM
 
-    User->>Secure2Send: Upload Document
-    Secure2Send->>Secure2Send: Store Document Locally
-    Secure2Send->>Zapier: POST webhook (async)
-    Note over Zapier: Document + Metadata + leadId
-    Zapier->>IRIS CRM: POST /leads/{leadId}/documents
-    Secure2Send->>User: Upload Complete
+    User->>Secure2Send: Upload document
+    Secure2Send->>Secure2Send: Store in R2 / buffer
+    Secure2Send->>IRIS_CRM: POST /leads/{leadId}/documents (multipart)
+    IRIS_CRM-->>Secure2Send: 200
+    Secure2Send->>User: Upload complete
 ```
+
+### Application Update Flow
+
+On create, update, or status change of a merchant application:
+
+- Lead is created in IRIS if missing.
+- Pipeline stage is updated via `PATCH /leads/{leadId}` (status/group).
+- Full application data is sent to IRIS lead fields via `updateLeadWithMerchantApplication` (same PATCH, `fields` array with IRIS field IDs).
 
 ## Code Structure
 
-### Core Files Added/Modified
+### Core Files
 
-1. **`server/services/irisCrmService.ts`** - Main integration service
-2. **`shared/schema.ts`** - Added `irisLeadId` field to clients table
-3. **`server/storage.ts`** - Added method to update lead ID
-4. **`server/auth.ts`** - Integrated lead creation in registration
-5. **`server/routes.ts`** - Integrated lead creation and document sync
-6. **`server/env.ts`** - Added IRIS CRM environment variables
-7. **`migrations/003_add_iris_integration.sql`** - Database migration
+1. **`server/services/irisCrmService.ts`** - Main integration service:
+   - `createLead(user)` - create lead in IRIS
+   - `updateLeadStatus(leadId, stage)` - move lead in pipeline
+   - `uploadDocumentToIris(leadId, document, { fileUrl?, fileBuffer? })` - upload document to IRIS (direct API)
+   - `updateLeadWithMerchantApplication(leadId, application)` - map entire application to IRIS lead fields
+   - `uploadDocument(leadId, pdfBuffer, filename)` - used for filled PDF on approval
+2. **`server/routes.ts`** - Document upload and merchant application create/update/status endpoints call the above.
+3. **`shared/schema.ts`** - `irisLeadId` on merchant_applications (and clients where used).
+4. **`server/env.ts`** - `IRIS_CRM_API_KEY`, `IRIS_CRM_SUBDOMAIN`.
 
 ### Key Service Methods
 
@@ -123,40 +120,18 @@ sequenceDiagram
 // Create lead in IRIS CRM
 IrisCrmService.createLead(user: User): Promise<string | null>
 
-// Sync document via Zapier webhook
-IrisCrmService.syncDocumentToIris(
-  user: User, 
-  document: Document, 
+// Upload document directly to IRIS (no Zapier)
+IrisCrmService.uploadDocumentToIris(
   leadId: string,
-  filePath: string
+  document: Document,
+  options: { fileUrl?: string; fileBuffer?: Buffer }
 ): Promise<void>
 
-// Update lead information (for future use)
-IrisCrmService.updateLead(leadId: string, updateData: Partial<IrisLead>): Promise<void>
-```
+// Send entire merchant application to IRIS lead fields
+IrisCrmService.updateLeadWithMerchantApplication(leadId: string, application: any): Promise<void>
 
-## Zapier Webhook Payload
-
-The webhook sends this JSON structure:
-
-```json
-{
-  "leadId": "iris-lead-uuid",
-  "document": {
-    "filename": "generated-filename.pdf",
-    "originalName": "user-uploaded-name.pdf",
-    "documentType": "BUSINESS_LICENSE",
-    "fileSize": 1234567,
-    "mimeType": "application/pdf",
-    "fileContent": "base64-encoded-file-content"
-  },
-  "client": {
-    "firstName": "John",
-    "lastName": "Doe",
-    "email": "john@example.com",
-    "companyName": "Example Co."
-  }
-}
+// Update lead pipeline stage
+IrisCrmService.updateLeadStatus(leadId: string, stage: PipelineStage): Promise<void>
 ```
 
 ## Monitoring & Troubleshooting
@@ -164,78 +139,64 @@ The webhook sends this JSON structure:
 ### Logs to Watch
 
 ```bash
-# Successful lead creation
-✅ IRIS CRM lead created successfully: lead-uuid-123
+# Lead creation
+✅ IRIS CRM lead created successfully: <leadId>
 
-# Successful document sync
-✅ Document synced to IRIS CRM successfully: {...}
+# Document upload
+✅ Document uploaded to IRIS CRM successfully: <filename>
 
-# Error logs
-❌ Failed to create IRIS CRM lead: [error details]
-❌ Failed to sync document to IRIS CRM: [error details]
+# Lead fields update
+✅ IRIS CRM lead updated successfully with merchant application data
 
-# Warning when no lead ID exists
-⚠️ No IRIS lead ID found for client, skipping document sync
+# Warnings
+⚠️ No IRIS lead ID found for merchant application, skipping document sync
+⚠️ IRIS CRM API key or subdomain not configured
 ```
 
 ### Common Issues
 
-1. **Missing API Key**: Check `IRIS_CRM_API_KEY` environment variable
-2. **Network Issues**: IRIS CRM API connectivity problems
-3. **Missing Lead ID**: Client created before integration was enabled
-4. **Zapier Webhook Failures**: Check Zapier automation logs
+1. **Missing API Key or Subdomain**: Ensure `IRIS_CRM_API_KEY` and `IRIS_CRM_SUBDOMAIN` are set.
+2. **Network / API errors**: Check IRIS CRM API status and connectivity.
+3. **Missing Lead ID**: Lead is created when the merchant application is created; backfill runs when syncing if lead was missing.
 
 ### Manual Fixes
 
-If a client is missing an IRIS lead ID, you can manually create one:
+If a merchant application is missing an IRIS lead ID, the next sync (e.g. document upload or application update) will attempt to create a lead and attach it. You can also verify in the database:
 
 ```sql
--- Find clients without IRIS lead IDs
-SELECT c.id, u.email, u.company_name 
-FROM clients c 
-JOIN users u ON c.user_id = u.id 
-WHERE c.iris_lead_id IS NULL;
-
--- Update with IRIS lead ID (after manual creation in IRIS CRM)
-UPDATE clients SET iris_lead_id = 'your-iris-lead-id' WHERE id = 'client-uuid';
+SELECT id, iris_lead_id, legal_business_name FROM merchant_applications WHERE iris_lead_id IS NULL;
 ```
-
-## Testing
-
-### Test Lead Creation
-
-1. Register a new client account
-2. Check logs for IRIS CRM integration messages
-3. Verify lead appears in IRIS CRM
-4. Check database for `iris_lead_id` in clients table
-
-### Test Document Sync
-
-1. Upload a document as a client (with existing lead ID)
-2. Check logs for Zapier webhook call
-3. Verify document appears in IRIS CRM under correct lead
-4. Check Zapier automation logs
-
-## Future Enhancements
-
-- [ ] Bulk sync existing clients to IRIS CRM
-- [ ] Two-way sync (IRIS CRM updates back to Secure2Send)
-- [ ] Enhanced error recovery and retry logic
-- [ ] Real-time status updates from IRIS CRM
-- [ ] Support for additional IRIS CRM fields
-- [ ] Direct API integration option (bypass Zapier)
 
 ## Security Considerations
 
-- IRIS CRM API key is stored securely in environment variables
-- Document content is base64 encoded for webhook transmission
-- All API calls are made server-side (no client exposure)
-- Comprehensive audit logging for compliance
-- Graceful degradation if IRIS CRM is unavailable
+- IRIS CRM API key is stored in environment variables (never in code).
+- All API calls are made server-side over HTTPS.
+- Sensitive PII is sent to IRIS for legitimate business processing; see security note in `irisCrmService.ts`.
+- Graceful degradation if IRIS CRM is unavailable.
+
+## Testing the integration
+
+A script runs the main IRIS flows (create lead, update with application data, upload document, update status) so you can verify credentials and behavior without using the full app.
+
+**Prerequisites:** `.env` with `IRIS_CRM_API_KEY`, `IRIS_CRM_SUBDOMAIN`, and the rest of the app env (e.g. `DATABASE_URL`, `SESSION_SECRET`), since the script uses the server env and `IrisCrmService`.
+
+```bash
+# Verify API connection only (no lead created)
+npm run test:iris:connection
+
+# Run full integration test (creates a test lead, updates fields, uploads a file, updates status)
+npm run test:iris
+```
+
+Optional flags:
+
+- `--connection-only` – Only check env and that the IRIS API accepts the key (no lead created).
+- `--skip-document` – Skip the document upload step.
+- `--skip-application` – Skip the merchant application field update step.
+
+After a full run, the script prints the new lead ID; you can open that lead in IRIS CRM and confirm the application fields, Documents tab, and pipeline stage.
 
 ## Support
 
-For IRIS CRM API documentation and support:
 - [IRIS CRM API Documentation](https://www.iriscrm.com/api/)
-- Contact IRIS CRM support for API key issues
-- Check Zapier automation logs for webhook issues
+- Contact IRIS CRM support for API keys and field ID questions.

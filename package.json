@@ -26,7 +26,9 @@
     "create:mock-extracted-data": "tsx scripts/create-mock-extracted-data.ts",
     "list:admins": "tsx scripts/list-admin-users.js",
     "reset:admin:password": "tsx scripts/reset-admin-password.ts",
-    "verify:migrations": "tsx scripts/verify-production-migrations.ts"
+    "verify:migrations": "tsx scripts/verify-production-migrations.ts",
+    "test:iris": "tsx scripts/test-iris-integration.ts",
+    "test:iris:connection": "tsx scripts/test-iris-integration.ts --connection-only"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.864.0",

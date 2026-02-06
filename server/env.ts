@@ -39,6 +39,9 @@ const envSchema = z.object({
   // IRIS CRM Integration
   IRIS_CRM_API_KEY: z.string().optional(),
   IRIS_CRM_SUBDOMAIN: z.string().optional(),
+  // Document upload: tab and label are required integer IDs (see IRIS API doc).
+  IRIS_DOCUMENT_TAB_ID: z.string().regex(/^\d+$/).transform(Number).optional().default('1'),
+  IRIS_DOCUMENT_LABEL_ID: z.string().regex(/^\d+$/).transform(Number).optional().default('2'),
   
   // SignNow E-Signature Integration
   SIGNNOW_API_KEY: z.string().optional(),
@@ -50,12 +53,12 @@ const envSchema = z.object({
   CLOUDFLARE_ACCESS_AUD: z.string().optional(),
   CLOUDFLARE_ACCESS_ISSUER: z.string().url().optional(),
   
-  // Zapier Webhook URLs (for integrations)
+  // Zapier Webhook URLs (KindTap only; document/application sync to IRIS use direct IRIS API)
   ZAPIER_KINDTAP_WEBHOOK_URL: z.string().url().optional(),
-  ZAPIER_DOCUMENT_WEBHOOK_URL: z.string().url().optional(),
-  ZAPIER_APPLICATION_WEBHOOK_URL: z.string().url().optional(),
-  
-  // Webhook Security - Secret token for authenticating webhook requests
+  ZAPIER_DOCUMENT_WEBHOOK_URL: z.string().url().optional(), // Deprecated: IRIS document sync is now direct API
+  ZAPIER_APPLICATION_WEBHOOK_URL: z.string().url().optional(), // Deprecated: IRIS application sync is now direct API
+
+  // Webhook Security - Secret token for KindTap webhook authentication
   ZAPIER_WEBHOOK_SECRET: z.string().min(32).optional(),
   
   // OpenAI OCR Configuration

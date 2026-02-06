@@ -15,8 +15,8 @@
  * 3. Subject to IRIS CRM's own security controls
  * 
  * For audit purposes, all IRIS CRM syncs are logged in the audit_logs table.
- * If you need to send masked data instead, modify syncMerchantApplicationToIris()
- * and updateLeadWithMerchantApplication() to use PIIProtectionService.maskSensitiveValue().
+ * If you need to send masked data instead, modify updateLeadWithMerchantApplication()
+ * to use PIIProtectionService.maskSensitiveValue().
  */
 
 import { env } from '../env';
@@ -41,37 +41,7 @@ export interface IrisLeadResponse {
   // Add other response fields as needed based on IRIS CRM API response
 }
 
-export interface ZapierDocumentPayload {
-  leadId: string;
-  document: {
-    filename: string;
-    originalName: string;
-    documentType: string;
-    fileSize: number;
-    mimeType: string;
-    // Either file URL (preferred) or base64 content
-    fileUrl?: string;
-    fileContent?: string;
-  };
-  client: {
-    firstName: string;
-    lastName: string;
-    email: string;
-    companyName: string;
-  };
-  uploadedAt: string;
-}
-
 export class IrisCrmService {
-  // Webhook URLs are now loaded from environment variables for security
-  private static get ZAPIER_DOCUMENT_WEBHOOK_URL() {
-    return env.ZAPIER_DOCUMENT_WEBHOOK_URL;
-  }
-  
-  private static get ZAPIER_APPLICATION_WEBHOOK_URL() {
-    return env.ZAPIER_APPLICATION_WEBHOOK_URL;
-  }
-
   // IRIS CRM Pipeline Stage Mappings
   // Based on actual IRIS CRM configuration
   private static readonly PIPELINE_STAGES = {
@@ -432,156 +402,6 @@ export class IrisCrmService {
   }
 
   /**
-   * Send document to IRIS CRM via Zapier webhook
-   */
-  static async syncDocumentToIris(
-    user: User, 
-    document: Document, 
-    leadId: string,
-    filePath: string
-  ): Promise<void> {
-    try {
-      // Check if webhook URL is configured
-      if (!this.ZAPIER_DOCUMENT_WEBHOOK_URL) {
-        console.warn('⚠️ ZAPIER_DOCUMENT_WEBHOOK_URL not configured, skipping document sync to IRIS');
-        return;
-      }
-
-      console.log('🔄 Syncing document to IRIS CRM via Zapier:', document.originalName);
-
-      // Read file and convert to base64
-      const fs = await import('fs');
-      const fileBuffer = fs.readFileSync(filePath);
-      const fileContent = fileBuffer.toString('base64');
-
-      const payload = {
-        leadId,
-        document: {
-          filename: document.filename,
-          originalName: document.originalName,
-          documentType: document.documentType,
-          fileSize: document.fileSize,
-          mimeType: document.mimeType,
-          fileContent,
-        },
-        client: {
-          firstName: user.firstName || '',
-          lastName: user.lastName || '',
-          email: user.email,
-          companyName: user.companyName || '',
-        },
-        uploadedAt: new Date().toISOString(),
-        // Security: Include authentication token (flattened for Zapier)
-        auth_token: env.ZAPIER_WEBHOOK_SECRET || '',
-        auth_timestamp: new Date().toISOString(),
-      };
-
-      const response = await fetch(this.ZAPIER_DOCUMENT_WEBHOOK_URL!, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Zapier webhook error: ${response.status} - ${errorText}`);
-      }
-
-      const result = await response.json();
-      console.log('✅ Document synced to IRIS CRM successfully:', result);
-    } catch (error) {
-      console.error('❌ Failed to sync document to IRIS CRM:', error);
-      // Don't throw - we want to continue with normal flow
-    }
-  }
-
-  /**
-   * Send document to IRIS CRM via Zapier webhook with URL (preferred) or Buffer fallback
-   */
-  static async syncDocumentToIrisWithUrl(
-    user: User, 
-    document: Document, 
-    leadId: string,
-    fileUrl?: string,
-    fileBuffer?: Buffer
-  ): Promise<void> {
-    try {
-      // Check if webhook URL is configured
-      if (!this.ZAPIER_DOCUMENT_WEBHOOK_URL) {
-        console.warn('⚠️ ZAPIER_DOCUMENT_WEBHOOK_URL not configured, skipping document sync to IRIS');
-        return;
-      }
-
-      const method = fileUrl ? 'URL' : 'buffer';
-      console.log(`🔄 Syncing document to IRIS CRM via Zapier (${method}):`, document.originalName);
-
-      const payload = {
-        leadId,
-        document: {
-          filename: document.filename,
-          originalName: document.originalName,
-          documentType: document.documentType,
-          fileSize: document.fileSize,
-          mimeType: document.mimeType,
-          ...(fileUrl ? 
-            { fileUrl } : 
-            { fileContent: fileBuffer?.toString('base64') || '' }
-          )
-        },
-        client: {
-          firstName: user.firstName || '',
-          lastName: user.lastName || '',
-          email: user.email,
-          companyName: user.companyName || '',
-        },
-        uploadedAt: new Date().toISOString(),
-        // Security: Include authentication token (flattened for Zapier)
-        auth_token: env.ZAPIER_WEBHOOK_SECRET || '',
-        auth_timestamp: new Date().toISOString(),
-      };
-
-      console.log(`📤 Sending ${fileUrl ? 'file URL' : 'base64 content'} to Zapier webhook`);
-      if (fileUrl) {
-        console.log(`🔗 File URL: ${fileUrl}`);
-      }
-
-      const response = await fetch(this.ZAPIER_DOCUMENT_WEBHOOK_URL!, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Zapier webhook error: ${response.status} - ${errorText}`);
-      }
-
-      const result = await response.json();
-      console.log(`✅ Document synced to IRIS CRM successfully (${method}):`, result);
-    } catch (error) {
-      console.error('❌ Failed to sync document to IRIS CRM:', error);
-      // Don't throw - we want to continue with normal flow
-    }
-  }
-
-  /**
-   * Send document to IRIS CRM via Zapier webhook using a Buffer
-   * (Used when file has already been read into memory)
-   */
-  static async syncDocumentToIrisWithBuffer(
-    user: User, 
-    document: Document, 
-    leadId: string,
-    fileBuffer: Buffer
-  ): Promise<void> {
-    return this.syncDocumentToIrisWithUrl(user, document, leadId, undefined, fileBuffer);
-  }
-
-  /**
    * Alternative method to sync document directly to IRIS CRM API
    * (in case you want to use direct API instead of Zapier webhook)
    */
@@ -631,188 +451,68 @@ export class IrisCrmService {
   }
 
   /**
-   * Send merchant application data to IRIS CRM via Zapier webhook
+   * Upload a document directly to IRIS CRM (no Zapier).
+   * Accepts either a downloadable file URL (e.g. R2 signed URL) or a buffer.
    */
-  static async syncMerchantApplicationToIris(
-    user: User,
-    application: any,
-    leadId: string
+  static async uploadDocumentToIris(
+    leadId: string,
+    document: Document,
+    options: { fileUrl?: string; fileBuffer?: Buffer }
   ): Promise<void> {
     try {
-      // Check if webhook URL is configured
-      if (!this.ZAPIER_APPLICATION_WEBHOOK_URL) {
-        console.warn('⚠️ ZAPIER_APPLICATION_WEBHOOK_URL not configured, skipping application sync to IRIS');
+      if (!env.IRIS_CRM_API_KEY || !env.IRIS_CRM_SUBDOMAIN) {
+        console.warn('⚠️ IRIS CRM API key or subdomain not configured, skipping document upload to IRIS');
         return;
       }
 
-      console.log('🔄 Syncing merchant application to IRIS CRM via Zapier:', application.id);
+      let fileBuffer: Buffer;
+      if (options.fileUrl) {
+        console.log('🔄 Uploading document to IRIS CRM (from URL):', document.originalName);
+        const res = await fetch(options.fileUrl);
+        if (!res.ok) {
+          throw new Error(`Failed to fetch file from URL: ${res.status}`);
+        }
+        const arrayBuffer = await res.arrayBuffer();
+        fileBuffer = Buffer.from(arrayBuffer);
+      } else if (options.fileBuffer && options.fileBuffer.length > 0) {
+        console.log('🔄 Uploading document to IRIS CRM (from buffer):', document.originalName);
+        fileBuffer = options.fileBuffer;
+      } else {
+        console.warn('⚠️ No fileUrl or fileBuffer provided for IRIS document upload');
+        return;
+      }
 
-      const payload = {
-        leadId,
-        application: {
-          // Basic Application Info
-          id: application.id,
-          status: application.status,
-          submittedAt: application.submittedAt,
-          createdAt: application.createdAt,
-          updatedAt: application.updatedAt,
-          
-          // MPA and Sales Information
-          mpaSignedDate: this.formatDate(application.mpaSignedDate),
-          salesRepName: application.salesRepName,
-          
-          // DBA Information
-          dbaBusinessName: application.dbaBusinessName,
-          dbaWebsite: application.dbaWebsite,
-          locationAddress: application.locationAddress,
-          productOrServiceSold: application.productOrServiceSold,
-          city: application.city,
-          state: application.state,
-          zip: application.zip,
-          multipleLocations: application.multipleLocations,
-          businessPhone: application.businessPhone,
-          contactEmail: application.contactEmail,
-          
-          // Corporate Information
-          legalBusinessName: application.legalBusinessName,
-          billingAddress: application.billingAddress,
-          legalContactName: application.legalContactName,
-          legalPhone: application.legalPhone,
-          legalEmail: application.legalEmail,
-          ownershipType: application.ownershipType,
-          federalTaxIdNumber: application.federalTaxIdNumber,
-          incorporationState: application.incorporationState,
-          entityStartDate: this.formatDate(application.entityStartDate),
-          
-          // Transaction and Volume
-          averageTicket: application.averageTicket,
-          highTicket: application.highTicket,
-          monthlySalesVolume: application.monthlySalesVolume,
-          monthlyTransactions: application.monthlyTransactions,
-          annualVolume: application.annualVolume,
-          annualTransactions: application.annualTransactions,
-          
-          // Enhanced Banking Information
-          accountOwnerFirstName: application.accountOwnerFirstName,
-          accountOwnerLastName: application.accountOwnerLastName,
-          nameOnBankAccount: application.nameOnBankAccount,
-          bankName: application.bankName,
-          abaRoutingNumber: application.abaRoutingNumber,
-          ddaNumber: application.ddaNumber,
-          bankOfficerName: application.bankOfficerName,
-          bankOfficerPhone: application.bankOfficerPhone,
-          bankOfficerEmail: application.bankOfficerEmail,
-          
-          // Enhanced Owner Information
-          ownerFullName: application.ownerFullName,
-          ownerFirstName: application.ownerFirstName,
-          ownerLastName: application.ownerLastName,
-          ownerOfficer: application.ownerOfficer,
-          ownerTitle: application.ownerTitle,
-          ownerOwnershipPercentage: application.ownerOwnershipPercentage,
-          ownerMobilePhone: application.ownerMobilePhone,
-          ownerEmail: application.ownerEmail,
-          ownerSsn: application.ownerSsn,
-          ownerBirthday: this.formatDate(application.ownerBirthday),
-          ownerStateIssuedIdNumber: application.ownerStateIssuedIdNumber,
-          ownerIdExpDate: this.formatDate(application.ownerIdExpDate),
-          ownerIssuingState: application.ownerIssuingState,
-          ownerIdDateIssued: this.formatDate(application.ownerIdDateIssued),
-          ownerLegalAddress: application.ownerLegalAddress,
-          ownerCity: application.ownerCity,
-          ownerState: application.ownerState,
-          ownerZip: application.ownerZip,
-          ownerCountry: application.ownerCountry,
-          
-          // Business Operations
-          businessType: application.businessType,
-          refundGuarantee: application.refundGuarantee,
-          refundDays: application.refundDays,
-          posSystem: application.posSystem,
-          processingCategories: application.processingCategories,
-          
-          // Complex Objects - Format dates in nested objects
-          principalOfficers: application.principalOfficers ? application.principalOfficers.map((officer: any) => ({
-            ...officer,
-            dob: this.formatDate(officer.dob)
-          })) : application.principalOfficers,
-          beneficialOwners: application.beneficialOwners ? application.beneficialOwners.map((bo: any) => ({
-            ...bo,
-            dob: this.formatDate(bo.dob),
-            idDateIssued: this.formatDate(bo.idDateIssued),
-            idExpDate: this.formatDate(bo.idExpDate)
-          })) : application.beneficialOwners,
-          financialRepresentative: application.financialRepresentative ? {
-            ...application.financialRepresentative,
-            birthday: this.formatDate(application.financialRepresentative.birthday),
-            idExpDate: this.formatDate(application.financialRepresentative.idExpDate)
-          } : application.financialRepresentative,
-          authorizedContacts: application.authorizedContacts,
-          
-          // Legacy Fields (for backward compatibility)
-          businessFaxNumber: application.businessFaxNumber,
-          customerServicePhone: application.customerServicePhone,
-          contactName: application.contactName,
-          contactPhoneNumber: application.contactPhoneNumber,
-          websiteAddress: application.websiteAddress,
-          accountName: application.accountName,
-          feeScheduleData: application.feeScheduleData,
-          supportingInformation: application.supportingInformation,
-          equipmentData: application.equipmentData,
-          
-          // Certification Fields
-          processedCardsPast: application.processedCardsPast,
-          previouslyProcessed: application.previouslyProcessed,
-          automaticBilling: application.automaticBilling,
-          cardholderData3rdParty: application.cardholderData3rdParty,
-          corporateResolution: application.corporateResolution,
-          merchantSignature: application.merchantSignature,
-          merchantName: application.merchantName,
-          merchantTitle: application.merchantTitle,
-          merchantDate: this.formatDate(application.merchantDate),
-          agreementAccepted: application.agreementAccepted,
-          corduroSignature: application.corduroSignature,
-          corduroName: application.corduroName,
-          corduroTitle: application.corduroTitle,
-          corduroDate: this.formatDate(application.corduroDate)
-        },
-        client: {
-          firstName: user.firstName || '',
-          lastName: user.lastName || '',
-          email: user.email,
-          companyName: user.companyName || '',
-        },
-        // Security: Include authentication token (flattened for Zapier)
-        auth_token: env.ZAPIER_WEBHOOK_SECRET || '',
-        auth_timestamp: new Date().toISOString(),
-      };
+      // IRIS API: tab and label are required integer IDs (query params), body is raw binary (https://www.iriscrm.com/api/#/paths/~1leads~1{leadId}~1documents/post)
+      const tabId = env.IRIS_DOCUMENT_TAB_ID ?? 1;
+      const labelId = env.IRIS_DOCUMENT_LABEL_ID ?? 2;
+      const filename = encodeURIComponent(document.originalName);
+      const apiUrl = `${this.getApiBaseUrl()}/leads/${leadId}/documents?tab=${tabId}&label=${labelId}&filename=${filename}`;
 
-      // Debug: Log the payload being sent to Zapier
-      console.log('📤 Sending payload to Zapier webhook:', JSON.stringify(payload, null, 2));
-
-      const response = await fetch(this.ZAPIER_APPLICATION_WEBHOOK_URL!, {
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'X-API-KEY': env.IRIS_CRM_API_KEY!,
+          'Content-Type': document.mimeType || 'application/octet-stream',
+          'accept': 'application/json',
         },
-        body: JSON.stringify(payload),
+        body: new Uint8Array(fileBuffer),
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Zapier application webhook error: ${response.status} - ${errorText}`);
+        const errText = await response.text();
+        throw new Error(`IRIS document API ${response.status}: ${errText}`);
       }
 
-      const result = await response.json();
-      console.log('✅ Merchant application synced to IRIS CRM successfully:', result);
+      console.log('✅ Document uploaded to IRIS CRM successfully:', document.originalName);
     } catch (error) {
-      console.error('❌ Failed to sync merchant application to IRIS CRM:', error);
+      console.error('❌ Failed to upload document to IRIS CRM:', error);
       // Don't throw - we want to continue with normal flow
     }
   }
 
   /**
-   * Map merchant application fields to IRIS CRM field IDs and update lead
+   * Map merchant application fields to IRIS CRM field IDs and update lead.
+   * Sends the entire merchant application into the correct IRIS lead fields (direct API).
    */
   static async updateLeadWithMerchantApplication(
     leadId: string,
@@ -842,7 +542,7 @@ export class IrisCrmService {
         { id: '3895', value: application.contactEmail || '' }, // *Location Contact Email
         { id: '3858', value: application.productOrServiceSold || '' }, // *Product or Service Sold
         { id: '3853', value: application.dbaWebsite || '' }, // DBA Website
-        { id: '4273', value: this.mapDropdownValue('4273', application.multipleLocations ? 'Yes' : 'No') }, // Multiple Locations?
+        // 4273 Multiple Locations? - omitted; some IRIS instances reject "Yes"/"No". Re-add when instance options are known.
         
         // Corporate Information
         { id: '2', value: application.legalBusinessName || '' }, // *Legal Name
@@ -881,7 +581,8 @@ export class IrisCrmService {
         { id: '4274', value: application.ownerFullName || '' }, // Owner Full Name
         { id: '3782', value: application.ownerFirstName || '' }, // *First Name
         { id: '3781', value: application.ownerLastName || '' }, // *Last Name
-        { id: '3779', value: this.mapDropdownValue('3779', application.ownerOfficer) }, // Owner/Officer
+        // 3779 Owner/Officer - omitted when empty/N/A; some IRIS instances reject. Re-add when instance options are known.
+        ...(application.ownerOfficer ? [{ id: '3779' as const, value: this.mapDropdownValue('3779', application.ownerOfficer) }] : []),
         { id: '3780', value: application.ownerTitle || '' }, // *Title (free text field)
         { id: '3778', value: application.ownerOwnershipPercentage?.toString() || '' }, // *Ownership
         { id: '3777', value: this.formatPhone(application.ownerMobilePhone) }, // Owner Mobile Phone Number
@@ -921,16 +622,15 @@ export class IrisCrmService {
           { id: '4270', value: this.mapDropdownValue('4270', application.financialRepresentative.country) }, // FR Country
         ] : []),
         
-        // Business Operations - Auto-filled fields as specified
-        { id: '4278', value: 'Retail' }, // Business Type - Autofill "Retail"
+        // Business Operations - 4278 Business Type omitted; some IRIS instances reject "Retail". Re-add when instance options are known.
         // Field 3860 (Processed Cards in Past) is a LABEL - cannot be updated
-        { id: '4174', value: '(Please select)' }, // Previously Processed? - Default placeholder
+        // Omit 4174, 4316, 4181 when no real value (empty = filtered out); some IRIS instances reject "(Please select)"
+        { id: '4174', value: application.previouslyProcessed === true ? 'Yes' : application.previouslyProcessed === false ? 'No' : '' },
         { id: '3859', value: 'N/A' }, // If Yes, Under What Name? - Autofill "N/A"
-        { id: '4316', value: '(Please select)' }, // Automatic Billing? - Default placeholder
+        { id: '4316', value: application.automaticBilling === true ? 'Yes' : application.automaticBilling === false ? 'No' : '' },
         // Field 4107 (Cardholder Data 3rd Party) is a LABEL - cannot be updated
-        
-        // Refund/Guarantee Information
-        { id: '4181', value: application.refundGuarantee ? 'Yes' : '(Please Select)' }, // Refund/Guarantee? - Default placeholder
+
+        // Refund/Guarantee - 4181 omitted; some IRIS instances reject Yes/No. Re-add when instance options are known.
         { id: '4141', value: application.refundDays?.toString() || '' }, // Refund # Days
         
         // POS System - Removed as it's a label field that shouldn't be updated

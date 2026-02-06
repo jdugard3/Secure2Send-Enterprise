@@ -215,8 +215,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error('Failed to check document completion status:', error);
       });
 
-      // Sync document to IRIS CRM via Zapier webhook (async, don't block response)
-      // Read file content before potential cleanup
+      // Sync document to IRIS CRM via direct API (async, don't block response)
+      // Read file content before potential cleanup (for buffer fallback)
       let fileContentForIris: Buffer | null = null;
       if (merchantApplication.irisLeadId && fs.existsSync(file.path)) {
         try {
@@ -235,34 +235,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Now sync to IRIS CRM - prefer R2 URL, fallback to buffer
+      // Upload to IRIS CRM directly - prefer R2 signed URL, fallback to buffer
       if (merchantApplication.irisLeadId) {
         import('./services/irisCrmService').then(async ({ IrisCrmService }) => {
           if (r2Key && cloudflareR2) {
             try {
-              // Generate signed URL that Zapier can access (24 hour expiry)
               const signedUrl = await cloudflareR2.getDownloadUrl(r2Key, 86400);
-              console.log('🔗 Using Cloudflare R2 signed URL for IRIS sync (24h expiry)');
-              IrisCrmService.syncDocumentToIrisWithUrl(user, document, merchantApplication.irisLeadId!, signedUrl).catch(error => {
-                console.error('Failed to sync document to IRIS CRM with signed URL:', error);
-              });
+              console.log('🔗 Using Cloudflare R2 signed URL for IRIS upload (24h expiry)');
+              await IrisCrmService.uploadDocumentToIris(merchantApplication.irisLeadId!, document, { fileUrl: signedUrl });
             } catch (error) {
-              console.error('Failed to generate signed URL, falling back to base64:', error);
-              // Fallback to base64 if signed URL generation fails
+              console.error('Failed to generate signed URL, falling back to buffer:', error);
               if (fileContentForIris) {
-                IrisCrmService.syncDocumentToIrisWithBuffer(user, document, merchantApplication.irisLeadId!, fileContentForIris).catch(error => {
-                  console.error('Failed to sync document to IRIS CRM with buffer:', error);
-                });
+                await IrisCrmService.uploadDocumentToIris(merchantApplication.irisLeadId!, document, { fileBuffer: fileContentForIris });
               }
             }
           } else if (fileContentForIris) {
-            // Fallback to base64 content when R2 isn't available
-            console.log('💾 Using base64 content for IRIS sync (R2 not available)');
-            IrisCrmService.syncDocumentToIrisWithBuffer(user, document, merchantApplication.irisLeadId!, fileContentForIris).catch(error => {
-              console.error('Failed to sync document to IRIS CRM with buffer:', error);
-            });
+            console.log('💾 Using buffer for IRIS upload (R2 not available)');
+            await IrisCrmService.uploadDocumentToIris(merchantApplication.irisLeadId!, document, { fileBuffer: fileContentForIris });
           } else {
-            console.warn('⚠️ No R2 key or file content available for IRIS sync');
+            console.warn('⚠️ No R2 key or file content available for IRIS upload');
           }
         }).catch(error => {
           console.error('Failed to import IRIS CRM service:', error);
@@ -1514,12 +1505,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               console.error('Failed to update IRIS CRM lead status to SALES_PRE_SALE:', error);
             });
 
-            // Sync application data to IRIS via Zapier webhook
-            IrisCrmService.syncMerchantApplicationToIris(user, application, irisLeadId).catch(error => {
-              console.error('Failed to sync merchant application to IRIS CRM via Zapier:', error);
-            });
-            
-            // Also update lead fields directly (field ID mapping)
+            // Sync entire application to IRIS lead fields (direct API)
             IrisCrmService.updateLeadWithMerchantApplication(irisLeadId, application).catch(error => {
               console.error('Failed to update IRIS CRM lead fields:', error);
             });
@@ -1723,13 +1709,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             
             // Note: Pipeline stage updates happen in the status change endpoint or on creation
             // Don't update pipeline here as it could conflict with explicit status changes
-            
-            // Sync via Zapier webhook (comprehensive payload)
-            IrisCrmService.syncMerchantApplicationToIris(applicationOwner, application, irisLeadId).catch(error => {
-              console.error('Failed to sync merchant application to IRIS CRM via Zapier:', error);
-            });
-            
-            // Also update lead fields directly (field ID mapping)
+
+            // Sync entire application to IRIS lead fields (direct API)
             IrisCrmService.updateLeadWithMerchantApplication(irisLeadId, application).catch(error => {
               console.error('Failed to update IRIS CRM lead with field mapping:', error);
             });
@@ -2082,13 +2063,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   console.error('❌ Failed to import PDF fill service:', error);
                 });
               }
-              
-              // Sync via Zapier webhook (comprehensive payload)
-              IrisCrmService.syncMerchantApplicationToIris(applicationOwner, application, irisLeadId).catch(error => {
-                console.error('Failed to sync merchant application to IRIS CRM via Zapier:', error);
-              });
-              
-              // Also update lead fields directly (field ID mapping)
+
+              // Sync entire application to IRIS lead fields (direct API)
               IrisCrmService.updateLeadWithMerchantApplication(irisLeadId, application).catch(error => {
                 console.error('Failed to update IRIS CRM lead with field mapping:', error);
               });
