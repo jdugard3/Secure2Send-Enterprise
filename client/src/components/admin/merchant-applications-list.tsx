@@ -47,6 +47,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { formatDistanceToNow } from "date-fns";
 import { PricingTermsModal, type PricingTermsData } from "./PricingTermsModal";
+import { DocuSealForm } from "@/components/DocuSealForm";
 
 /**
  * PII Masking Utilities for Frontend Display
@@ -323,6 +324,9 @@ export default function MerchantApplicationsList() {
   const [includeKindTapAgreement, setIncludeKindTapAgreement] = useState(false);
   const [pricingModalOpen, setPricingModalOpen] = useState(false);
   const [pendingApprovalAppId, setPendingApprovalAppId] = useState<string | null>(null);
+  const [embedDialogOpen, setEmbedDialogOpen] = useState(false);
+  const [embedSignerUrl, setEmbedSignerUrl] = useState<string | null>(null);
+  const [embedSignerEmail, setEmbedSignerEmail] = useState<string | null>(null);
   const { toast} = useToast();
   const queryClient = useQueryClient();
 
@@ -441,13 +445,18 @@ export default function MerchantApplicationsList() {
       });
       return response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: (data: { signerEmbedUrl?: string; signerEmail?: string }) => {
       toast({
         title: "E-Signature Request Sent",
         description: `Signing invitations sent to merchant and admin.${includeKindTapAgreement ? ' KindTap agreement included.' : ''}`,
       });
       queryClient.invalidateQueries({ queryKey: ['/api/merchant-applications'] });
       setIncludeKindTapAgreement(false); // Reset checkbox after successful send
+      if (data.signerEmbedUrl) {
+        setEmbedSignerUrl(data.signerEmbedUrl);
+        setEmbedSignerEmail(data.signerEmail ?? null);
+        setEmbedDialogOpen(true);
+      }
     },
     onError: (error: Error) => {
       toast({
@@ -1035,6 +1044,44 @@ export default function MerchantApplicationsList() {
         isLoading={reviewMutation.isPending}
         initialData={selectedApplication?.feeScheduleData as PricingTermsData}
       />
+
+      {/* DocuSeal embed dialog – sign in-app or copy link */}
+      <Dialog open={embedDialogOpen} onOpenChange={(open) => { setEmbedDialogOpen(open); if (!open) { setEmbedSignerUrl(null); setEmbedSignerEmail(null); } }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Sign document</DialogTitle>
+            <DialogDescription>
+              The signer can complete the form below or use the link sent to their email. You can copy the link to share.
+            </DialogDescription>
+          </DialogHeader>
+          {embedSignerUrl && (
+            <div className="space-y-4">
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(embedSignerUrl!);
+                    toast({ title: "Link copied", description: "Signing link copied to clipboard." });
+                  }}
+                >
+                  Copy signing link
+                </Button>
+              </div>
+              <div className="min-h-[400px] border rounded-md p-2 bg-muted/30">
+                <DocuSealForm
+                  src={embedSignerUrl}
+                  email={embedSignerEmail ?? undefined}
+                  onCompleted={() => {
+                    toast({ title: "Document signed", description: "Signature completed. You can close this and check status." });
+                    queryClient.invalidateQueries({ queryKey: ['/api/merchant-applications'] });
+                  }}
+                />
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

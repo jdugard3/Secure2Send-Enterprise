@@ -2370,9 +2370,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ========================================================================
-  // E-SIGNATURE ROUTES - SignNow Integration
+  // E-SIGNATURE ROUTES - DocuSeal Integration (Cloudflare-hosted)
   // ========================================================================
-  
+
   app.post('/api/merchant-applications/:id/send-for-signature', requireAuth, async (req: any, res: Response) => {
     try {
       const { id } = req.params;
@@ -2427,38 +2427,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       console.log(`✅ PDF prepared successfully (${filledPdfBuffer.length} bytes)${includeKindTapAgreement ? ' - includes KindTap agreement' : ''}`);
 
-      // Step 2: Upload PDF to SignNow
-      const { SignNowService } = await import('./services/signNowService');
+      // Step 2: Create DocuSeal submission from PDF and send to merchant
+      const { DocuSealService } = await import('./services/docuSealService');
       const documentFilename = includeKindTapAgreement
         ? `merchant-application-with-kindtap-${application.legalBusinessName || application.dbaBusinessName || id}.pdf`
         : `merchant-application-${application.legalBusinessName || application.dbaBusinessName || id}.pdf`;
-      
-      const documentId = await SignNowService.uploadDocument(
-        filledPdfBuffer,
-        documentFilename
-      );
-      console.log(`✅ Document uploaded to SignNow, document ID: ${documentId}`);
 
-      // Step 3: Send simple freeform invite (no roles/fields required - signers click anywhere to sign)
       const merchantName = `${clientUser.firstName || ''} ${clientUser.lastName || ''}`.trim() || 'Merchant';
-      const adminName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Admin';
-      
-      // Use SignNow account owner email as sender (required for API)
-      const fromEmail = env.SIGNNOW_OWNER_EMAIL || 'submissions@miapayments.com';
-      
-      await SignNowService.createFreeformInvite(
-        documentId,
-        clientUser.email, // Merchant signs
-        fromEmail, // From email (SignNow account owner)
-        'Merchant Application - Signature Required',
-        `Please review and sign the merchant application for ${application.legalBusinessName || application.dbaBusinessName || 'your business'}. After you sign, it will be sent to the admin for their signature.`
+      const fromEmail = env.DOCUSEAL_REPLY_TO || 'submissions@miapayments.com';
+
+      const { submissionId, signerEmbedUrl } = await DocuSealService.createSubmissionFromPdf(
+        filledPdfBuffer,
+        documentFilename,
+        {
+          toEmail: clientUser.email,
+          toName: merchantName,
+          fromEmail,
+          subject: 'Merchant Application - Signature Required',
+          message: `Please review and sign the merchant application for ${application.legalBusinessName || application.dbaBusinessName || 'your business'}. After you sign, it will be sent to the admin for their signature.`,
+        }
       );
-      console.log(`✅ Signing invite sent to ${clientUser.email} (merchant signs first)`);
+      console.log(`✅ DocuSeal submission created and invite sent to ${clientUser.email}`);
 
       // Step 4: Update application status in database
       await storage.updateMerchantApplicationESignature(id, {
         eSignatureStatus: 'PENDING',
-        eSignatureApplicationId: documentId,
+        eSignatureApplicationId: submissionId,
         eSignatureSentAt: new Date(),
       });
 
@@ -2476,7 +2470,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({
         message: "E-signature request sent successfully",
-        documentId: documentId,
+        documentId: submissionId,
+        signerEmbedUrl: signerEmbedUrl || undefined,
+        signerEmail: clientUser.email,
         signers: [
           { email: clientUser.email, role: 'Merchant', order: 1 },
           { email: user.email, role: 'Admin', order: 2 },
@@ -2519,30 +2515,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Check status with SignNow if pending
+      // Check status with DocuSeal if pending
       if (application.eSignatureStatus === 'PENDING') {
         try {
-          const { SignNowService } = await import('./services/signNowService');
-          const signNowStatus = await SignNowService.getDocumentStatus(application.eSignatureApplicationId);
-          
+          const { DocuSealService } = await import('./services/docuSealService');
+          const docuSealStatus = await DocuSealService.getDocumentStatus(application.eSignatureApplicationId);
+
           // Update local status if changed
-          if (signNowStatus.status !== application.eSignatureStatus) {
+          if (docuSealStatus.status !== application.eSignatureStatus) {
             await storage.updateMerchantApplicationESignature(id, {
-              eSignatureStatus: signNowStatus.status,
-              eSignatureCompletedAt: signNowStatus.status === 'SIGNED' && signNowStatus.completedAt 
-                ? new Date(signNowStatus.completedAt) 
+              eSignatureStatus: docuSealStatus.status,
+              eSignatureCompletedAt: docuSealStatus.status === 'SIGNED' && docuSealStatus.completedAt
+                ? new Date(docuSealStatus.completedAt)
                 : undefined,
             });
           }
 
           return res.json({
-            status: signNowStatus.status,
+            status: docuSealStatus.status,
             sentAt: application.eSignatureSentAt,
-            completedAt: signNowStatus.completedAt || null,
-            signers: signNowStatus.signers,
+            completedAt: docuSealStatus.completedAt || null,
+            signers: docuSealStatus.signers,
           });
         } catch (error) {
-          console.error('Error checking SignNow e-signature status:', error);
+          console.error('Error checking DocuSeal e-signature status:', error);
           // Fall through to return local status
         }
       }
@@ -2597,10 +2593,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`📥 Downloading signed document for application ${id}`);
 
-      // Download from SignNow
-      const { SignNowService } = await import('./services/signNowService');
-      const signedPdfBuffer = await SignNowService.downloadSignedDocument(application.eSignatureApplicationId);
-      console.log(`✅ Downloaded signed PDF from SignNow (${signedPdfBuffer.length} bytes)`);
+      // Download from DocuSeal
+      const { DocuSealService } = await import('./services/docuSealService');
+      const signedPdfBuffer = await DocuSealService.downloadSignedDocument(application.eSignatureApplicationId);
+      console.log(`✅ Downloaded signed PDF from DocuSeal (${signedPdfBuffer.length} bytes)`);
 
       // Generate filename with "signed-" prefix
       const businessName = (application.legalBusinessName || application.dbaBusinessName || id)

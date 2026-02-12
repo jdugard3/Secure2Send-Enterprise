@@ -28,7 +28,8 @@
     "reset:admin:password": "tsx scripts/reset-admin-password.ts",
     "verify:migrations": "tsx scripts/verify-production-migrations.ts",
     "test:iris": "tsx scripts/test-iris-integration.ts",
-    "test:iris:connection": "tsx scripts/test-iris-integration.ts --connection-only"
+    "test:iris:connection": "tsx scripts/test-iris-integration.ts --connection-only",
+    "test:docuseal": "tsx scripts/test-docuseal.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.864.0",

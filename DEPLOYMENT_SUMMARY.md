@@ -111,8 +111,8 @@ APP_URL
 ```bash
 IRIS_CRM_API_KEY          # IRIS CRM integration
 IRIS_CRM_SUBDOMAIN
-SIGNNOW_API_KEY           # E-signature
-SIGNNOW_OWNER_EMAIL
+DOCUSEAL_API_KEY          # E-signature (DocuSeal, Cloudflare-hosted)
+DOCUSEAL_REPLY_TO         # Optional reply-to for signing emails
 ZAPIER_KINDTAP_WEBHOOK_URL
 ZAPIER_WEBHOOK_SECRET     # 32+ characters
 ```

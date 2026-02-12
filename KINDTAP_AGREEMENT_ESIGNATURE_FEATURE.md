@@ -1,7 +1,7 @@
 # KindTap Agreement E-Signature Integration
 
 ## Overview
-This feature allows admins to optionally include the KindTap Merchant Agreement PDF when sending a merchant application for e-signatures via SignNow.
+This feature allows admins to optionally include the KindTap Merchant Agreement PDF when sending a merchant application for e-signatures via DocuSeal (Cloudflare-hosted).
 
 ## Implementation Summary
 
@@ -108,7 +108,7 @@ Added a checkbox in the E-Signature section:
 4. System:
    - Fills the merchant application PDF with data
    - If checkbox was checked: merges KindTap agreement PDF after the application
-   - Uploads combined PDF to SignNow
+   - Uploads combined PDF to DocuSeal
    - Sends signing invitations to merchant and admin
 5. Signers receive a single document containing:
    - Merchant application (filled with their data)

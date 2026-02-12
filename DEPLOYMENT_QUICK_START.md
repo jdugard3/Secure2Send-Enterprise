@@ -96,7 +96,7 @@ fly secrets set APP_URL="https://secure2send.fly.dev"
 ### Recommended:
 ```bash
 fly secrets set IRIS_CRM_API_KEY="..."
-fly secrets set SIGNNOW_API_KEY="..."
+fly secrets set DOCUSEAL_API_KEY="..."
 fly secrets set ZAPIER_KINDTAP_WEBHOOK_URL="https://hooks.zapier.com/..."
 fly secrets set ZAPIER_WEBHOOK_SECRET="32-char-minimum"
 ```

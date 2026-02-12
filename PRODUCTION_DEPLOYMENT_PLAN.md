@@ -62,8 +62,8 @@
 #### Integrations (Required for full functionality):
 - `IRIS_CRM_API_KEY` - IRIS CRM integration
 - `IRIS_CRM_SUBDOMAIN` - IRIS subdomain
-- `SIGNNOW_API_KEY` - E-signature integration
-- `SIGNNOW_OWNER_EMAIL` - SignNow owner email
+- `DOCUSEAL_API_KEY` - E-signature integration (DocuSeal, Cloudflare-hosted)
+- `DOCUSEAL_REPLY_TO` - Optional reply-to for signing emails
 - `ZAPIER_KINDTAP_WEBHOOK_URL` - KindTap webhook
 - `ZAPIER_DOCUMENT_WEBHOOK_URL` - Document sync webhook
 - `ZAPIER_APPLICATION_WEBHOOK_URL` - Application sync webhook
@@ -292,8 +292,8 @@ fly secrets set APP_URL="https://secure2send.fly.dev"
 # Integration secrets
 fly secrets set IRIS_CRM_API_KEY="your-iris-key"
 fly secrets set IRIS_CRM_SUBDOMAIN="your-subdomain"
-fly secrets set SIGNNOW_API_KEY="your-signnow-key"
-fly secrets set SIGNNOW_OWNER_EMAIL="submissions@miapayments.com"
+fly secrets set DOCUSEAL_API_KEY="your-docuseal-key"
+fly secrets set DOCUSEAL_REPLY_TO="submissions@miapayments.com"
 
 # Webhook secrets
 fly secrets set ZAPIER_KINDTAP_WEBHOOK_URL="https://hooks.zapier.com/hooks/catch/..."
@@ -712,7 +712,7 @@ Status: [ ] SUCCESS [ ] PARTIAL [ ] FAILED [ ] ROLLED BACK
 
 1. **Monitor for 24 hours** - Watch logs and metrics
 2. **Test all critical flows** - Login, applications, admin functions
-3. **Verify integrations** - Webhooks, IRIS CRM, SignNow
+3. **Verify integrations** - Webhooks, IRIS CRM, DocuSeal
 4. **Update documentation** - Record any issues or learnings
 5. **Notify stakeholders** - Inform team of successful deployment
 6. **Schedule next deployment** - Plan for future updates

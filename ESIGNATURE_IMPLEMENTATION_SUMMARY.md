@@ -2,7 +2,7 @@
 
 ## ✅ Implementation Complete
 
-This document summarizes the completed IRIS e-signature integration for merchant applications.
+This document summarizes the completed e-signature integration for merchant applications. **E-signature is now provided by DocuSeal (Cloudflare-hosted)**; the workflow (send for signature, poll status, download signed PDF) is unchanged from the app and UI perspective.
 
 ---
 
