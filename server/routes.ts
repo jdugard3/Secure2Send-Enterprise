@@ -240,7 +240,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         import('./services/irisCrmService').then(async ({ IrisCrmService }) => {
           if (r2Key && cloudflareR2) {
             try {
-              const signedUrl = await cloudflareR2.getDownloadUrl(r2Key, 86400);
+              const signedUrl = await cloudflareR2.getDownloadUrl(r2Key, 3600);
               console.log('🔗 Using Cloudflare R2 signed URL for IRIS upload (24h expiry)');
               await IrisCrmService.uploadDocumentToIris(merchantApplication.irisLeadId!, document, { fileUrl: signedUrl });
             } catch (error) {

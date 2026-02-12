@@ -21,6 +21,8 @@
     "migrate:encrypt-pii": "tsx scripts/migrate-encrypt-existing-pii.ts",
     "migrate:encrypt-pii:dry-run": "tsx scripts/migrate-encrypt-existing-pii.ts --dry-run",
     "migrate:encrypt-pii:verify": "tsx scripts/migrate-encrypt-existing-pii.ts --verify",
+    "migrate:encrypt-mfa-secrets": "tsx scripts/migrate-encrypt-mfa-secrets.ts",
+    "migrate:encrypt-mfa-secrets:dry-run": "tsx scripts/migrate-encrypt-mfa-secrets.ts --dry-run",
     "verify:pii-status": "tsx scripts/verify-pii-encryption-status.ts",
     "cleanup:extracted-data": "tsx scripts/cleanup-extracted-data.ts",
     "create:mock-extracted-data": "tsx scripts/create-mock-extracted-data.ts",

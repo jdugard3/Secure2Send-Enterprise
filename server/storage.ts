@@ -32,6 +32,37 @@ import { db } from "./db";
 import { eq, desc, and, sql } from "drizzle-orm";
 import { LogSanitizer, safeLog } from "./utils/logSanitizer";
 import { PIIProtectionService } from "./services/piiProtectionService";
+import { env } from "./env";
+
+const MFA_SECRET_ENCRYPTED_PREFIX = "enc:";
+
+function decryptStoredMfaSecret(secret: string | null): string | null {
+  if (!secret) {
+    return null;
+  }
+  if (!secret.startsWith(MFA_SECRET_ENCRYPTED_PREFIX)) {
+    return secret;
+  }
+  if (!env.FIELD_ENCRYPTION_KEY) {
+    return secret;
+  }
+  try {
+    return PIIProtectionService.decryptField(secret.slice(MFA_SECRET_ENCRYPTED_PREFIX.length));
+  } catch (error) {
+    console.error("Failed to decrypt mfaSecret:", error);
+    return secret;
+  }
+}
+
+function decryptUserMfaSecret(user: User | undefined): User | undefined {
+  if (!user) {
+    return undefined;
+  }
+  return {
+    ...user,
+    mfaSecret: decryptStoredMfaSecret(user.mfaSecret),
+  };
+}
 
 export interface IStorage {
   // User operations
@@ -126,12 +157,12 @@ export class DatabaseStorage implements IStorage {
   // User operations
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
+    return decryptUserMfaSecret(user);
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(sql`lower(${users.email}) = ${email.toLowerCase()}`);
-    return user;
+    return decryptUserMfaSecret(user);
   }
 
   async getUserByPasswordResetToken(token: string): Promise<User | undefined> {
@@ -158,7 +189,7 @@ export class DatabaseStorage implements IStorage {
       console.log(`❌ No user found for password reset token`);
     }
     
-    return user;
+    return decryptUserMfaSecret(user);
   }
 
   async updateUserOnboardingStep(userId: string, step: 'PART1' | 'DOCUMENTS' | 'PART2' | 'REVIEW' | 'COMPLETE'): Promise<User> {
@@ -331,7 +362,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAllUsers(): Promise<User[]> {
-    return await db.select().from(users);
+    const usersList = await db.select().from(users);
+    return usersList.map((user) => ({
+      ...user,
+      mfaSecret: decryptStoredMfaSecret(user.mfaSecret),
+    }));
   }
 
   async deleteUser(id: string): Promise<void> {
@@ -928,12 +963,21 @@ export class DatabaseStorage implements IStorage {
 
   // MFA-related methods
   async enableUserMfa(userId: string, secret: string, backupCodes: string[]): Promise<void> {
+    let secretToStore = secret;
+    if (env.FIELD_ENCRYPTION_KEY) {
+      try {
+        secretToStore = `${MFA_SECRET_ENCRYPTED_PREFIX}${PIIProtectionService.encryptField(secret)}`;
+      } catch (error) {
+        console.error("Failed to encrypt mfaSecret, storing plaintext as fallback:", error);
+      }
+    }
+
     await db
       .update(users)
       .set({
         mfaEnabled: true,
         mfaRequired: false, // No longer required once enabled
-        mfaSecret: secret,
+        mfaSecret: secretToStore,
         mfaBackupCodes: backupCodes,
         mfaSetupAt: new Date(),
         updatedAt: new Date(),
